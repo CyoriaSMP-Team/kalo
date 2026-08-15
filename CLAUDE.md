@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **Kalo** is a free and open-source custom content engine for Minecraft Paper/Folia
-servers. Content creators define custom items (and eventually blocks, furniture, armor)
-in YAML content packs; Kalo compiles them into a resource pack and runtime objects with
-no client mods required.
+servers. Content creators define custom items, blocks, furniture, armor and recipes in
+YAML content packs; Kalo compiles them into a resource pack and runtime objects with no
+client mods required.
 
 The product thesis is **cross-platform by design**: one YAML definition compiles to both
 Java and Bedrock output. That constraint drives the architecture — see `docs/IR_DESIGN.md`.
@@ -49,8 +49,14 @@ Output: `build/libs/Kalo-{version}.jar`
 
 - `Kalo` / `KaloPlugin` — singleton accessor and plugin interface
 - `content` — `Content`, `ContentType`, `ContentsPack`, `PackContext`
-- `content.item.definition` — **the IR**: `ItemDefinition`, `ModelDefinition`,
-  `DisplayProperties`, `ItemBehaviour`, `JavaOptions`, `BedrockOptions`
+- **the IR**, one package per content type, none of it naming a platform:
+  - `content.item.definition` — `ItemDefinition`, `ModelDefinition`, `DisplayProperties`,
+    `ItemBehaviour`, `JavaOptions`, `BedrockOptions`
+  - `content.block.definition` — `BlockDefinition`, `BlockModelDefinition`,
+    `BlockBehaviour`, `BlockCarrier`, `JavaBlockOptions`
+  - `content.armor` — `ArmorDefinition`, `ArmorSlot`, and the worn `EquipmentTexture`
+  - `content.recipe.definition` — `RecipeDefinition`, `RecipeIngredient`, `RecipeResult`
+- `content.furniture` — `Furniture extends Block`; static, block-backed by design
 - `content.feature` — `Feature`, `FeatureFactory`, `FeatureBuilder`, `FeatureEventBus`
 - `pack` — `ResourcePack`, `PackMeta`, `Writable`
 - `registry` / `manager` — registry and manager interfaces
@@ -60,8 +66,19 @@ Output: `build/libs/Kalo-{version}.jar`
 - `KaloPluginImpl` / `KaloPluginLoader`
 - `manager.*Impl` — registry, content, resource pack, command managers
 - `pack` — `ResourcePackImpl`, `ZipPackWriter`, `PackFormats`, `Json`
-- `platform.java` — `JavaItemCompiler` (→ `ItemStack`), `JavaPackCompiler` (→ pack assets)
+- `platform.java` — `JavaItemCompiler` / `JavaBlockItemCompiler` / `JavaArmorItemCompiler`
+  (→ `ItemStack`), `JavaPackCompiler` / `JavaBlockCompiler` / `JavaArmorCompiler`
+  (→ pack assets), `JavaRecipeCompiler` (→ Bukkit recipes), `BlockStateAllocator`,
+  `JavaBlockListener`
+- `platform.bedrock` — `BedrockPackCompiler` (→ `.mcpack` + Geyser mappings),
+  `BedrockGeometry` (Java model → Bedrock geometry), `BedrockPackWriter`
+- `migration` — `OraxenImporter`, `ItemsAdderImporter`, `ImportReport`
 - `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
+
+### `geyser-extension` — runs inside Geyser, not Paper
+
+Registers Kalo's custom blocks through Geyser's API. It shares a **file format** with the
+plugin (`bedrock-mappings.json`), never classes — the two are different processes.
 
 ## Architecture
 
@@ -78,6 +95,25 @@ only be satisfied by naming a Java concept, it belongs in a platform options rec
 
 When adding a content type, add the `*Definition` first, then a case in each compiler.
 Never let a platform type leak upward into the definition.
+`JavaPackCompilerTest.javaOptionsIsTheOnlyPlaceMaterialAppears` and its block counterpart
+exist to fail loudly if that rule is broken.
+
+### Custom blocks borrow vanilla states
+
+Java cannot add a block without a client mod, so a custom block is a note block in a state
+the pack tells the client to render differently. `BlockStateAllocator` assigns those
+states, **persists them, and never reuses one**: a placed block is stored as only its
+borrowed state, so a shifting assignment silently turns every already-placed block into
+something else. Assignments are written through on allocation, not just at shutdown.
+
+`JavaBlockListener` suppresses the three ways vanilla fights this: instrument
+recomputation on neighbour updates, right-click tuning, and note playing.
+
+### Shared output files must be merged, not replaced
+
+Several content types write the same file — `note_block.json` (blocks and furniture),
+`lang/en_us.json` (every type), the Bedrock mapping (every type). Each of those has been a
+bug where the type that compiled last erased the others. New compilers must merge.
 
 ### Resource pack generation
 
@@ -102,10 +138,15 @@ implementing `Reloadable` participate in `KaloPlugin.reload()`.
 
 ### Registries
 
-`GlobalRegistries` (types, features, contentsPacks) plus per-pack `Registries` (items).
-Backed by `ConcurrentHashMap`; pack generation reads from a background thread while the
-main thread may still be registering. `RegistryInitializeEvent` fires when global
-registries are open for registration.
+`GlobalRegistries` (types, features, contentsPacks) plus per-pack `Registries` (item,
+block, furniture, armor). Backed by `ConcurrentHashMap`; pack generation reads from a
+background thread while the main thread may still be registering.
+`RegistryInitializeEvent` fires when global registries are open for registration.
+
+Recipes are the exception: they are not `Content` — no key to hand a player, no item form,
+nothing in the pack — so `RecipeType` holds them itself and registers them with the server
+only after **every** pack has loaded, since a recipe may reference content from a pack
+that had not been read when it was parsed.
 
 ### Content packs
 
@@ -122,11 +163,33 @@ bypasses that lands content in `minecraft:` and collides across packs.
 - `@NotNull` / `@Nullable` on API surfaces
 - Never swallow exceptions during pack loading — a content creator's typo must produce a
   message naming the file and the problem
-- Tests live in `core/src/test/java`; `./gradlew build` runs them
+- Tests live in `core/src/test/java` and `geyser-extension/src/test/java`;
+  `./gradlew build` runs them
+- Compilers must stay runnable without a live server. `org.bukkit.Instrument` is
+  registry-backed on Paper 26.2 and throws `No RegistryAccess implementation found`
+  outside one — that is why `JavaBlockCompiler` holds instrument *ids* and the Bukkit
+  table lives in `JavaBlockListener`
+
+## Migration importers
+
+`io.kalo.migration` reads Oraxen/Nexo and ItemsAdder configs. The governing rule is that
+**a migration must report what it cannot carry, never guess**: both plugins have their own
+behaviour systems with no mechanical equivalent in Kalo's features, and an item that
+quietly stops working is discovered from players weeks later. `ImportReport` collects
+failures, unsupported keys and warnings; `/kalo import` prints them.
+
+Both are written against documented formats, **not validated against real packs**. The
+tests pin the importers' own assumptions and are a regression guard, not proof.
+
+Two notices are raised unconditionally when they apply, because they are the expensive
+surprises: `BlockImportNotice` (placed blocks are not migrated — every plugin allocates
+note block states independently) and `FurnitureImportNotice` (Kalo furniture is a static
+block, so rotation, hitboxes and seats do not survive).
 
 ## Examples
 
-`examples/testpack` is the reference pack (`run/` is gitignored). See `examples/README.md`.
+`examples/testpack` is the reference pack (`run/` is gitignored). It exercises every
+content type. See `examples/README.md`.
 
 ## License
 
