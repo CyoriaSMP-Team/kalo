@@ -46,6 +46,8 @@ public final class BedrockPackCompiler {
     private final JsonObject blockDefinitions = new JsonObject();
     private final JsonObject terrainTextureData = new JsonObject();
     private final JsonArray mappedBlocks = new JsonArray();
+    /** java content key -> Bedrock geometry identifier, for the extension to apply. */
+    private final JsonObject geometries = new JsonObject();
 
     private int skipped;
 
@@ -190,9 +192,56 @@ public final class BedrockPackCompiler {
                 });
                 return faces;
             }
-            case BlockModelDefinition.Custom ignored -> {
+            case BlockModelDefinition.Custom custom -> {
+                // A hand-authored Java model: convert its shape to Bedrock geometry and
+                // register whatever textures it declares.
+                JsonObject geometry = convertGeometry(definition, custom);
+                if (geometry == null) {
+                    return null;
+                }
+                custom.textures().forEach((slot, texture) ->
+                        registerTerrainTexture(shorthand + "_" + slot, texture));
+                return new com.google.gson.JsonPrimitive(shorthand);
+            }
+        }
+    }
+
+    /**
+     * Converts the block's Java model into Bedrock geometry and writes it into the pack.
+     *
+     * <p>Reads the model out of the Java pack rather than off disk, because that pack has
+     * already gathered every content pack's assets in one place.</p>
+     *
+     * @return the geometry, or {@code null} if the model has no shape of its own — a
+     *         model that only sets a parent inherits one, which cannot be resolved here
+     */
+    private @Nullable JsonObject convertGeometry(@NotNull BlockDefinition definition,
+                                                 @NotNull BlockModelDefinition.Custom custom) {
+        Key model = custom.model();
+        String source = "assets/" + model.namespace() + "/models/" + model.value() + ".json";
+        Writable content = javaSource.file(source);
+        if (content == null) {
+            return null;
+        }
+
+        try {
+            JsonObject javaModel = com.google.gson.JsonParser
+                    .parseString(new String(content.toByteArray(), StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+
+            Key key = definition.key();
+            String identifier = BedrockGeometry.identifierFor(key.namespace(), key.value());
+            JsonObject geometry = BedrockGeometry.convert(identifier, javaModel);
+            if (geometry == null) {
                 return null;
             }
+
+            pack.file("models/blocks/" + key.namespace() + "_" + key.value() + ".geo.json",
+                    Json.writable(geometry));
+            geometries.addProperty(key.asString(), identifier);
+            return geometry;
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -254,6 +303,9 @@ public final class BedrockPackCompiler {
         // Blocks are registered by a Geyser extension at runtime rather than through the
         // item mapping file, so they are recorded separately for it to read.
         mappings.add("kalo:blocks", mappedBlocks);
+        if (!geometries.isEmpty()) {
+            mappings.add("kalo:geometries", geometries);
+        }
 
         return new Result(pack, Json.writable(mappings), mappedItems.size(), mappedBlocks.size(), skipped);
     }

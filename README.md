@@ -21,10 +21,11 @@ Bedrock output, because the content model is platform-neutral by design rather t
 translation. That is the thing Kalo exists to do.
 
 > ⚠️ **Pre-alpha.** Items, blocks, furniture and armor work on Java and are verified on a
-> live server. The Bedrock path — `.mcpack`, Geyser mappings, and an extension that
-> registers blocks — is written and unit-tested but has **not** been run against a live
-> Geyser instance yet, so treat it as unproven. Furniture is static (block-backed) rather
-> than entity-backed. See [the roadmap](#roadmap) for what is real and what is not.
+> live server. The Bedrock path — `.mcpack`, Geyser mappings, geometry conversion, and an
+> extension that registers blocks — is written and unit-tested but has **not** been run
+> against a live Geyser instance yet, so treat it as unproven. Furniture is static
+> (block-backed) rather than entity-backed. See [the roadmap](#roadmap) for what is real
+> and what is not.
 
 ## Four pillars
 
@@ -156,7 +157,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 |---|---|---|
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
-| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 sprite items and cube blocks compile to `.mcpack` + mappings, and the Geyser extension registers blocks; not yet verified against a live Geyser, and custom-model geometry is unconverted |
+| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 items, cube blocks and custom-model blocks all compile, including Java→Bedrock geometry conversion; not yet verified against a live Geyser |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | planned |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |

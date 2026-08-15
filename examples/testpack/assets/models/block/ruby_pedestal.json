@@ -1,0 +1,31 @@
+{
+  "texture_size": [16, 16],
+  "textures": {
+    "0": "testpack:block/ruby_block"
+  },
+  "elements": [
+    {
+      "from": [3, 0, 3],
+      "to": [13, 2, 13],
+      "faces": {
+        "north": {"uv": [0, 0, 10, 2], "texture": "#0"},
+        "south": {"uv": [0, 0, 10, 2], "texture": "#0"},
+        "east":  {"uv": [0, 0, 10, 2], "texture": "#0"},
+        "west":  {"uv": [0, 0, 10, 2], "texture": "#0"},
+        "up":    {"uv": [0, 0, 10, 10], "texture": "#0"},
+        "down":  {"uv": [0, 0, 10, 10], "texture": "#0"}
+      }
+    },
+    {
+      "from": [6, 2, 6],
+      "to": [10, 12, 10],
+      "faces": {
+        "north": {"uv": [0, 0, 4, 10], "texture": "#0"},
+        "south": {"uv": [0, 0, 4, 10], "texture": "#0"},
+        "east":  {"uv": [0, 0, 4, 10], "texture": "#0"},
+        "west":  {"uv": [0, 0, 4, 10], "texture": "#0"},
+        "up":    {"uv": [0, 0, 4, 4], "texture": "#0"}
+      }
+    }
+  ]
+}

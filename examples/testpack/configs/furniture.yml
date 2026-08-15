@@ -1,9 +1,13 @@
+# A hand-authored model rather than a cube: exercises the Java custom-model path
+# and, on Bedrock, the geometry conversion.
 ruby_pedestal:
   type: furniture
   display:
     name: "<red>Ruby Pedestal</red>"
   model:
-    cube_all: "item/ruby_sword"
+    custom: "block/ruby_pedestal"
+    textures:
+      all: "block/ruby_block"
   behaviour:
     hardness: 2.0
     requires_tool: false

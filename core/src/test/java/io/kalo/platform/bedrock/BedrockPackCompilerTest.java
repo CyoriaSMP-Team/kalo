@@ -223,6 +223,49 @@ class BedrockPackCompilerTest {
     }
 
     @Test
+    void aCustomBlockModelIsConvertedToBedrockGeometry() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/chair.png");
+        java.file("assets/testpack/models/block/chair.json", Writable.string(
+                "{\"elements\":[{\"from\":[4,0,4],\"to\":[12,10,12],\"faces\":{}}]}"));
+
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(
+                io.kalo.content.block.definition.BlockDefinition.builder(Key.key("testpack", "chair"))
+                        .model(new io.kalo.content.block.definition.BlockModelDefinition.Custom(
+                                Key.key("testpack", "block/chair"),
+                                Map.of("all", Key.key("testpack", "block/chair"))))
+                        .build())), key -> 4);
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        assertEquals(1, result.blockCount(), "a custom model should no longer be skipped");
+        assertNotNull(result.pack().file("models/blocks/testpack_chair.geo.json"));
+
+        // The extension needs to know which geometry to apply to which block.
+        JsonObject mappings = json(result.mappings());
+        assertEquals("geometry.kalo.testpack_chair",
+                mappings.getAsJsonObject("kalo:geometries").get("testpack:chair").getAsString());
+    }
+
+    @Test
+    void aModelThatOnlyInheritsAParentIsStillSkipped() throws IOException {
+        // Nothing to convert: the shape lives in the parent, which the pack cannot resolve.
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/plain.png");
+        java.file("assets/testpack/models/block/plain.json", Writable.string(
+                "{\"parent\":\"minecraft:block/cube_all\"}"));
+
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(
+                io.kalo.content.block.definition.BlockDefinition.builder(Key.key("testpack", "plain"))
+                        .model(new io.kalo.content.block.definition.BlockModelDefinition.Custom(
+                                Key.key("testpack", "block/plain"), Map.of()))
+                        .build())), key -> 5);
+
+        assertEquals(1, compiler.finish().skippedCount());
+    }
+
+    @Test
     void aPackWithNoBlocksEmitsNoBlockFiles() throws IOException {
         ResourcePack java = javaPackWith("assets/testpack/textures/item/ruby_sword.png");
 
