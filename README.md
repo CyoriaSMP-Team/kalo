@@ -20,8 +20,9 @@ armor on Paper and Folia servers — no client mods, no player limits, no featur
 Bedrock output, because the content model is platform-neutral by design rather than by
 translation. That is the thing Kalo exists to do.
 
-> ⚠️ **Pre-alpha.** Items are the only content type implemented today, and the Bedrock
-> compiler lands in Phase 2. See [the roadmap](#roadmap) for what is real and what is not.
+> ⚠️ **Pre-alpha.** Items, blocks, furniture and armor work on Java. Furniture is static
+> (block-backed) rather than entity-backed, and the Bedrock compiler is an early slice.
+> See [the roadmap](#roadmap) for what is real and what is not.
 
 ## Four pillars
 
@@ -68,6 +69,38 @@ will consume in Phase 2.
 
 Content keys are namespaced by the pack that defines them, so the item above is
 `mypack:ruby_sword` and cannot collide with another pack's.
+
+### Blocks and armor
+
+```yaml
+ruby_block:
+  type: block
+  model:
+    cube_all: "block/ruby_block"     # or `cube:` per face, or `custom:`
+  behaviour:
+    hardness: 3.0
+    requires_tool: true
+
+ruby_helmet:
+  type: armor
+  slot: head                          # head | chest | legs | feet
+  model:
+    sprite: "item/ruby_helmet"        # the hotbar icon
+  equipment:
+    humanoid: "ruby"                  # what is painted onto the player
+  java:
+    base_material: NETHERITE_HELMET
+```
+
+Blocks and furniture borrow note block states, so they need no client mod. Assignments
+are persisted in `plugins/Kalo/block-states.json` and never reused — a placed block is
+stored as only its borrowed vanilla state, so a shifting assignment would silently turn
+every already-placed block into something else.
+
+Armor needs two textures, and they are different things: the `model:` sprite is the icon
+in the hotbar, while `equipment:` is the sheet painted onto the player model. Leave
+`equipment:` out and the piece is named after itself; set `equipment: {enabled: false}`
+to keep the base material's vanilla armor texture.
 
 ### Model sources
 
@@ -120,8 +153,8 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 | Phase | Scope | State |
 |---|---|---|
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
-| **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 items done |
-| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | planned |
+| **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
+| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 early slice — item mappings and `.mcpack` scaffolding only |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | planned |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |

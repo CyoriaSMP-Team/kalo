@@ -1,13 +1,71 @@
+# A full set sharing one equipment texture, which is how vanilla armor works too:
+# the layer texture is per-material, not per-piece.
 ruby_helmet:
   type: armor
   slot: head
   display:
     name: "<red>Ruby Helmet</red>"
-    lore:
-      - "<gray>Item appearance only for now — see examples/README.md.</gray>"
   model:
     sprite: "item/ruby_sword"
   behaviour:
     durability: 165
   java:
     base_material: NETHERITE_HELMET
+  equipment:
+    humanoid: "ruby"
+
+ruby_chestplate:
+  type: armor
+  slot: chest
+  display:
+    name: "<red>Ruby Chestplate</red>"
+  model:
+    sprite: "item/ruby_sword"
+  behaviour:
+    durability: 240
+  java:
+    base_material: NETHERITE_CHESTPLATE
+  equipment:
+    humanoid: "ruby"
+
+# Leggings are drawn on their own layer, so they need the leggings sheet.
+ruby_leggings:
+  type: armor
+  slot: legs
+  display:
+    name: "<red>Ruby Leggings</red>"
+  model:
+    sprite: "item/ruby_sword"
+  behaviour:
+    durability: 225
+  java:
+    base_material: NETHERITE_LEGGINGS
+  equipment:
+    humanoid: "ruby"
+    leggings: "ruby"
+
+ruby_boots:
+  type: armor
+  slot: feet
+  display:
+    name: "<red>Ruby Boots</red>"
+  model:
+    sprite: "item/ruby_sword"
+  behaviour:
+    durability: 195
+  java:
+    base_material: NETHERITE_BOOTS
+  equipment:
+    humanoid: "ruby"
+
+# Opts out of a custom worn appearance: keeps netherite's own armor texture
+# while still being a distinct item.
+plain_helmet:
+  type: armor
+  slot: head
+  display:
+    name: "<gray>Plain Helmet</gray>"
+  java:
+    base_material: NETHERITE_HELMET
+  equipment:
+    enabled: false
