@@ -20,10 +20,11 @@ armor on Paper and Folia servers — no client mods, no player limits, no featur
 Bedrock output, because the content model is platform-neutral by design rather than by
 translation. That is the thing Kalo exists to do.
 
-> ⚠️ **Pre-alpha.** Items, blocks, furniture and armor work on Java. On Bedrock, sprite
-> items compile to a real `.mcpack` and Geyser mapping; blocks and custom models do not
-> yet. Furniture is static (block-backed) rather than entity-backed. See
-> [the roadmap](#roadmap) for what is real and what is not.
+> ⚠️ **Pre-alpha.** Items, blocks, furniture and armor work on Java. Bedrock output — a
+> real `.mcpack` plus Geyser mappings — is generated for sprite items and cube blocks;
+> the Geyser extension that registers them at runtime is not written yet, so nothing
+> reaches a Bedrock player in-game so far. Furniture is static (block-backed) rather than
+> entity-backed. See [the roadmap](#roadmap) for what is real and what is not.
 
 ## Four pillars
 
@@ -155,7 +156,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 |---|---|---|
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
-| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 sprite items compile to `.mcpack` + Geyser v2 mappings; blocks and custom models pending |
+| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 sprite items and cube blocks compile to `.mcpack` + mappings; the Geyser extension that registers them, and custom-model geometry, are next |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | planned |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |

@@ -1,5 +1,6 @@
 package io.kalo.manager;
 
+import io.kalo.Kalo;
 import io.kalo.content.Content;
 import io.kalo.content.ContentType;
 import io.kalo.content.ContentsPack;
@@ -94,6 +95,14 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
     private static void generateBedrockPack(@NotNull ResourcePack javaPack) {
         Registries registries = RegistryManager.GlobalRegistries.registries();
 
+        // The Java carrier state each block sits in, so the Geyser extension can
+        // translate a placed block without re-deriving the allocation.
+        java.util.Map<net.kyori.adventure.key.Key, Integer> blockStates = new java.util.HashMap<>();
+        if (Kalo.plugin().registryManager() instanceof RegistryManagerImpl impl) {
+            impl.blockStateAllocator().assignments().forEach((key, index) ->
+                    blockStates.put(net.kyori.adventure.key.Key.key(key), index));
+        }
+
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, PACK_DESCRIPTION));
         BedrockPackCompiler compiler = new BedrockPackCompiler(javaPack, bedrock);
 
@@ -101,6 +110,8 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         // type meant the last one to run erased the others' mappings.
         compiler.add(registries.item());
         compiler.add(registries.armor());
+        compiler.addBlocks(registries.block(), blockStates::get);
+        compiler.addBlocks(registries.furniture(), blockStates::get);
 
         BedrockPackCompiler.Result result = compiler.finish();
 
@@ -114,7 +125,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         }
 
         LOGGER.info("Successfully generated Bedrock pack (" + result.pack().files().size() + " files, "
-                + result.mappedCount() + " mapped vanilla items)");
+                + result.mappedCount() + " mapped vanilla items, " + result.blockCount() + " blocks)");
         if (result.skippedCount() > 0) {
             // Said out loud rather than silently dropped: a pack author who sees their
             // item on Java but not on Bedrock deserves to know why.

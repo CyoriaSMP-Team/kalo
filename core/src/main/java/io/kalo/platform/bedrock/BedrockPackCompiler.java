@@ -1,7 +1,11 @@
 package io.kalo.platform.bedrock;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import io.kalo.content.block.Block;
+import io.kalo.content.block.definition.BlockDefinition;
+import io.kalo.content.block.definition.BlockModelDefinition;
 import io.kalo.content.item.Item;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
@@ -38,6 +42,11 @@ public final class BedrockPackCompiler {
 
     private final JsonObject textureData = new JsonObject();
     private final JsonObject mappedItems = new JsonObject();
+
+    private final JsonObject blockDefinitions = new JsonObject();
+    private final JsonObject terrainTextureData = new JsonObject();
+    private final JsonArray mappedBlocks = new JsonArray();
+
     private int skipped;
 
     public BedrockPackCompiler(@NotNull ResourcePack javaSource, @NotNull ResourcePack pack) {
@@ -114,6 +123,97 @@ public final class BedrockPackCompiler {
         copyTexture(sprite.texture(), "textures/items/" + icon + ".png");
     }
 
+    /**
+     * Adds custom blocks: their Bedrock appearance, and the record a Geyser extension
+     * needs to register them.
+     *
+     * <p>Bedrock has real custom blocks rather than borrowed states, so nothing here
+     * mirrors the note block carrier the Java side uses. What does have to cross over is
+     * the pairing — which Java block key corresponds to which Bedrock identifier — so
+     * that is written out for the extension to consume at runtime. The resource pack can
+     * only supply the look; registration itself happens inside Geyser.</p>
+     *
+     * @param allocator supplies the Java carrier state each block occupies, so the
+     *                  extension can translate a placed block without re-deriving it
+     */
+    public void addBlocks(@NotNull Iterable<? extends Block> blocks,
+                          @NotNull java.util.function.Function<Key, Integer> allocator) {
+        for (Block block : blocks) {
+            BlockDefinition definition = block.definition();
+            if (!definition.bedrock().enabled()) {
+                continue;
+            }
+
+            Key key = definition.key();
+            String bedrockId = key.namespace() + ":" + key.value();
+            String shorthand = key.namespace() + "_" + key.value();
+
+            JsonElement textures = blockTextures(definition, shorthand);
+            if (textures == null) {
+                // Custom geometry, which Bedrock needs authored separately.
+                skipped++;
+                continue;
+            }
+
+            JsonObject blockDefinition = new JsonObject();
+            blockDefinition.add("textures", textures);
+            blockDefinition.addProperty("sound", "stone");
+            blockDefinitions.add(bedrockId, blockDefinition);
+
+            JsonObject record = new JsonObject();
+            record.addProperty("java_key", key.asString());
+            record.addProperty("bedrock_identifier", bedrockId);
+            Integer state = allocator.apply(key);
+            if (state != null) {
+                record.addProperty("java_carrier_state", state);
+            }
+            mappedBlocks.add(record);
+        }
+    }
+
+    /**
+     * Registers each face texture in the terrain atlas and returns what {@code blocks.json}
+     * should point at — a single shorthand for a uniform cube, or a per-face object.
+     */
+    private @Nullable JsonElement blockTextures(@NotNull BlockDefinition definition, @NotNull String shorthand) {
+        switch (definition.model()) {
+            case BlockModelDefinition.CubeAll cubeAll -> {
+                registerTerrainTexture(shorthand, cubeAll.texture());
+                return new com.google.gson.JsonPrimitive(shorthand);
+            }
+            case BlockModelDefinition.Cube cube -> {
+                JsonObject faces = new JsonObject();
+                cube.faces().forEach((face, texture) -> {
+                    String faceShorthand = shorthand + "_" + face;
+                    registerTerrainTexture(faceShorthand, texture);
+                    faces.addProperty(bedrockFace(face), faceShorthand);
+                });
+                return faces;
+            }
+            case BlockModelDefinition.Custom ignored -> {
+                return null;
+            }
+        }
+    }
+
+    private void registerTerrainTexture(@NotNull String shorthand, @NotNull Key texture) {
+        JsonObject entry = new JsonObject();
+        entry.addProperty("textures", "textures/blocks/" + shorthand);
+        terrainTextureData.add(shorthand, entry);
+
+        copyTexture(texture, "textures/blocks/" + shorthand + ".png");
+    }
+
+    /** Java names cube faces by direction; Bedrock uses up/down/side plus directions. */
+    private static @NotNull String bedrockFace(@NotNull String javaFace) {
+        return switch (javaFace) {
+            case "top" -> "up";
+            case "bottom" -> "down";
+            case "all" -> "side";
+            default -> javaFace;
+        };
+    }
+
     /** Pulls a texture out of the Java pack, which already gathered every pack's assets. */
     private void copyTexture(@NotNull Key texture, @NotNull String destination) {
         String source = "assets/" + texture.namespace() + "/textures/" + texture.value() + ".png";
@@ -133,11 +233,29 @@ public final class BedrockPackCompiler {
         pack.file("textures/item_texture.json", Json.writable(itemTexture));
         pack.file("manifest.json", Json.writable(manifest()));
 
+        if (!blockDefinitions.isEmpty()) {
+            JsonObject blocks = new JsonObject();
+            blocks.addProperty("format_version", "1.21.0");
+            blockDefinitions.entrySet().forEach(entry -> blocks.add(entry.getKey(), entry.getValue()));
+            pack.file("blocks.json", Json.writable(blocks));
+
+            JsonObject terrain = new JsonObject();
+            terrain.addProperty("resource_pack_name", "kalo");
+            terrain.addProperty("texture_name", "atlas.terrain");
+            terrain.addProperty("padding", 8);
+            terrain.addProperty("num_mip_levels", 4);
+            terrain.add("texture_data", terrainTextureData);
+            pack.file("textures/terrain_texture.json", Json.writable(terrain));
+        }
+
         JsonObject mappings = new JsonObject();
         mappings.addProperty("format_version", 2);
         mappings.add("items", mappedItems);
+        // Blocks are registered by a Geyser extension at runtime rather than through the
+        // item mapping file, so they are recorded separately for it to read.
+        mappings.add("kalo:blocks", mappedBlocks);
 
-        return new Result(pack, Json.writable(mappings), mappedItems.size(), skipped);
+        return new Result(pack, Json.writable(mappings), mappedItems.size(), mappedBlocks.size(), skipped);
     }
 
     /**
@@ -145,9 +263,11 @@ public final class BedrockPackCompiler {
      * @param mappings    the Geyser mapping file, which lives beside the pack rather
      *                    than inside it
      * @param mappedCount how many vanilla items carry at least one custom definition
+     * @param blockCount  how many custom blocks got a Bedrock appearance
      * @param skippedCount content that needs Bedrock geometry Kalo cannot yet produce
      */
-    public record Result(@NotNull ResourcePack pack, @NotNull Writable mappings, int mappedCount, int skippedCount) {
+    public record Result(@NotNull ResourcePack pack, @NotNull Writable mappings,
+                         int mappedCount, int blockCount, int skippedCount) {
     }
 
     private static @Nullable String plainName(@NotNull ItemDefinition definition) {

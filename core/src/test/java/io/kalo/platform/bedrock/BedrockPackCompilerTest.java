@@ -49,6 +49,14 @@ class BedrockPackCompilerTest {
                 .build();
     }
 
+    private static io.kalo.content.block.definition.BlockDefinition cubeAll(String name) {
+        Key key = Key.key("testpack", name);
+        return io.kalo.content.block.definition.BlockDefinition.builder(key)
+                .model(new io.kalo.content.block.definition.BlockModelDefinition.CubeAll(
+                        Key.key("testpack", "block/" + name)))
+                .build();
+    }
+
     private static BedrockPackCompiler.Result compile(ResourcePack java, List<Item> items) {
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
@@ -170,6 +178,91 @@ class BedrockPackCompilerTest {
         // A changing uuid makes Bedrock treat it as a brand new pack every regeneration.
         assertEquals(header.get("uuid").getAsString(),
                 second.getAsJsonObject("header").get("uuid").getAsString());
+    }
+
+    @Test
+    void cubeBlocksGetABedrockAppearanceAndATerrainAtlasEntry() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/ruby_block.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7);
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        assertEquals(1, result.blockCount());
+
+        // Bedrock has real custom blocks, declared in blocks.json at the pack root.
+        JsonObject blocks = json(result.pack().file("blocks.json"));
+        assertEquals("testpack_ruby_block",
+                blocks.getAsJsonObject("testpack:ruby_block").get("textures").getAsString());
+
+        // Block faces resolve through the terrain atlas, separate from the item atlas.
+        JsonObject terrain = json(result.pack().file("textures/terrain_texture.json"));
+        assertEquals("textures/blocks/testpack_ruby_block",
+                terrain.getAsJsonObject("texture_data")
+                        .getAsJsonObject("testpack_ruby_block").get("textures").getAsString());
+        assertNotNull(result.pack().file("textures/blocks/testpack_ruby_block.png"));
+    }
+
+    @Test
+    void blockRecordCarriesTheJavaStateForTheGeyserExtension() throws IOException {
+        // Geyser registers custom blocks at runtime, not through the mapping file, so the
+        // Java carrier state has to reach the extension somehow.
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/ruby_block.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7);
+
+        JsonObject mappings = json(compiler.finish().mappings());
+        JsonObject record = mappings.getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
+
+        assertEquals("testpack:ruby_block", record.get("java_key").getAsString());
+        assertEquals("testpack:ruby_block", record.get("bedrock_identifier").getAsString());
+        assertEquals(7, record.get("java_carrier_state").getAsInt());
+    }
+
+    @Test
+    void aPackWithNoBlocksEmitsNoBlockFiles() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/ruby_sword.png");
+
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(sprite("ruby_sword"))));
+
+        assertFalse(result.pack().files().containsKey("blocks.json"));
+        assertFalse(result.pack().files().containsKey("textures/terrain_texture.json"));
+    }
+
+    private record StubBlock(io.kalo.content.block.definition.BlockDefinition definition)
+            implements io.kalo.content.block.Block {
+        @Override
+        public @NotNull io.kalo.content.block.definition.BlockDefinition definition() {
+            return definition;
+        }
+
+        @Override
+        public @NotNull ImmutableItemStack itemStack() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public @NotNull Collection<Feature> features() {
+            return List.of();
+        }
+
+        @Override
+        public @NotNull FeatureEventBus featureEventBus() {
+            return new FeatureEventBusImpl();
+        }
+
+        @Override
+        public @NotNull Key key() {
+            return definition.key();
+        }
+
+        @Override
+        public @NotNull String translationKey() {
+            return definition.translationKey();
+        }
     }
 
     private static JsonObject json(Writable writable) throws IOException {
