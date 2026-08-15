@@ -124,7 +124,7 @@ model:
 |---|---|
 | `/kalo reload` | `kalo.command.reload` |
 | `/kalo give <player> <item>` | `kalo.command.give` |
-| `/kalo import oraxen <file>` | `kalo.command.import` |
+| `/kalo import <file>` | `kalo.command.import` |
 
 ## Architecture
 
@@ -189,18 +189,25 @@ Output: `build/libs/Kalo-<version>.jar`
 - **`geyser-extension`** — runs inside Geyser, not Paper; registers Kalo's custom blocks
   so Bedrock renders them
 
-## Migrating from Oraxen or Nexo
+## Migrating from Oraxen, Nexo or ItemsAdder
 
 ```
-/kalo import oraxen plugins/Oraxen/items/weapons.yml
+/kalo import plugins/Oraxen/items/weapons.yml
+/kalo import plugins/ItemsAdder/contents/mypack/items.yml
 ```
 
-Writes `weapons.yml.kalo.yml` next to the source, never overwriting, and prints
-everything it could **not** carry over. Read that list before adopting the result:
-Oraxen's `Mechanics` drive its own behaviour system, which Kalo expresses through
-features instead, so those are reported rather than guessed at.
+The format is detected, not asked for. The result is written as `<file>.kalo.yml` next to
+the source, never overwriting.
 
-The importer is written against the documented format rather than validated against a
+What matters more than what converts is what does not. Both plugins drive their own
+behaviour systems — Oraxen's `Mechanics`, ItemsAdder's `behaviours` — which Kalo expresses
+through features instead. Those are **listed as needing hand-porting rather than mapped to
+something plausible**, because a mechanic quietly dropped is something a server owner
+learns about from their players. Unrecognised keys are reported by name for the same
+reason, and non-item sections say how many entries they held so an empty result is not
+mistaken for having nothing to do.
+
+Both importers are written against the documented formats rather than validated against a
 corpus of real packs, so treat a first import as a draft to review.
 
 ## Bedrock setup

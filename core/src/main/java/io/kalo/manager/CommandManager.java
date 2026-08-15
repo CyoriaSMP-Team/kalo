@@ -2,6 +2,7 @@ package io.kalo.manager;
 
 import io.kalo.Kalo;
 import io.kalo.migration.ImportReport;
+import io.kalo.migration.ItemsAdderImporter;
 import io.kalo.migration.OraxenImporter;
 import io.kalo.utils.Plugins;
 import io.kalo.content.item.Item;
@@ -69,7 +70,6 @@ public final class CommandManager implements Managerial {
 
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("import")
-                .literal("oraxen")
                 .permission(Permission.of(PERMISSION_PREFIX + "import"))
                 .required("file", StringParser.greedyStringParser())
                 .handler(ctx -> runImport(ctx.sender().getSender(), ctx.get("file"))));
@@ -92,7 +92,17 @@ public final class CommandManager implements Managerial {
         ImportReport report = new ImportReport();
         try {
             YamlConfiguration config = YamlConfiguration.loadConfiguration(source);
-            String converted = OraxenImporter.convert(config, "imported", report);
+
+            // Detected rather than asked for: someone migrating knows which plugin they
+            // are leaving, but not necessarily which file format it wrote.
+            String converted;
+            if (ItemsAdderImporter.looksLikeItemsAdder(config)) {
+                sender.sendMessage(Component.text("Detected ItemsAdder format", NamedTextColor.GRAY));
+                converted = ItemsAdderImporter.convert(config, report);
+            } else {
+                sender.sendMessage(Component.text("Detected Oraxen/Nexo format", NamedTextColor.GRAY));
+                converted = OraxenImporter.convert(config, "imported", report);
+            }
 
             File destination = new File(source.getParentFile(), source.getName() + ".kalo.yml");
             if (destination.exists()) {
