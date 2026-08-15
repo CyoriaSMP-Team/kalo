@@ -1,0 +1,212 @@
+package io.kalo.migration;
+
+import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Converts Oraxen — and Nexo, which continues the same format — item configs into Kalo
+ * definitions.
+ *
+ * <p>The shapes are close enough that most items map cleanly:</p>
+ *
+ * <pre>
+ * ruby_sword:                        ruby_sword:
+ *   displayname: "&lt;red&gt;Ruby"          type: item
+ *   material: NETHERITE_SWORD   →     display:
+ *   Pack:                               name: "&lt;red&gt;Ruby"
+ *     generate_model: true            model:
+ *     textures:                         sprite: "item/ruby_sword"
+ *       - item/ruby_sword.png         java:
+ *   durability:                         base_material: NETHERITE_SWORD
+ *     value: 250                      behaviour:
+ *                                       durability: 250
+ * </pre>
+ *
+ * <p>What does not map is the mechanics: Oraxen's {@code Mechanics} block drives its own
+ * behaviour system, which Kalo expresses through features instead. Those are reported as
+ * unsupported rather than guessed at — a mechanic quietly dropped is a bug a server owner
+ * finds out about from their players.</p>
+ *
+ * <p><b>Caveat.</b> This is written against the documented format rather than validated
+ * against a corpus of real packs, so treat a first import as something to review, not to
+ * trust. The report names everything it could not carry over.</p>
+ */
+public final class OraxenImporter {
+
+    /**
+     * Top-level keys the importer understands. Anything else in an item is reported, which
+     * is what makes an unrecognised or newer format visible instead of silently lossy.
+     */
+    private static final Set<String> KNOWN_KEYS = Set.of(
+            "displayname", "display_name", "material", "Pack", "pack",
+            "durability", "itemname", "lore", "unbreakable", "color",
+            "customModelData", "custom_model_data"
+    );
+
+    private OraxenImporter() {
+    }
+
+    /**
+     * Converts one Oraxen/Nexo items file into Kalo pack YAML.
+     *
+     * @param namespace the Kalo pack id the imported content will live under
+     * @return the generated YAML, ready to be written to {@code configs/}
+     */
+    public static @NotNull String convert(@NotNull YamlConfiguration source,
+                                          @NotNull String namespace,
+                                          @NotNull ImportReport report) {
+        YamlConfiguration output = new YamlConfiguration();
+
+        for (String key : source.getKeys(false)) {
+            ConfigurationSection item = source.getConfigurationSection(key);
+            if (item == null) {
+                continue;
+            }
+            try {
+                convertItem(key, item, output, report);
+                report.imported(namespace + ":" + key);
+            } catch (Exception e) {
+                report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        }
+
+        return output.saveToString();
+    }
+
+    private static void convertItem(@NotNull String key,
+                                    @NotNull ConfigurationSection item,
+                                    @NotNull YamlConfiguration output,
+                                    @NotNull ImportReport report) {
+        Map<String, Object> converted = new LinkedHashMap<>();
+        converted.put("type", "item");
+
+        Map<String, Object> display = new LinkedHashMap<>();
+        String name = firstNonNull(item.getString("displayname"), item.getString("display_name"),
+                item.getString("itemname"));
+        if (name != null) {
+            // Oraxen accepts both MiniMessage and legacy '&' codes. Kalo is MiniMessage
+            // only, so legacy is flagged rather than half-translated.
+            if (name.indexOf('&') >= 0 || name.indexOf('§') >= 0) {
+                report.warn("'" + key + "' uses legacy colour codes in its name; rewrite as MiniMessage");
+            }
+            display.put("name", name);
+        }
+        List<String> lore = item.getStringList("lore");
+        if (!lore.isEmpty()) {
+            display.put("lore", lore);
+        }
+        if (!display.isEmpty()) {
+            converted.put("display", display);
+        }
+
+        ConfigurationSection pack = item.getConfigurationSection("Pack");
+        if (pack == null) {
+            pack = item.getConfigurationSection("pack");
+        }
+        Map<String, Object> model = convertModel(key, pack, report);
+        if (model != null) {
+            converted.put("model", model);
+        }
+
+        Map<String, Object> behaviour = new LinkedHashMap<>();
+        ConfigurationSection durability = item.getConfigurationSection("durability");
+        if (durability != null && durability.contains("value")) {
+            behaviour.put("durability", durability.getInt("value"));
+        }
+        if (!behaviour.isEmpty()) {
+            converted.put("behaviour", behaviour);
+        }
+
+        String material = item.getString("material");
+        if (material != null) {
+            Material parsed = Material.matchMaterial(material.toUpperCase(Locale.ROOT));
+            if (parsed == null) {
+                throw new IllegalArgumentException("unknown material '" + material + "'");
+            }
+            converted.put("java", Map.of("base_material", parsed.name()));
+        }
+
+        reportUnknownKeys(key, item, report);
+
+        output.createSection(key, converted);
+    }
+
+    /**
+     * Oraxen's {@code Pack} section is where the model lives. {@code generate_model: true}
+     * with a texture list is the sprite case; a {@code model} path is a hand-authored one.
+     */
+    private static @Nullable Map<String, Object> convertModel(@NotNull String key,
+                                                              @Nullable ConfigurationSection pack,
+                                                              @NotNull ImportReport report) {
+        if (pack == null) {
+            return null;
+        }
+
+        String model = pack.getString("model");
+        if (model != null) {
+            return Map.of("custom", stripExtension(model));
+        }
+
+        List<String> textures = pack.getStringList("textures");
+        if (textures.isEmpty()) {
+            String texture = pack.getString("texture");
+            if (texture != null) {
+                textures = List.of(texture);
+            }
+        }
+
+        if (textures.isEmpty()) {
+            return null;
+        }
+        if (textures.size() > 1) {
+            // Multiple layers mean a tinted or composited item; Kalo's sprite model is a
+            // single layer, so the rest would be dropped without saying so.
+            report.unsupported(key + ".Pack.textures (" + textures.size() + " layers; only the first is used)");
+        }
+
+        return Map.of("sprite", stripExtension(textures.get(0)));
+    }
+
+    private static void reportUnknownKeys(@NotNull String key,
+                                          @NotNull ConfigurationSection item,
+                                          @NotNull ImportReport report) {
+        for (String child : item.getKeys(false)) {
+            if (KNOWN_KEYS.contains(child)) {
+                continue;
+            }
+            if (child.equals("Mechanics") || child.equals("mechanics")) {
+                // Oraxen's behaviour system. Kalo expresses these as features, which is a
+                // different model — a mapping would be guesswork.
+                report.unsupported(key + ".Mechanics (Kalo uses features; port these by hand)");
+                continue;
+            }
+            report.unsupported(key + "." + child);
+        }
+    }
+
+    /** Oraxen texture paths carry a {@code .png}; Kalo keys do not. */
+    static @NotNull String stripExtension(@NotNull String path) {
+        int dot = path.lastIndexOf('.');
+        int slash = path.lastIndexOf('/');
+        return dot > slash ? path.substring(0, dot) : path;
+    }
+
+    @SafeVarargs
+    private static <T> @Nullable T firstNonNull(T... values) {
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+}

@@ -124,6 +124,7 @@ model:
 |---|---|
 | `/kalo reload` | `kalo.command.reload` |
 | `/kalo give <player> <item>` | `kalo.command.give` |
+| `/kalo import oraxen <file>` | `kalo.command.import` |
 
 ## Architecture
 
@@ -158,7 +159,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
 | **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 items, cube blocks and custom-model blocks all compile, including Java→Bedrock geometry conversion; not yet verified against a live Geyser |
-| **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | planned |
+| **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 Oraxen/Nexo items import, reporting what did not carry over; ItemsAdder and blocks pending |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |
 
@@ -187,6 +188,20 @@ Output: `build/libs/Kalo-<version>.jar`
 - **`core`** — implementation: managers, compilers, pack writer, commands
 - **`geyser-extension`** — runs inside Geyser, not Paper; registers Kalo's custom blocks
   so Bedrock renders them
+
+## Migrating from Oraxen or Nexo
+
+```
+/kalo import oraxen plugins/Oraxen/items/weapons.yml
+```
+
+Writes `weapons.yml.kalo.yml` next to the source, never overwriting, and prints
+everything it could **not** carry over. Read that list before adopting the result:
+Oraxen's `Mechanics` drive its own behaviour system, which Kalo expresses through
+features instead, so those are reported rather than guessed at.
+
+The importer is written against the documented format rather than validated against a
+corpus of real packs, so treat a first import as a draft to review.
 
 ## Bedrock setup
 
