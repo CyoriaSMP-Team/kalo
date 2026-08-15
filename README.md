@@ -181,7 +181,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
 | **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 items, cube blocks and custom-model blocks all compile, including Java→Bedrock geometry conversion; not yet verified against a live Geyser |
-| **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items, blocks and furniture from both, reporting what did not carry over; recipes and placed-world migration pending |
+| **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items, blocks, furniture and crafting recipes from both, reporting what did not carry over; non-crafting stations and placed-world migration pending |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |
 
@@ -215,6 +215,7 @@ Output: `build/libs/Kalo-<version>.jar`
 
 ```
 /kalo import plugins/Oraxen/items/weapons.yml
+/kalo import plugins/Oraxen/recipes/weapons.yml
 /kalo import plugins/ItemsAdder/contents/mypack/items.yml
 ```
 

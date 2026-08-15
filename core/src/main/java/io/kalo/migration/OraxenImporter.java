@@ -105,6 +105,70 @@ public final class OraxenImporter {
         return mechanics != null && (mechanics.contains("noteblock") || mechanics.contains("block"));
     }
 
+    /**
+     * Converts an Oraxen recipes file, which lives in its own folder rather than
+     * alongside items.
+     *
+     * <p>Oraxen writes an ingredient as a section naming either {@code oraxen_item} or
+     * {@code minecraft_type}, which is how it distinguishes its own content from vanilla —
+     * the same distinction Kalo makes with the namespace.</p>
+     */
+    public static @NotNull String convertRecipes(@NotNull YamlConfiguration source,
+                                                 @NotNull String namespace,
+                                                 @NotNull ImportReport report) {
+        YamlConfiguration output = new YamlConfiguration();
+
+        for (String key : source.getKeys(false)) {
+            ConfigurationSection recipe = source.getConfigurationSection(key);
+            if (recipe == null) {
+                continue;
+            }
+            try {
+                ConfigurationSection ingredients = recipe.getConfigurationSection("ingredients");
+                if (ingredients == null) {
+                    throw new IllegalArgumentException("recipe has no ingredients section");
+                }
+
+                ConfigurationSection resultSection = recipe.getConfigurationSection("result");
+                String result = resultSection != null ? resultSection.getString("oraxen_item") : null;
+                if (result == null) {
+                    String vanillaResult = resultSection != null
+                            ? resultSection.getString("minecraft_type") : null;
+                    if (vanillaResult != null) {
+                        // Kalo recipes produce Kalo content; a vanilla result would need a
+                        // datapack instead.
+                        report.unsupported(key + ".result.minecraft_type "
+                                + "(Kalo recipes produce Kalo content, not vanilla items)");
+                        continue;
+                    }
+                    throw new IllegalArgumentException("recipe has no result");
+                }
+
+                int amount = resultSection.getInt("amount", 1);
+                List<String> pattern = recipe.getStringList("shape");
+
+                output.createSection(key, RecipeImport.convert(key, pattern, ingredients,
+                        result, amount, OraxenImporter::readIngredient, report));
+                report.imported(namespace + ":" + key);
+            } catch (Exception e) {
+                report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        }
+
+        return output.saveToString();
+    }
+
+    private static @Nullable String readIngredient(@NotNull ConfigurationSection ingredient,
+                                                   @NotNull String slot) {
+        String oraxenItem = ingredient.getString("oraxen_item");
+        if (oraxenItem != null) {
+            // Unqualified means "in this pack", which is what Kalo assumes too.
+            return oraxenItem;
+        }
+        String material = ingredient.getString("minecraft_type");
+        return material != null ? RecipeImport.vanilla(material) : null;
+    }
+
     /** Oraxen marks furniture with {@code Mechanics.furniture}. */
     static boolean hasFurnitureMechanic(@NotNull ConfigurationSection item) {
         ConfigurationSection mechanics = item.getConfigurationSection("Mechanics");

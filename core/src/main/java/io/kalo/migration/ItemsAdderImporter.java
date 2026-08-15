@@ -90,9 +90,10 @@ public final class ItemsAdderImporter {
         // normal in ItemsAdder, and bailing here would import nothing from it.
         int blocks = convertBlocks(source, output, namespace, report);
         int furniture = convertFurniture(source, output, namespace, report);
+        int recipes = convertRecipes(source, output, namespace, report);
 
-        if (items == null && blocks == 0 && furniture == 0) {
-            report.warn("No items, blocks or furniture section found — nothing to import");
+        if (items == null && blocks == 0 && furniture == 0 && recipes == 0) {
+            report.warn("No items, blocks, furniture or recipes section found — nothing to import");
         }
         BlockImportNotice.addTo(report, blocks + furniture);
         FurnitureImportNotice.addTo(report, furniture);
@@ -321,9 +322,67 @@ public final class ItemsAdderImporter {
         return converted;
     }
 
+    /**
+     * ItemsAdder groups recipes by the station that crafts them, so a crafting table
+     * recipe sits one level deeper than in Oraxen.
+     */
+    private static int convertRecipes(@NotNull YamlConfiguration source,
+                                      @NotNull YamlConfiguration output,
+                                      @Nullable String namespace,
+                                      @NotNull ImportReport report) {
+        ConfigurationSection recipes = source.getConfigurationSection("recipes");
+        if (recipes == null) {
+            return 0;
+        }
+
+        int converted = 0;
+        for (String station : recipes.getKeys(false)) {
+            ConfigurationSection group = recipes.getConfigurationSection(station);
+            if (group == null) {
+                continue;
+            }
+            if (!station.equals("crafting_table")) {
+                // Furnaces, blast furnaces and ItemsAdder's own stations have no Kalo
+                // equivalent yet; a crafting-table recipe would be the wrong shape.
+                report.unsupported("recipes." + station
+                        + " (only crafting_table recipes are imported so far)");
+                continue;
+            }
+
+            for (String key : group.getKeys(false)) {
+                ConfigurationSection recipe = group.getConfigurationSection(key);
+                if (recipe == null) {
+                    continue;
+                }
+                try {
+                    ConfigurationSection ingredients = recipe.getConfigurationSection("ingredients");
+                    if (ingredients == null) {
+                        throw new IllegalArgumentException("recipe has no ingredients section");
+                    }
+
+                    ConfigurationSection resultSection = recipe.getConfigurationSection("result");
+                    String result = resultSection != null ? resultSection.getString("item") : null;
+                    if (result == null) {
+                        throw new IllegalArgumentException("recipe has no result item");
+                    }
+                    int amount = resultSection.getInt("amount", 1);
+
+                    output.createSection(key, RecipeImport.convert(key,
+                            recipe.getStringList("pattern"), ingredients, result, amount,
+                            (ingredient, slot) -> ingredient.getString("item"), report));
+                    report.imported((namespace != null ? namespace : "imported") + ":" + key);
+                    converted++;
+                } catch (Exception e) {
+                    report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+                }
+            }
+        }
+        return converted;
+    }
+
     private static void reportUnconvertedSections(@NotNull YamlConfiguration source,
                                                   @NotNull ImportReport report) {
-        for (String section : List.of("armors_rendering", "entities", "recipes")) {
+        for (String section : List.of("armors_rendering", "entities")) {
             if (source.contains(section)) {
                 ConfigurationSection content = source.getConfigurationSection(section);
                 int count = content != null ? content.getKeys(false).size() : 0;

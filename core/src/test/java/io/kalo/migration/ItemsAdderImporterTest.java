@@ -181,12 +181,12 @@ class ItemsAdderImporterTest {
                 info:
                   namespace: mypack
                 items: {}
-                recipes:
+                entities:
                   a: {}
                   b: {}
                 """, report);
 
-        assertTrue(report.unsupported().stream().anyMatch(p -> p.startsWith("recipes (2")),
+        assertTrue(report.unsupported().stream().anyMatch(p -> p.startsWith("entities (2")),
                 report.unsupported().toString());
     }
 

@@ -99,8 +99,13 @@ public final class CommandManager implements Managerial {
             if (ItemsAdderImporter.looksLikeItemsAdder(config)) {
                 sender.sendMessage(Component.text("Detected ItemsAdder format", NamedTextColor.GRAY));
                 converted = ItemsAdderImporter.convert(config, report);
+            } else if (looksLikeOraxenRecipes(config)) {
+                // Oraxen keeps recipes in their own folder, so the file gives no other
+                // hint about what it holds.
+                sender.sendMessage(Component.text("Detected Oraxen/Nexo recipes", NamedTextColor.GRAY));
+                converted = OraxenImporter.convertRecipes(config, "imported", report);
             } else {
-                sender.sendMessage(Component.text("Detected Oraxen/Nexo format", NamedTextColor.GRAY));
+                sender.sendMessage(Component.text("Detected Oraxen/Nexo items", NamedTextColor.GRAY));
                 converted = OraxenImporter.convert(config, "imported", report);
             }
 
@@ -125,6 +130,20 @@ public final class CommandManager implements Managerial {
             Plugins.logger().log(Level.WARNING, "Import of " + source + " failed", e);
             sender.sendMessage(Component.text("Import failed: " + e.getMessage(), NamedTextColor.RED));
         }
+    }
+
+    /**
+     * An Oraxen recipes file has entries with a {@code result} section, which an items
+     * file never does.
+     */
+    private static boolean looksLikeOraxenRecipes(@NotNull YamlConfiguration config) {
+        for (String key : config.getKeys(false)) {
+            var section = config.getConfigurationSection(key);
+            if (section != null && section.isConfigurationSection("result")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
