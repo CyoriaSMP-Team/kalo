@@ -227,6 +227,55 @@ class OraxenImporterTest {
     }
 
     @Test
+    void furnitureConvertsButSaysWhatItLost() {
+        // The shape and name come across; the behaviour does not. Producing something
+        // that merely looks converted is the worst outcome here.
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("""
+                oak_chair:
+                  displayname: "Oak Chair"
+                  material: PAPER
+                  Pack:
+                    model: block/oak_chair
+                  Mechanics:
+                    furniture:
+                      type: DISPLAY_ENTITY
+                      seat:
+                        height: 0.5
+                      hitbox:
+                        width: 1
+                      rotatable: true
+                """, report);
+
+        assertEquals("furniture", out.getString("oak_chair.type"));
+        assertEquals("block/oak_chair", out.getString("oak_chair.model.custom"));
+
+        String unsupported = report.unsupported().toString();
+        assertTrue(unsupported.contains("seat"), unsupported);
+        assertTrue(unsupported.contains("hitbox"), unsupported);
+        assertTrue(unsupported.contains("rotatable"), unsupported);
+        assertTrue(unsupported.contains("type"), unsupported);
+    }
+
+    @Test
+    void furnitureRaisesBothTheStaticAndTheWorldWarnings() {
+        ImportReport report = new ImportReport();
+        convert("""
+                oak_chair:
+                  material: PAPER
+                  Pack:
+                    model: block/oak_chair
+                  Mechanics:
+                    furniture:
+                      rotatable: true
+                """, report);
+
+        String warnings = report.warnings().toString();
+        assertTrue(warnings.contains("static block"), warnings);
+        assertTrue(warnings.contains("NOT migrated"), warnings);
+    }
+
+    @Test
     void texturePathsWithoutAnExtensionAreLeftAlone() {
         assertEquals("item/ruby", OraxenImporter.stripExtension("item/ruby"));
         assertEquals("item/ruby", OraxenImporter.stripExtension("item/ruby.png"));

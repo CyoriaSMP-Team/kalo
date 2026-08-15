@@ -146,6 +146,34 @@ class ItemsAdderImporterTest {
     }
 
     @Test
+    void furnitureConvertsAndReportsWhatBlockBackedFurnitureCannotDo() {
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("""
+                info:
+                  namespace: mypack
+                furniture:
+                  oak_chair:
+                    display_name: "Oak Chair"
+                    resource:
+                      model_path: block/oak_chair
+                    entity: ITEM_DISPLAY
+                    hitbox:
+                      width: 1
+                    sit: true
+                """, report);
+
+        assertEquals("furniture", out.getString("oak_chair.type"));
+
+        String unsupported = report.unsupported().toString();
+        assertTrue(unsupported.contains("entity"), unsupported);
+        assertTrue(unsupported.contains("hitbox"), unsupported);
+        assertTrue(unsupported.contains("sit"), unsupported);
+
+        assertTrue(report.warnings().stream().anyMatch(w -> w.contains("static block")),
+                report.warnings().toString());
+    }
+
+    @Test
     void nonItemSectionsAreCalledOutSoAnEmptyResultIsNotMistakenForNothingToDo() {
         // Someone importing a file full of blocks should not conclude they had none.
         ImportReport report = new ImportReport();
@@ -153,12 +181,12 @@ class ItemsAdderImporterTest {
                 info:
                   namespace: mypack
                 items: {}
-                furniture:
-                  chair: {}
-                  table: {}
+                recipes:
+                  a: {}
+                  b: {}
                 """, report);
 
-        assertTrue(report.unsupported().stream().anyMatch(p -> p.startsWith("furniture (2")),
+        assertTrue(report.unsupported().stream().anyMatch(p -> p.startsWith("recipes (2")),
                 report.unsupported().toString());
     }
 

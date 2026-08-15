@@ -66,6 +66,7 @@ public final class OraxenImporter {
                                           @NotNull ImportReport report) {
         YamlConfiguration output = new YamlConfiguration();
         int blocks = 0;
+        int furniture = 0;
 
         for (String key : source.getKeys(false)) {
             ConfigurationSection item = source.getConfigurationSection(key);
@@ -75,7 +76,10 @@ public final class OraxenImporter {
             try {
                 // Oraxen expresses a custom block as an item carrying the noteblock
                 // mechanic, so what a config calls an item may be either.
-                if (hasNoteBlockMechanic(item)) {
+                if (hasFurnitureMechanic(item)) {
+                    convertFurniture(key, item, output, report);
+                    furniture++;
+                } else if (hasNoteBlockMechanic(item)) {
                     convertBlock(key, item, output, report);
                     blocks++;
                 } else {
@@ -87,7 +91,8 @@ public final class OraxenImporter {
             }
         }
 
-        BlockImportNotice.addTo(report, blocks);
+        BlockImportNotice.addTo(report, blocks + furniture);
+        FurnitureImportNotice.addTo(report, furniture);
         return output.saveToString();
     }
 
@@ -98,6 +103,59 @@ public final class OraxenImporter {
             mechanics = item.getConfigurationSection("mechanics");
         }
         return mechanics != null && (mechanics.contains("noteblock") || mechanics.contains("block"));
+    }
+
+    /** Oraxen marks furniture with {@code Mechanics.furniture}. */
+    static boolean hasFurnitureMechanic(@NotNull ConfigurationSection item) {
+        ConfigurationSection mechanics = item.getConfigurationSection("Mechanics");
+        if (mechanics == null) {
+            mechanics = item.getConfigurationSection("mechanics");
+        }
+        return mechanics != null && mechanics.contains("furniture");
+    }
+
+    private static void convertFurniture(@NotNull String key,
+                                         @NotNull ConfigurationSection item,
+                                         @NotNull YamlConfiguration output,
+                                         @NotNull ImportReport report) {
+        // Same shape as a block on Kalo's side; the difference is everything that does
+        // not come with it.
+        convertBlock(key, item, output, report);
+
+        ConfigurationSection converted = output.getConfigurationSection(key);
+        if (converted != null) {
+            converted.set("type", "furniture");
+        }
+
+        ConfigurationSection mechanics = item.getConfigurationSection("Mechanics");
+        if (mechanics == null) {
+            mechanics = item.getConfigurationSection("mechanics");
+        }
+        ConfigurationSection furniture = mechanics != null
+                ? mechanics.getConfigurationSection("furniture") : null;
+        if (furniture == null) {
+            return;
+        }
+
+        // Named individually rather than as one blanket warning: a chair losing its seat
+        // and a lamp losing its hitbox need different follow-up work.
+        for (String property : furniture.getKeys(false)) {
+            switch (property) {
+                case "hitbox", "barriers", "barrier" ->
+                        report.unsupported(key + ".Mechanics.furniture." + property
+                                + " (Kalo furniture occupies exactly one block)");
+                case "seat", "seats" ->
+                        report.unsupported(key + ".Mechanics.furniture." + property
+                                + " (Kalo furniture cannot be sat on)");
+                case "rotatable", "rotation" ->
+                        report.unsupported(key + ".Mechanics.furniture." + property
+                                + " (Kalo furniture faces one way)");
+                case "type", "display_entity", "item_frame" ->
+                        report.unsupported(key + ".Mechanics.furniture." + property
+                                + " (Kalo furniture is block-backed, not entity-backed)");
+                default -> report.unsupported(key + ".Mechanics.furniture." + property);
+            }
+        }
     }
 
     private static void convertBlock(@NotNull String key,

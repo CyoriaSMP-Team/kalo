@@ -89,11 +89,13 @@ public final class ItemsAdderImporter {
         // Not an early return when items is absent: a blocks-only file is perfectly
         // normal in ItemsAdder, and bailing here would import nothing from it.
         int blocks = convertBlocks(source, output, namespace, report);
+        int furniture = convertFurniture(source, output, namespace, report);
 
-        if (items == null && blocks == 0) {
-            report.warn("No items or blocks section found — nothing to import");
+        if (items == null && blocks == 0 && furniture == 0) {
+            report.warn("No items, blocks or furniture section found — nothing to import");
         }
-        BlockImportNotice.addTo(report, blocks);
+        BlockImportNotice.addTo(report, blocks + furniture);
+        FurnitureImportNotice.addTo(report, furniture);
 
         // Whatever is left still has no importer; saying so beats letting someone think
         // an empty result means they had none.
@@ -270,9 +272,58 @@ public final class ItemsAdderImporter {
         output.createSection(key, converted);
     }
 
+    /** ItemsAdder furniture is entity-backed; Kalo's is a block. See FurnitureImportNotice. */
+    private static int convertFurniture(@NotNull YamlConfiguration source,
+                                        @NotNull YamlConfiguration output,
+                                        @Nullable String namespace,
+                                        @NotNull ImportReport report) {
+        ConfigurationSection furniture = source.getConfigurationSection("furniture");
+        if (furniture == null) {
+            return 0;
+        }
+
+        int converted = 0;
+        for (String key : furniture.getKeys(false)) {
+            ConfigurationSection piece = furniture.getConfigurationSection(key);
+            if (piece == null) {
+                continue;
+            }
+            try {
+                convertBlock(key, piece, output, report);
+                ConfigurationSection out = output.getConfigurationSection(key);
+                if (out != null) {
+                    out.set("type", "furniture");
+                }
+
+                for (String property : piece.getKeys(false)) {
+                    switch (property) {
+                        case "entity" -> report.unsupported(key + ".entity "
+                                + "(Kalo furniture is block-backed, not entity-backed)");
+                        case "hitbox" -> report.unsupported(key + ".hitbox "
+                                + "(Kalo furniture occupies exactly one block)");
+                        case "sit", "seats" -> report.unsupported(key + "." + property
+                                + " (Kalo furniture cannot be sat on)");
+                        case "rotation", "rotatable" -> report.unsupported(key + "." + property
+                                + " (Kalo furniture faces one way)");
+                        case "display_name", "displayname", "resource", "specific_properties" -> {
+                            // Handled by convertBlock.
+                        }
+                        default -> report.unsupported(key + "." + property);
+                    }
+                }
+
+                report.imported((namespace != null ? namespace : "imported") + ":" + key);
+                converted++;
+            } catch (Exception e) {
+                report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        }
+        return converted;
+    }
+
     private static void reportUnconvertedSections(@NotNull YamlConfiguration source,
                                                   @NotNull ImportReport report) {
-        for (String section : List.of("furniture", "armors_rendering", "entities", "recipes")) {
+        for (String section : List.of("armors_rendering", "entities", "recipes")) {
             if (source.contains(section)) {
                 ConfigurationSection content = source.getConfigurationSection(section);
                 int count = content != null ? content.getKeys(false).size() : 0;
