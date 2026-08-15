@@ -6,6 +6,7 @@ import io.kalo.content.item.ItemType;
 import io.kalo.content.block.BlockType;
 import io.kalo.content.furniture.FurnitureType;
 import io.kalo.content.armor.ArmorType;
+import io.kalo.content.recipe.RecipeType;
 import io.kalo.content.feature.FeatureFactory;
 import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.registry.DirectScalableRegistry;
@@ -30,7 +31,8 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
     private final io.kalo.platform.java.BlockStateAllocator blockStateAllocator =
             new io.kalo.platform.java.BlockStateAllocator(io.kalo.content.block.definition.BlockCarrier.NOTE_BLOCK);
-    private final GlobalRegistries globalRegistries = new GlobalRegistriesImpl(blockStateAllocator);
+    private final RecipeType recipeType = new RecipeType();
+    private final GlobalRegistries globalRegistries = new GlobalRegistriesImpl(blockStateAllocator, recipeType);
 
     @Override
     public void preload(@NotNull Context context) {
@@ -38,6 +40,7 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
         globalRegistries.unlockAll();
         globalRegistries.clearAll();
+        recipeType.clear();
         try {
             java.nio.file.Path stateFile =
                     new File(context.plugin().getDataFolder(), "block-states.json").toPath();
@@ -55,6 +58,13 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
         Bukkit.getPluginManager().callEvent(new RegistryInitializeEvent(globalRegistries));
 
         globalRegistries.lockAll();
+
+        // After every pack is in: a recipe may reference content from a pack that had not
+        // been read when the recipe itself was parsed.
+        int recipes = recipeType.registerAll();
+        if (recipes > 0) {
+            LOGGER.info("Registered " + recipes + " recipe(s)");
+        }
 
         LOGGER.info("Successfully initialized registries!");
     }
@@ -85,12 +95,14 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
         @Getter @Accessors(fluent = true)
         private final DirectWritableRegistry<ContentsPack> contentsPacks;
 
-        private GlobalRegistriesImpl(@NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator) {
+        private GlobalRegistriesImpl(@NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator,
+                                    @NotNull RecipeType recipeType) {
             Map<Key, ContentType<?>> typeMap = Map.of(
                     ItemType.KEY, new ItemType(),
                     BlockType.KEY, new BlockType(blockStateAllocator),
                     FurnitureType.KEY, new FurnitureType(blockStateAllocator),
-                    ArmorType.KEY, new ArmorType());
+                    ArmorType.KEY, new ArmorType(),
+                    RecipeType.KEY, recipeType);
             this.types = create(new MappedRegistry<>(typeMap));
             this.features = create(new DirectScalableRegistry<>());
             this.contentsPacks = create(new DirectScalableRegistry<>());

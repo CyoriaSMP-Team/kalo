@@ -105,6 +105,28 @@ in the hotbar, while `equipment:` is the sheet painted onto the player model. Le
 `equipment:` out and the piece is named after itself; set `equipment: {enabled: false}`
 to keep the base material's vanilla armor texture.
 
+### Recipes
+
+```yaml
+ruby_sword_recipe:
+  type: recipe
+  result: ruby_sword          # or "4x ruby_dust", or "otherpack:thing"
+  pattern:
+    - " R "
+    - " R "
+    - " S "
+  ingredients:
+    R: mypack:ruby            # Kalo content
+    S: minecraft:stick        # vanilla
+```
+
+Leave `pattern` out for a shapeless recipe. **The namespace decides** whether an
+ingredient is vanilla or Kalo content — a pack is free to define `mypack:diamond`, and it
+must not silently resolve to the vanilla one, so an unqualified name means "in this pack".
+
+Kalo ingredients match on the id stamped into the item rather than on the whole stack, so
+a player who renamed one on an anvil can still craft with it.
+
 ### Model sources
 
 ```yaml

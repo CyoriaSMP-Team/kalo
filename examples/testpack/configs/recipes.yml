@@ -1,0 +1,21 @@
+# Shaped: mixes a Kalo item with a vanilla one. The namespace decides which is
+# which — an unqualified name means this pack.
+ruby_sword_recipe:
+  type: recipe
+  result: ruby_sword
+  pattern:
+    - " R "
+    - " R "
+    - " S "
+  ingredients:
+    R: minecraft:redstone
+    S: minecraft:stick
+
+# Shapeless: no pattern. Consumes a Kalo item, which is matched on its stamped
+# id rather than on the whole stack, so renaming it does not break the recipe.
+greeting_paper_recipe:
+  type: recipe
+  result: 4x greeting_paper
+  ingredients:
+    a: minecraft:paper
+    b: ruby_sword
