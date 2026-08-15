@@ -4,127 +4,130 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Neko is a Minecraft Paper/Folia plugin framework for creating custom content through a feature-based system. It uses a content pack system where developers define custom items and behaviors using YAML configuration files and Java/Kotlin features.
+**Kalo** is a free and open-source custom content engine for Minecraft Paper/Folia
+servers. Content creators define custom items (and eventually blocks, furniture, armor)
+in YAML content packs; Kalo compiles them into a resource pack and runtime objects with
+no client mods required.
+
+The product thesis is **cross-platform by design**: one YAML definition compiles to both
+Java and Bedrock output. That constraint drives the architecture — see `docs/IR_DESIGN.md`.
+
+Kalo is derived from [Neko](https://github.com/bindglam/Neko) (MIT, Woobeen Jeon). The
+original copyright notice stays in `LICENSE`.
 
 ## Build System
 
-This project uses Gradle with Kotlin DSL. Key properties are defined in `gradle.properties`:
-- `plugin_version`: Current plugin version (0.0.1)
-- `minecraft_version`: Target Minecraft version (1.20.1)
+Gradle with Kotlin DSL. Key properties in `gradle.properties`:
+
+- `plugin_version` — plugin version
+- `minecraft_version` — target Minecraft version (`26.2`)
+- `paper_api_version` — exact Paper artifact (`26.2.build.112-stable`)
+- `paper_plugin_api_version` — `api-version` written into `paper-plugin.yml`
+
+**Minecraft uses calendar versioning now** (26.1, 26.2 — not 1.21.x), and Paper artifacts
+are build-pinned rather than `-R0.1-SNAPSHOT`. Bumping the version means updating both
+`minecraft_version` and `paper_api_version`.
+
+**Java 25 is the floor.** Minecraft 26.x will not run on less. The foojay resolver in
+`settings.gradle.kts` provisions the toolchain automatically.
 
 ### Common Commands
 
 ```bash
-# Build the plugin
-./gradlew build
-
-# Build and shadow (creates fat JAR with dependencies)
-./gradlew shadowJar
-
-# Clean build artifacts
-./gradlew clean
-
-# Run a test Paper server with the plugin
-./gradlew runServer
-
-# Run a test Folia server with the plugin
-./gradlew runFolia
+./gradlew build        # compile + test
+./gradlew shadowJar    # fat jar
+./gradlew runServer    # test Paper server
+./gradlew runFolia     # test Folia server
+./gradlew test         # tests only
 ```
 
-The built JAR is located at `build/libs/Neko-{version}.jar`.
+Output: `build/libs/Kalo-{version}.jar`
 
 ## Module Structure
 
-The project is split into two main modules:
+### `api` — public API, package `io.kalo`
 
-### `api` Module
-Public API for content creators and plugin developers. Contains interfaces and abstractions:
-- `io.github.bindglam.neko.Neko` - Static singleton accessor to the plugin instance
-- `io.github.bindglam.neko.NekoPlugin` - Main plugin interface providing access to managers
-- `io.github.bindglam.neko.content` - Content system interfaces (Content, Feature, ContentsPack)
-- `io.github.bindglam.neko.content.item` - Item-related interfaces (Item, ItemProperties, ImmutableItemStack)
-- `io.github.bindglam.neko.content.feature` - Feature system (Feature, FeatureBuilder, FeatureFactory, FeatureEventBus)
-- `io.github.bindglam.neko.manager` - Manager interfaces (RegistryManager, ContentManager, ResourcePackManager)
-- `io.github.bindglam.neko.registry` - Registry system interfaces
+- `Kalo` / `KaloPlugin` — singleton accessor and plugin interface
+- `content` — `Content`, `ContentType`, `ContentsPack`, `PackContext`
+- `content.item.definition` — **the IR**: `ItemDefinition`, `ModelDefinition`,
+  `DisplayProperties`, `ItemBehaviour`, `JavaOptions`, `BedrockOptions`
+- `content.feature` — `Feature`, `FeatureFactory`, `FeatureBuilder`, `FeatureEventBus`
+- `pack` — `ResourcePack`, `PackMeta`, `Writable`
+- `registry` / `manager` — registry and manager interfaces
 
-### `core` Module
-Implementation of the API and core functionality:
-- `io.github.bindglam.neko.NekoPluginImpl` - Main plugin implementation
-- `io.github.bindglam.neko.NekoPluginLoader` - Paper plugin loader for dependency resolution
-- `io.github.bindglam.neko.manager.*Impl` - Implementations of manager interfaces
-- `io.github.bindglam.neko.content.*Impl` - Implementations of content interfaces
-- `io.github.bindglam.neko.content.feature.builtin` - Built-in features (e.g., HelloWorldFeature)
-- `io.github.bindglam.neko.registry.*` - Registry implementations (MappedRegistry, DirectScalableRegistry, EntryScalableRegistry)
+### `core` — implementation
+
+- `KaloPluginImpl` / `KaloPluginLoader`
+- `manager.*Impl` — registry, content, resource pack, command managers
+- `pack` — `ResourcePackImpl`, `ZipPackWriter`, `PackFormats`, `Json`
+- `platform.java` — `JavaItemCompiler` (→ `ItemStack`), `JavaPackCompiler` (→ pack assets)
+- `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
 
 ## Architecture
 
-### Content Pack System
-Content packs are loaded from the `run/plugins/Neko/packs/` directory. Each pack requires:
-- `pack.yml` - Pack metadata (id, version, author)
-- `configs/` - YAML files defining content items
+### The IR is the load-bearing decision
 
-Example pack structure:
 ```
-testpack/
-├── pack.yml
-└── configs/
-    └── items.yml
+YAML → ItemDefinition (platform-neutral) → ┬→ JavaCompiler    → resource pack + ItemStack
+                                           └→ BedrockCompiler → .mcpack + Geyser mappings
 ```
 
-### Manager Lifecycle
-All managers implement the `Managerial` interface with three lifecycle phases:
-1. `preload(Context)` - Initialize and unlock resources
-2. `start(Context)` - Begin operations after server load
-3. `end(Context)` - Cleanup on disable
+**No `org.bukkit.*`, no Geyser type, and no pack-format constant may appear in the
+definition layer.** `Material` lives in `JavaOptions` and nowhere else. If a field can
+only be satisfied by naming a Java concept, it belongs in a platform options record.
 
-Managers can also implement `Reloadable` to support hot-reloading via `NekoPlugin.reload()`.
+When adding a content type, add the `*Definition` first, then a case in each compiler.
+Never let a platform type leak upward into the definition.
 
-### Registry System
-The plugin uses a hierarchical registry system:
-- `GlobalRegistries` - Global plugin-level registries (types, features, contentsPacks)
-- `Registries` (per-pack) - Content registries for individual packs (items)
+### Resource pack generation
 
-Registries support locking/unlocking and can be cleared during reloads. The `RegistryInitializeEvent` is fired when global registries are ready for registration.
+Kalo writes its own packs. The old Creative dependency was dropped: its last release
+(1.7.3, April 2024) predates the 1.21.4 item-definition system and is binary-incompatible
+with the Adventure 5 that Paper 26.2 ships. See `docs/PHASE0_AUDIT.md` §2.4.
 
-### Feature System
-Features are modular behaviors attached to content items:
-- `FeatureFactory` - Creates feature instances with `FeatureArguments`
-- `FeatureBuilder` - Combines a factory with arguments
-- `FeatureEventBus` - Event-driven communication within content (ItemStackGenerationEvent, ResourcePackGenerationEvent)
-- `Feature` is abstract and receives a reference to its parent `Content`
+Target format is the **item definition system** (`assets/<ns>/items/*.json` +
+`minecraft:item_model`), *not* legacy CustomModelData overrides.
 
-Features can subscribe to events via the content's `FeatureEventBus` to modify behavior during various phases (item stack generation, resource pack generation).
+`PackFormats.CURRENT` must be verified against `version.json` in the vanilla client jar
+(`pack_version.resource_major`) on every Minecraft bump — a wrong value makes the client
+reject the whole pack.
 
-### Content Type System
-New content types are registered in `GlobalRegistries.types()`:
-- `ItemType` - Built-in item content type
-- Implement `ContentType<T extends Content>` to add new types
-- Types are responsible for parsing YAML config and registering to registries
+`ZipPackWriter` writes deterministically (fixed entry timestamps, sorted entries) so an
+unchanged pack has a stable hash and clients do not re-download it every restart.
 
-## Plugin Loading
+### Manager lifecycle
 
-Neko uses Paper's plugin loader system (`NekoPluginLoader`) to resolve dependencies at runtime:
-- Cloud (command framework) - `org.incendo:cloud-paper:2.0.0-beta.14`
-- Creative (resource pack API) - `team.unnamed:creative-*:1.7.3`
-- ConfigLib (via compileOnly) - `com.github.bindglam:ConfigLib:1.0.0`
+`Managerial`: `preload(Context)` → `start(Context)` → `end(Context)`. Managers
+implementing `Reloadable` participate in `KaloPlugin.reload()`.
 
-The plugin supports both Paper and Folia (foliaSupported: true in plugin.yml).
+### Registries
 
-## Resource Pack Generation
+`GlobalRegistries` (types, features, contentsPacks) plus per-pack `Registries` (items).
+Backed by `ConcurrentHashMap`; pack generation reads from a background thread while the
+main thread may still be registering. `RegistryInitializeEvent` fires when global
+registries are open for registration.
 
-The `ResourcePackManager.generateResourcePack()` method asynchronously generates the resource pack using the Creative library. This process is triggered after content is loaded.
+### Content packs
 
-## Java Version
+Loaded from `plugins/Kalo/packs/`. Each pack needs `pack.yml` (id, version, author);
+`configs/**.yml` holds definitions and `assets/**` is copied into the generated pack under
+the pack's namespace.
 
-The project uses Java 21 (configured in buildSrc/src/main/kotlin/paper-conventions.gradle.kts).
+**Content keys are namespaced by the owning pack** via `PackContext`. Anything that
+bypasses that lands content in `minecraft:` and collides across packs.
 
-## Development
+## Conventions
 
-- Test content packs are located in `run/plugins/Neko/packs/`
-- The test server runs on default Minecraft server port
-- Use `./gradlew runServer` to start the test server with hot-reload support
-- Built-in features demonstrate the feature system in `core/src/main/java/io/github/bindglam/neko/content/feature/builtin/`
+- Java 25, Lombok for accessors on implementation classes
+- `@NotNull` / `@Nullable` on API surfaces
+- Never swallow exceptions during pack loading — a content creator's typo must produce a
+  message naming the file and the problem
+- Tests live in `core/src/test/java`; `./gradlew build` runs them
+
+## Examples
+
+`examples/testpack` is the reference pack (`run/` is gitignored). See `examples/README.md`.
 
 ## License
 
-MIT License - Copyright (c) 2026 Woobeen Jeon
+MIT — Copyright (c) 2026 Woobeen Jeon and Kalo Contributors.

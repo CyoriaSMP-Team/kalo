@@ -1,0 +1,34 @@
+ruby_sword:
+  type: item
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Sword</gradient>"
+    lore:
+      - "<gray>A blade cut from a single ruby.</gray>"
+      - "<dark_gray>testpack</dark_gray>"
+    glint: true
+  model:
+    sprite: "item/ruby_sword"
+  behaviour:
+    durability: 250
+  java:
+    base_material: NETHERITE_SWORD
+
+# No model declared: falls back to the base material's own vanilla appearance
+# rather than rendering as a missing texture.
+plain_apple:
+  type: item
+  display:
+    name: "<green>Slightly Better Apple</green>"
+  java:
+    base_material: APPLE
+
+# Exercises the feature system and the stack-size path.
+greeting_paper:
+  type: item
+  behaviour:
+    stack_size: 16
+  features:
+    hello:
+      id: "kalo:hello_world"
+      arguments:
+        msg: "compiled from the IR"

@@ -1,9 +1,8 @@
 plugins {
     id("java-library")
-    kotlin("jvm")
 }
 
-group = "io.github.bindglam.neko"
+group = "io.kalo"
 version = property("plugin_version").toString()
 
 repositories {
@@ -15,18 +14,26 @@ repositories {
 dependencies {
     compileOnly("org.projectlombok:lombok:1.18.44")
     annotationProcessor("org.projectlombok:lombok:1.18.44")
+
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks {
     compileJava {
         options.encoding = Charsets.UTF_8.name()
     }
+
+    test {
+        useJUnitPlatform()
+        testLogging {
+            events("passed", "skipped", "failed")
+        }
+    }
 }
 
+// Minecraft 26.x requires Java 25 or newer to run, so that is the floor for the plugin too.
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
-}
-
-kotlin {
-    jvmToolchain(21)
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
 }

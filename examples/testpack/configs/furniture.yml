@@ -1,0 +1,11 @@
+ruby_pedestal:
+  type: furniture
+  display:
+    name: "<red>Ruby Pedestal</red>"
+  model:
+    cube_all: "item/ruby_sword"
+  behaviour:
+    hardness: 2.0
+    requires_tool: false
+  bedrock:
+    enabled: true

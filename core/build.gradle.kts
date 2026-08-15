@@ -6,19 +6,16 @@ plugins {
 dependencies {
     implementation(project(":api"))
     compileOnly("com.github.bindglam:ConfigLib:1.0.0")
-    compileOnly("org.incendo:cloud-paper:2.0.0-beta.14")
-    //compileOnly("org.incendo:cloud-minecraft-extras:2.0.0-beta.14")
-    implementation("team.unnamed:creative-serializer-minecraft:1.7.3")
-    implementation("team.unnamed:creative-server:1.7.3")
+    compileOnly("org.incendo:cloud-paper:2.0.0")
 }
 
 paperPluginYaml {
     name = rootProject.name
     version = rootProject.version.toString()
-    main = "$group.NekoPluginImpl"
-    loader = "$group.NekoPluginLoader"
-    apiVersion = "1.20"
-    author = "Bindglam"
+    main = "$group.KaloPluginImpl"
+    loader = "$group.KaloPluginLoader"
+    apiVersion = property("paper_plugin_api_version").toString()
+    author = "Kalo"
     foliaSupported = true
     dependencies {
     }

@@ -1,0 +1,13 @@
+ruby_helmet:
+  type: armor
+  slot: head
+  display:
+    name: "<red>Ruby Helmet</red>"
+    lore:
+      - "<gray>Item appearance only for now — see examples/README.md.</gray>"
+  model:
+    sprite: "item/ruby_sword"
+  behaviour:
+    durability: 165
+  java:
+    base_material: NETHERITE_HELMET
