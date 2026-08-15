@@ -34,6 +34,13 @@ jobs:
           path: build/libs/Kalo-*.jar
           if-no-files-found: error
 
+      - name: Upload Geyser extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kalo-geyser-extension
+          path: geyser-extension/build/libs/geyser-extension-*.jar
+          if-no-files-found: error
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4

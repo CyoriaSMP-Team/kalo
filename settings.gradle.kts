@@ -7,3 +7,4 @@ rootProject.name = "Kalo"
 
 include("api")
 include("core")
+include("geyser-extension")

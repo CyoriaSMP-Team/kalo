@@ -1,0 +1,7 @@
+api: 1.0.0
+id: kalo
+name: Kalo
+main: io.kalo.geyser.KaloExtension
+version: 0.0.1
+authors:
+  - Kalo

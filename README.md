@@ -20,11 +20,11 @@ armor on Paper and Folia servers — no client mods, no player limits, no featur
 Bedrock output, because the content model is platform-neutral by design rather than by
 translation. That is the thing Kalo exists to do.
 
-> ⚠️ **Pre-alpha.** Items, blocks, furniture and armor work on Java. Bedrock output — a
-> real `.mcpack` plus Geyser mappings — is generated for sprite items and cube blocks;
-> the Geyser extension that registers them at runtime is not written yet, so nothing
-> reaches a Bedrock player in-game so far. Furniture is static (block-backed) rather than
-> entity-backed. See [the roadmap](#roadmap) for what is real and what is not.
+> ⚠️ **Pre-alpha.** Items, blocks, furniture and armor work on Java and are verified on a
+> live server. The Bedrock path — `.mcpack`, Geyser mappings, and an extension that
+> registers blocks — is written and unit-tested but has **not** been run against a live
+> Geyser instance yet, so treat it as unproven. Furniture is static (block-backed) rather
+> than entity-backed. See [the roadmap](#roadmap) for what is real and what is not.
 
 ## Four pillars
 
@@ -66,8 +66,8 @@ ruby_sword:
 ```
 
 That compiles to a Java resource pack containing the item definition, the generated
-model, the texture, and a lang entry — and the same definition is what a Bedrock compiler
-will consume in Phase 2.
+model, the texture, and a lang entry — and the same definition is what the Bedrock
+compiler consumes to produce the `.mcpack` and Geyser mappings.
 
 Content keys are namespaced by the pack that defines them, so the item above is
 `mypack:ruby_sword` and cannot collide with another pack's.
@@ -134,7 +134,7 @@ packs/*/configs/*.yml
         │
    ┌────┴────┐
    ▼         ▼
-JavaCompiler  BedrockCompiler (Phase 2)
+JavaCompiler  BedrockCompiler
    │             │
    ▼             ▼
 resourcepack   .mcpack + Geyser mappings
@@ -156,7 +156,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 |---|---|---|
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
-| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 sprite items and cube blocks compile to `.mcpack` + mappings; the Geyser extension that registers them, and custom-model geometry, are next |
+| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 sprite items and cube blocks compile to `.mcpack` + mappings, and the Geyser extension registers blocks; not yet verified against a live Geyser, and custom-model geometry is unconverted |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | planned |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |
@@ -184,6 +184,22 @@ Output: `build/libs/Kalo-<version>.jar`
 
 - **`api`** — public API: content model, definitions, registries, features, pack model
 - **`core`** — implementation: managers, compilers, pack writer, commands
+- **`geyser-extension`** — runs inside Geyser, not Paper; registers Kalo's custom blocks
+  so Bedrock renders them
+
+## Bedrock setup
+
+Two processes are involved, so there are two artifacts. The Paper plugin generates the
+Bedrock pack and mappings; the Geyser extension registers them.
+
+1. Run the server once so `plugins/Kalo/` contains `generated.mcpack` and
+   `bedrock-mappings.json`.
+2. Put `geyser-extension-<version>.jar` in Geyser's `extensions/` folder.
+3. Copy `bedrock-mappings.json` into `extensions/kalo/`.
+4. Serve `generated.mcpack` to Bedrock clients through Geyser's `packs/` folder.
+
+The extension does not fail when the mapping file is missing — Geyser often starts before
+the Paper side has generated one — it simply has nothing to register and says so.
 
 ## License
 
