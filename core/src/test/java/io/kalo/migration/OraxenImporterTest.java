@@ -161,6 +161,72 @@ class OraxenImporterTest {
     }
 
     @Test
+    void anItemCarryingTheNoteblockMechanicBecomesABlock() {
+        // Oraxen has no separate block section: a custom block is an item with a mechanic.
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("""
+                ruby_block:
+                  displayname: "<red>Ruby Block</red>"
+                  material: PAPER
+                  Pack:
+                    textures:
+                      - block/ruby_block.png
+                  Mechanics:
+                    noteblock:
+                      custom_variation: 37
+                      hardness: 3
+                """, report);
+
+        assertEquals("block", out.getString("ruby_block.type"));
+        assertEquals("block/ruby_block", out.getString("ruby_block.model.cube_all"));
+    }
+
+    @Test
+    void oraxensStateNumberIsDeliberatelyNotCarriedOver() {
+        // Adopting it would collide with states Kalo has already handed out.
+        ImportReport report = new ImportReport();
+        convert("""
+                ruby_block:
+                  material: PAPER
+                  Pack:
+                    textures: [block/ruby_block.png]
+                  Mechanics:
+                    noteblock:
+                      custom_variation: 37
+                """, report);
+
+        assertTrue(report.unsupported().stream().anyMatch(p -> p.contains("custom_variation")),
+                report.unsupported().toString());
+    }
+
+    @Test
+    void importingBlocksWarnsThatThePlacedWorldIsNotMigrated() {
+        // The most expensive thing to discover after going live.
+        ImportReport report = new ImportReport();
+        convert("""
+                ruby_block:
+                  material: PAPER
+                  Pack:
+                    textures: [block/ruby_block.png]
+                  Mechanics:
+                    noteblock:
+                      custom_variation: 37
+                """, report);
+
+        assertTrue(report.warnings().stream().anyMatch(w -> w.contains("NOT migrated")),
+                report.warnings().toString());
+    }
+
+    @Test
+    void anItemOnlyImportDoesNotRaiseTheWorldWarning() {
+        ImportReport report = new ImportReport();
+        convert("ruby_sword:\n  material: PAPER\n", report);
+
+        assertFalse(report.warnings().stream().anyMatch(w -> w.contains("NOT migrated")),
+                report.warnings().toString());
+    }
+
+    @Test
     void texturePathsWithoutAnExtensionAreLeftAlone() {
         assertEquals("item/ruby", OraxenImporter.stripExtension("item/ruby"));
         assertEquals("item/ruby", OraxenImporter.stripExtension("item/ruby.png"));

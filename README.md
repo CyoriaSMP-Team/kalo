@@ -159,7 +159,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
 | **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 items, cube blocks and custom-model blocks all compile, including Java→Bedrock geometry conversion; not yet verified against a live Geyser |
-| **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 Oraxen/Nexo items import, reporting what did not carry over; ItemsAdder and blocks pending |
+| **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items and blocks from both, reporting what did not carry over; furniture, recipes and placed-world migration pending |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |
 
@@ -206,6 +206,13 @@ something plausible**, because a mechanic quietly dropped is something a server 
 learns about from their players. Unrecognised keys are reported by name for the same
 reason, and non-item sections say how many entries they held so an empty result is not
 mistaken for having nothing to do.
+
+Blocks come across too — Oraxen expresses them as items carrying the `noteblock` mechanic,
+ItemsAdder keeps them in a `blocks:` section — but **blocks already placed in a world are
+not migrated**. All three plugins store a placed custom block as a note block in some
+state and each decides independently which state means what, so existing blocks will read
+as the wrong block until they are replaced. The importer says this every time it converts
+one, because it is the most expensive thing to discover after going live.
 
 Both importers are written against the documented formats rather than validated against a
 corpus of real packs, so treat a first import as a draft to review.

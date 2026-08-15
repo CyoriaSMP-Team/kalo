@@ -65,6 +65,7 @@ public final class OraxenImporter {
                                           @NotNull String namespace,
                                           @NotNull ImportReport report) {
         YamlConfiguration output = new YamlConfiguration();
+        int blocks = 0;
 
         for (String key : source.getKeys(false)) {
             ConfigurationSection item = source.getConfigurationSection(key);
@@ -72,14 +73,89 @@ public final class OraxenImporter {
                 continue;
             }
             try {
-                convertItem(key, item, output, report);
+                // Oraxen expresses a custom block as an item carrying the noteblock
+                // mechanic, so what a config calls an item may be either.
+                if (hasNoteBlockMechanic(item)) {
+                    convertBlock(key, item, output, report);
+                    blocks++;
+                } else {
+                    convertItem(key, item, output, report);
+                }
                 report.imported(namespace + ":" + key);
             } catch (Exception e) {
                 report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
             }
         }
 
+        BlockImportNotice.addTo(report, blocks);
         return output.saveToString();
+    }
+
+    /** Oraxen marks a custom block with {@code Mechanics.noteblock}. */
+    static boolean hasNoteBlockMechanic(@NotNull ConfigurationSection item) {
+        ConfigurationSection mechanics = item.getConfigurationSection("Mechanics");
+        if (mechanics == null) {
+            mechanics = item.getConfigurationSection("mechanics");
+        }
+        return mechanics != null && (mechanics.contains("noteblock") || mechanics.contains("block"));
+    }
+
+    private static void convertBlock(@NotNull String key,
+                                     @NotNull ConfigurationSection item,
+                                     @NotNull YamlConfiguration output,
+                                     @NotNull ImportReport report) {
+        Map<String, Object> converted = new LinkedHashMap<>();
+        converted.put("type", "block");
+
+        Map<String, Object> display = new LinkedHashMap<>();
+        String name = firstNonNull(item.getString("displayname"), item.getString("display_name"),
+                item.getString("itemname"));
+        if (name != null) {
+            display.put("name", name);
+        }
+        if (!display.isEmpty()) {
+            converted.put("display", display);
+        }
+
+        ConfigurationSection pack = item.getConfigurationSection("Pack");
+        if (pack == null) {
+            pack = item.getConfigurationSection("pack");
+        }
+        String model = pack != null ? pack.getString("model") : null;
+        if (model != null) {
+            converted.put("model", Map.of("custom", stripExtension(model)));
+        } else {
+            List<String> textures = pack != null ? pack.getStringList("textures") : List.of();
+            if (textures.isEmpty()) {
+                throw new IllegalArgumentException("block has no model or texture in its Pack section");
+            }
+            converted.put("model", Map.of("cube_all", stripExtension(textures.get(0))));
+        }
+
+        ConfigurationSection mechanics = item.getConfigurationSection("Mechanics");
+        if (mechanics == null) {
+            mechanics = item.getConfigurationSection("mechanics");
+        }
+        ConfigurationSection noteblock = mechanics != null ? mechanics.getConfigurationSection("noteblock") : null;
+        if (noteblock != null && noteblock.contains("custom_variation")) {
+            // Deliberately not carried over: Kalo owns its own state allocation, and
+            // adopting Oraxen's numbering would collide with blocks Kalo already placed.
+            report.unsupported(key + ".Mechanics.noteblock.custom_variation "
+                    + "(Kalo allocates its own states; see the world-migration warning)");
+        }
+
+        Map<String, Object> behaviour = new LinkedHashMap<>();
+        if (mechanics != null) {
+            ConfigurationSection hardness = mechanics.getConfigurationSection("hardness");
+            if (hardness != null || mechanics.contains("hardness")) {
+                behaviour.put("hardness", mechanics.getDouble("hardness", 1.5));
+            }
+        }
+        if (!behaviour.isEmpty()) {
+            converted.put("behaviour", behaviour);
+        }
+
+        output.createSection(key, converted);
     }
 
     private static void convertItem(@NotNull String key,

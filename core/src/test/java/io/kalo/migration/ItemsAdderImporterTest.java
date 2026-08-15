@@ -90,6 +90,62 @@ class ItemsAdderImporterTest {
     }
 
     @Test
+    void blocksInTheirOwnSectionAreImported() {
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("""
+                info:
+                  namespace: mypack
+                blocks:
+                  ruby_block:
+                    display_name: "Ruby Block"
+                    resource:
+                      textures:
+                        - block/ruby_block.png
+                    specific_properties:
+                      block:
+                        hardness: 3
+                """, report);
+
+        assertEquals("block", out.getString("ruby_block.type"));
+        assertEquals("block/ruby_block", out.getString("ruby_block.model.cube_all"));
+        assertEquals(3.0, out.getDouble("ruby_block.behaviour.hardness"), 1e-9);
+    }
+
+    @Test
+    void aBlocksOnlyFileStillImports() {
+        // Regression: bailing out when there is no items section imported nothing from a
+        // perfectly normal blocks-only file.
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("""
+                info:
+                  namespace: mypack
+                blocks:
+                  ruby_block:
+                    resource:
+                      textures: [block/ruby_block.png]
+                """, report);
+
+        assertEquals("block", out.getString("ruby_block.type"));
+        assertEquals(1, report.imported().size());
+    }
+
+    @Test
+    void importingBlocksWarnsThatThePlacedWorldIsNotMigrated() {
+        ImportReport report = new ImportReport();
+        convert("""
+                info:
+                  namespace: mypack
+                blocks:
+                  ruby_block:
+                    resource:
+                      textures: [block/ruby_block.png]
+                """, report);
+
+        assertTrue(report.warnings().stream().anyMatch(w -> w.contains("NOT migrated")),
+                report.warnings().toString());
+    }
+
+    @Test
     void nonItemSectionsAreCalledOutSoAnEmptyResultIsNotMistakenForNothingToDo() {
         // Someone importing a file full of blocks should not conclude they had none.
         ImportReport report = new ImportReport();
@@ -97,12 +153,12 @@ class ItemsAdderImporterTest {
                 info:
                   namespace: mypack
                 items: {}
-                blocks:
-                  ruby_block: {}
-                  emerald_block: {}
+                furniture:
+                  chair: {}
+                  table: {}
                 """, report);
 
-        assertTrue(report.unsupported().stream().anyMatch(p -> p.startsWith("blocks (2")),
+        assertTrue(report.unsupported().stream().anyMatch(p -> p.startsWith("furniture (2")),
                 report.unsupported().toString());
     }
 

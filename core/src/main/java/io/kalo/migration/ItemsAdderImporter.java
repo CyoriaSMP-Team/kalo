@@ -71,26 +71,32 @@ public final class ItemsAdderImporter {
         }
 
         ConfigurationSection items = source.getConfigurationSection("items");
-        if (items == null) {
-            report.warn("No items section found — nothing to import");
-            return output.saveToString();
-        }
-
-        for (String key : items.getKeys(false)) {
-            ConfigurationSection item = items.getConfigurationSection(key);
-            if (item == null) {
-                continue;
-            }
-            try {
-                convertItem(key, item, output, report);
-                report.imported((namespace != null ? namespace : "imported") + ":" + key);
-            } catch (Exception e) {
-                report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+        if (items != null) {
+            for (String key : items.getKeys(false)) {
+                ConfigurationSection item = items.getConfigurationSection(key);
+                if (item == null) {
+                    continue;
+                }
+                try {
+                    convertItem(key, item, output, report);
+                    report.imported((namespace != null ? namespace : "imported") + ":" + key);
+                } catch (Exception e) {
+                    report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+                }
             }
         }
 
-        // Blocks and furniture live in their own sections with a different shape; saying
-        // so beats letting someone think an empty result means they had none.
+        // Not an early return when items is absent: a blocks-only file is perfectly
+        // normal in ItemsAdder, and bailing here would import nothing from it.
+        int blocks = convertBlocks(source, output, namespace, report);
+
+        if (items == null && blocks == 0) {
+            report.warn("No items or blocks section found — nothing to import");
+        }
+        BlockImportNotice.addTo(report, blocks);
+
+        // Whatever is left still has no importer; saying so beats letting someone think
+        // an empty result means they had none.
         reportUnconvertedSections(source, report);
 
         return output.saveToString();
@@ -194,9 +200,79 @@ public final class ItemsAdderImporter {
         }
     }
 
+    /** ItemsAdder keeps blocks in their own section rather than as items with a mechanic. */
+    private static int convertBlocks(@NotNull YamlConfiguration source,
+                                     @NotNull YamlConfiguration output,
+                                     @Nullable String namespace,
+                                     @NotNull ImportReport report) {
+        ConfigurationSection blocks = source.getConfigurationSection("blocks");
+        if (blocks == null) {
+            return 0;
+        }
+
+        int converted = 0;
+        for (String key : blocks.getKeys(false)) {
+            ConfigurationSection block = blocks.getConfigurationSection(key);
+            if (block == null) {
+                continue;
+            }
+            try {
+                convertBlock(key, block, output, report);
+                report.imported((namespace != null ? namespace : "imported") + ":" + key);
+                converted++;
+            } catch (Exception e) {
+                report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        }
+        return converted;
+    }
+
+    private static void convertBlock(@NotNull String key,
+                                     @NotNull ConfigurationSection block,
+                                     @NotNull YamlConfiguration output,
+                                     @NotNull ImportReport report) {
+        Map<String, Object> converted = new LinkedHashMap<>();
+        converted.put("type", "block");
+
+        String name = block.getString("display_name", block.getString("displayname"));
+        if (name != null) {
+            converted.put("display", Map.of("name", name));
+        }
+
+        ConfigurationSection resource = block.getConfigurationSection("resource");
+        String modelPath = resource != null ? resource.getString("model_path") : null;
+        if (modelPath != null) {
+            converted.put("model", Map.of("custom", OraxenImporter.stripExtension(modelPath)));
+        } else {
+            java.util.List<String> textures = resource != null ? resource.getStringList("textures") : List.of();
+            if (textures.isEmpty() && resource != null && resource.getString("texture") != null) {
+                textures = List.of(resource.getString("texture"));
+            }
+            if (textures.isEmpty()) {
+                throw new IllegalArgumentException("block has no model_path or texture in its resource section");
+            }
+            converted.put("model", Map.of("cube_all", OraxenImporter.stripExtension(textures.get(0))));
+        }
+
+        ConfigurationSection properties = block.getConfigurationSection("specific_properties");
+        ConfigurationSection blockProperties = properties != null
+                ? properties.getConfigurationSection("block") : null;
+        if (blockProperties != null && blockProperties.contains("hardness")) {
+            converted.put("behaviour", Map.of("hardness", blockProperties.getDouble("hardness")));
+        }
+        if (blockProperties != null && blockProperties.contains("placed_model")) {
+            // ItemsAdder can render a placed block differently from its item form; Kalo
+            // uses one model for both.
+            report.unsupported(key + ".specific_properties.block.placed_model "
+                    + "(Kalo uses one model for the item and the placed block)");
+        }
+
+        output.createSection(key, converted);
+    }
+
     private static void reportUnconvertedSections(@NotNull YamlConfiguration source,
                                                   @NotNull ImportReport report) {
-        for (String section : List.of("blocks", "furniture", "armors_rendering", "entities", "recipes")) {
+        for (String section : List.of("furniture", "armors_rendering", "entities", "recipes")) {
             if (source.contains(section)) {
                 ConfigurationSection content = source.getConfigurationSection(section);
                 int count = content != null ? content.getKeys(false).size() : 0;
