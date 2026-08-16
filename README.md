@@ -104,6 +104,34 @@ in the hotbar, while `equipment:` is the sheet painted onto the player model. Le
 `equipment:` out and the piece is named after itself; set `equipment: {enabled: false}`
 to keep the base material's vanilla armor texture.
 
+### Sounds and glyphs
+
+```yaml
+cave_wind:
+  type: sound
+  category: ambient
+  subtitle: "subtitles.mypack.cave_wind"
+  sounds:
+    - "ambient/cave_wind"        # assets/sounds/ambient/cave_wind.ogg
+
+coin:
+  type: glyph
+  texture: "font/coin"
+  character: "U+E000"            # or a literal character, or a decimal codepoint
+  ascent: 8
+  height: 9
+```
+
+A glyph binds an image to a character, so writing that character draws the image — icons
+in chat, item names and menus without a client mod. Use the **Private Use Area**
+(`U+E000` and up): those codepoints have no meaning of their own, so nothing in ordinary
+text can collide with them. Kalo warns if you pick one outside it, and if two glyphs claim
+the same character.
+
+Glyphs are **appended** to the font rather than replacing it. Overwriting
+`minecraft:default` outright would drop the providers the game uses for ordinary text and
+leave a server where nothing but the icons is legible.
+
 ### Recipes
 
 ```yaml

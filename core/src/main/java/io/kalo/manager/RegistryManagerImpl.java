@@ -7,6 +7,8 @@ import io.kalo.content.block.BlockType;
 import io.kalo.content.furniture.FurnitureType;
 import io.kalo.content.armor.ArmorType;
 import io.kalo.content.recipe.RecipeType;
+import io.kalo.content.sound.SoundType;
+import io.kalo.content.glyph.GlyphType;
 import io.kalo.content.feature.FeatureFactory;
 import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.registry.DirectScalableRegistry;
@@ -32,7 +34,9 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
     private final io.kalo.platform.java.BlockStateAllocator blockStateAllocator =
             new io.kalo.platform.java.BlockStateAllocator(io.kalo.content.block.definition.BlockCarrier.NOTE_BLOCK);
     private final RecipeType recipeType = new RecipeType();
-    private final GlobalRegistries globalRegistries = new GlobalRegistriesImpl(blockStateAllocator, recipeType);
+    private final SoundType soundType = new SoundType();
+    private final GlyphType glyphType = new GlyphType();
+    private final GlobalRegistries globalRegistries = new GlobalRegistriesImpl(blockStateAllocator, recipeType, soundType, glyphType);
 
     @Override
     public void preload(@NotNull Context context) {
@@ -44,6 +48,8 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
         // before anything tries to read them.
         ((GlobalRegistriesImpl) globalRegistries).registerBuiltinTypes();
         recipeType.clear();
+        soundType.clear();
+        glyphType.clear();
         try {
             java.nio.file.Path stateFile =
                     new File(context.plugin().getDataFolder(), "block-states.json").toPath();
@@ -81,6 +87,14 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
         }
     }
 
+    public @NotNull SoundType soundType() {
+        return soundType;
+    }
+
+    public @NotNull GlyphType glyphType() {
+        return glyphType;
+    }
+
     public @NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator() {
         return blockStateAllocator;
     }
@@ -100,14 +114,20 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
         private final io.kalo.platform.java.BlockStateAllocator blockStateAllocator;
         private final RecipeType recipeType;
+        private final SoundType soundType;
+        private final GlyphType glyphType;
 
         private GlobalRegistriesImpl(@NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator,
-                                    @NotNull RecipeType recipeType) {
+                                    @NotNull RecipeType recipeType,
+                                    @NotNull SoundType soundType,
+                                    @NotNull GlyphType glyphType) {
             // Writable rather than a fixed map: add-ons register their own content types
             // during RegistryInitializeEvent, before packs are read.
             this.types = create(new DirectScalableRegistry<>());
             this.blockStateAllocator = blockStateAllocator;
             this.recipeType = recipeType;
+            this.soundType = soundType;
+            this.glyphType = glyphType;
             registerBuiltinTypes();
             this.features = create(new DirectScalableRegistry<>());
             this.contentsPacks = create(new DirectScalableRegistry<>());
@@ -126,6 +146,8 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
             types.register(FurnitureType.KEY, new FurnitureType(blockStateAllocator));
             types.register(ArmorType.KEY, new ArmorType());
             types.register(RecipeType.KEY, recipeType);
+            types.register(SoundType.KEY, soundType);
+            types.register(GlyphType.KEY, glyphType);
         }
 
         @Override

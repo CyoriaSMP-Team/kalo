@@ -1,0 +1,8 @@
+# A custom sound event. The ogg ships in assets/sounds/ and is copied like any
+# other asset; this only declares the event that points at it.
+cave_wind:
+  type: sound
+  category: ambient
+  subtitle: "subtitles.testpack.cave_wind"
+  sounds:
+    - "ambient/cave_wind"

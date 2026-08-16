@@ -1,0 +1,9 @@
+# A glyph binds an image to a character, so writing that character draws the image.
+# U+E000 is the start of the Private Use Area — characters with no meaning of their
+# own, so nothing in ordinary text can collide with them.
+coin:
+  type: glyph
+  texture: "font/coin"
+  character: "U+E000"
+  ascent: 8
+  height: 9

@@ -95,6 +95,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
             copyPackAssets(resourcePack);
             compileContentTypes(resourcePack);
+            compileRegistrylessTypes(resourcePack);
             mergeBasePack(resourcePack);
 
             generateBedrockPack(resourcePack);
@@ -222,6 +223,20 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                 String relative = assetsFolder.toPath().relativize(asset.toPath()).toString().replace('\\', '/');
                 resourcePack.file("assets/" + pack.id() + "/" + relative, Writable.file(asset));
             }
+        }
+    }
+
+    /**
+     * Compiles the types that keep their own content rather than a registry.
+     *
+     * <p>{@link #compileContentTypes} walks the registries and skips a type with nothing
+     * in them — which is every time for sounds and glyphs, since neither produces
+     * {@code Content}. Without this they would silently never reach the pack.</p>
+     */
+    private static void compileRegistrylessTypes(@NotNull ResourcePack resourcePack) {
+        if (Kalo.plugin().registryManager() instanceof RegistryManagerImpl impl) {
+            impl.soundType().compile(resourcePack);
+            impl.glyphType().compile(resourcePack);
         }
     }
 
