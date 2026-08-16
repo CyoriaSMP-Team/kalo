@@ -384,6 +384,12 @@ corpus of real packs, so treat a first import as a draft to review.
 
 ## Bedrock setup
 
+Bedrock output is built **only when Geyser is running on this server**. A Java-only server
+gets no `.mcpack` and no mapping file, because it has no use for them — at a thousand
+items that is thousands of files written for nobody. Override with `bedrock: always` in
+the config when Geyser runs as a separate process Kalo cannot see, or `never` to skip it
+outright.
+
 **If Geyser runs as a plugin on the same server — the usual setup — there is nothing to
 install and nothing to copy.** Kalo registers its blocks with Geyser directly through
 Geyser's own API:

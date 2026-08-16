@@ -11,6 +11,16 @@
 # instead, since both packs' contents belong there.
 base-pack: ""
 
+# Whether to build Bedrock output (.mcpack and the Geyser mapping).
+#
+#   auto   only when Geyser is running on this server — the default. A Java-only
+#          server has no use for those files, and at scale that is thousands of
+#          them written for nobody.
+#   always build them even without Geyser here. Use this when Geyser runs as a
+#          separate process, which Kalo cannot detect from inside the server.
+#   never  skip Bedrock entirely.
+bedrock: auto
+
 # Serving the generated resource pack to players.
 #
 # Off by default on purpose: enabling it opens a port, and the address players need to

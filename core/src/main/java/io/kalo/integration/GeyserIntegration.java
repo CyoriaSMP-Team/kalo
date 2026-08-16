@@ -45,6 +45,16 @@ public final class GeyserIntegration {
         }
     }
 
+    /**
+     * Whether Geyser shares this JVM.
+     *
+     * <p>Public because the answer decides more than the hook: with no Geyser here there
+     * may be nothing to build a Bedrock pack for.</p>
+     */
+    public static boolean present() {
+        return geyserPresent();
+    }
+
     private static boolean geyserPresent() {
         for (String name : GEYSER_PLUGINS) {
             Plugin plugin = Bukkit.getPluginManager().getPlugin(name);

@@ -98,7 +98,9 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
             compileRegistrylessTypes(resourcePack);
             mergeBasePack(resourcePack);
 
-            generateBedrockPack(resourcePack);
+            if (bedrockWanted()) {
+                generateBedrockPack(resourcePack);
+            }
 
             RegistryManager.GlobalRegistries.registries().item().forEach(content ->
                     content.featureEventBus().call(new ResourcePackGenerationEvent(resourcePack)));
@@ -164,6 +166,27 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
      * layout and ignores the {@code assets/} tree entirely, so it gets its own container
      * rather than a copy of the Java one.</p>
      */
+    /**
+     * Whether to build Bedrock output at all.
+     *
+     * <p>A Java-only server has no use for a {@code .mcpack} or a Geyser mapping, and at
+     * scale that is thousands of files written for nobody. Detected rather than asked for,
+     * with an override because Geyser can also run as a separate process this cannot
+     * see.</p>
+     */
+    private static boolean bedrockWanted() {
+        String mode = Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin
+                ? plugin.getConfig().getString("bedrock", "auto")
+                : "auto";
+
+        return switch (mode == null ? "auto" : mode.toLowerCase(java.util.Locale.ROOT)) {
+            case "always", "true" -> true;
+            case "never", "false" -> false;
+            // "auto": build it when Geyser is here to consume it.
+            default -> io.kalo.integration.GeyserIntegration.present();
+        };
+    }
+
     private static void generateBedrockPack(@NotNull ResourcePack javaPack) {
         Registries registries = RegistryManager.GlobalRegistries.registries();
 
