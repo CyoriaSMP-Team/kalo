@@ -147,6 +147,21 @@ model:
 | `/kalo give <player> <item>` | `kalo.command.give` |
 | `/kalo import <file>` | `kalo.command.import` |
 
+## Asset validation
+
+After generating, Kalo follows every texture and model reference in the pack and reports
+the ones that go nowhere:
+
+```
+The generated pack has 1 broken reference(s) — these will render as missing textures:
+  assets/testpack/models/item/ruby_sword.json references texture
+  'testpack:item/ruby_sword_typo' (expected assets/testpack/textures/item/ruby_sword_typo.png)
+```
+
+A mistyped path used to produce no error anywhere — the pack built, the server started, and
+the first sign of trouble was a player looking at a magenta cube. It reports rather than
+refuses: a pack that is 95% right still loads, with the other 5% named.
+
 ## Building on an existing pack
 
 Most servers already ship a pack — a font, a HUD, retextured vanilla. Kalo used to replace

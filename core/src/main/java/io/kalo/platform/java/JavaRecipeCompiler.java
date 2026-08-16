@@ -58,6 +58,16 @@ public final class JavaRecipeCompiler {
                 // Removing first makes reload idempotent; Bukkit throws on a duplicate key.
                 Bukkit.removeRecipe(key);
 
+                // Same situation as an unknown result, and it should read the same way:
+                // one item failing to load should not spray stack traces for every recipe
+                // that mentions it.
+                String missing = firstMissingIngredient(definition);
+                if (missing != null) {
+                    LOGGER.warning("Recipe " + definition.key().asString()
+                            + " needs unknown content " + missing);
+                    continue;
+                }
+
                 switch (definition) {
                     case RecipeDefinition.Shaped shaped -> Bukkit.addRecipe(shaped(key, result, shaped));
                     case RecipeDefinition.Shapeless shapeless ->
@@ -77,6 +87,24 @@ public final class JavaRecipeCompiler {
         for (RecipeDefinition definition : recipes) {
             Bukkit.removeRecipe(toNamespacedKey(definition.key()));
         }
+    }
+
+    /** @return the first ingredient that cannot be resolved, or null when all can */
+    private static @Nullable String firstMissingIngredient(@NotNull RecipeDefinition definition) {
+        Iterable<RecipeIngredient> ingredients = switch (definition) {
+            case RecipeDefinition.Shaped shaped -> shaped.keys().values();
+            case RecipeDefinition.Shapeless shapeless -> shapeless.ingredients();
+        };
+
+        for (RecipeIngredient ingredient : ingredients) {
+            if (choice(ingredient) == null) {
+                return switch (ingredient) {
+                    case RecipeIngredient.Content content -> content.key().asString();
+                    case RecipeIngredient.Vanilla vanilla -> vanilla.item().asString();
+                };
+            }
+        }
+        return null;
     }
 
     private static @NotNull ShapedRecipe shaped(@NotNull NamespacedKey key,

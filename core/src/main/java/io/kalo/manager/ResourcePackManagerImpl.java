@@ -104,6 +104,10 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
             Bukkit.getPluginManager().callEvent(new AsyncResourcePackGenerationEvent(resourcePack));
 
+            // After the event: a listener may have supplied the very asset that would
+            // otherwise look missing.
+            io.kalo.pack.PackValidator.report(io.kalo.pack.PackValidator.validate(resourcePack));
+
             try {
                 ZipPackWriter.write(generatedPackFile(), resourcePack);
             } catch (Exception e) {
