@@ -32,6 +32,9 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
     public void onEnable() {
         Kalo.registerPlugin(this);
 
+        // Writes config.yml on first run without overwriting an edited one.
+        saveDefaultConfig();
+
         Context context = new Context(this);
         managers.forEach(manager -> manager.preload(context));
         getServer().getPluginManager().registerEvents(

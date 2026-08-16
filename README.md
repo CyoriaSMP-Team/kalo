@@ -147,6 +147,31 @@ model:
 | `/kalo give <player> <item>` | `kalo.command.give` |
 | `/kalo import <file>` | `kalo.command.import` |
 
+## Serving the pack
+
+Generating a pack is only half the job — without somewhere to fetch it from, the file sits
+in the data folder and no player sees the content. Kalo can serve it itself:
+
+```yaml
+# plugins/Kalo/config.yml
+pack-host:
+  enabled: true
+  port: 8163
+  public-address: "play.example.com"   # what players actually connect to
+  required: false                       # true kicks players who decline
+```
+
+Off by default deliberately: it opens a port, and the right public address is something
+only you know — a wrong value hands out a URL nobody can reach.
+
+The URL carries a token that rotates whenever the pack is regenerated. Minecraft caches a
+pack by URL, so reusing one after a content change would strand every player on the old
+pack with nothing to indicate anything was wrong. The SHA-1 is sent with it, which is what
+lets an *unchanged* pack come from cache — the reason `ZipPackWriter` is deterministic.
+
+This is the piece Kalo Cloud would later replace with a managed CDN. Self-hosting stays
+free and fully functional.
+
 ## Add-ons
 
 A third-party plugin can add its own content type — Kalo's own five are registered the
@@ -214,7 +239,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 | **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | ✅ verified against Geyser 2.11.1: the extension loads and registers blocks into Geyser's palettes. A Bedrock client has not connected yet |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items, blocks, furniture and crafting recipes from both, reporting what did not carry over; non-crafting stations and placed-world migration pending |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | 🚧 PlaceholderAPI done; the others planned |
-| **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |
+| **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | 🚧 self-hosted pack serving works; the managed side is planned |
 
 Deliberately **not** in v0.1: HUD, custom mobs, a scripting language, web editor,
 marketplace. The basics have to be solid first.

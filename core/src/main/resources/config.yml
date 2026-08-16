@@ -1,0 +1,20 @@
+# Kalo configuration.
+
+# Serving the generated resource pack to players.
+#
+# Off by default on purpose: enabling it opens a port, and the address players need to
+# reach is something only you know — a wrong value hands out a URL nobody can fetch.
+pack-host:
+  enabled: false
+
+  # Port for the built-in HTTP server. Must be reachable by players, so open it in your
+  # firewall and forward it if the server is behind NAT.
+  port: 8163
+
+  # The host or IP players will reach the server on. "127.0.0.1" only works for a client
+  # on the same machine as the server.
+  public-address: "127.0.0.1"
+
+  # true kicks players who decline or fail to download. Leave false unless the content is
+  # essential to play — a failed download then only means missing textures, not no access.
+  required: false
