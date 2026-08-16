@@ -147,6 +147,19 @@ model:
 | `/kalo give <player> <item>` | `kalo.command.give` |
 | `/kalo import <file>` | `kalo.command.import` |
 
+## PlaceholderAPI
+
+Registered automatically when PlaceholderAPI is installed; nothing to configure, and
+nothing happens on servers without it.
+
+| Placeholder | Gives |
+|---|---|
+| `%kalo_held_id%` | the Kalo id of the held item, empty if it is not Kalo content |
+| `%kalo_held_name%` | its display name as plain text |
+| `%kalo_is_held_<key>%` | `true` / `false` |
+| `%kalo_count_<key>%` | how many are in the player's inventory |
+| `%kalo_items%`, `%kalo_blocks%` | how many are registered |
+
 ## Architecture
 
 ```
@@ -181,7 +194,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
 | **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | ✅ verified against Geyser 2.11.1: the extension loads and registers blocks into Geyser's palettes. A Bedrock client has not connected yet |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items, blocks, furniture and crafting recipes from both, reporting what did not carry over; non-crafting stations and placed-world migration pending |
-| **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
+| **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | 🚧 PlaceholderAPI done; the others planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |
 
 Deliberately **not** in v0.1: HUD, custom mobs, a scripting language, web editor,

@@ -70,6 +70,10 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
 
             Context context = new Context(KaloPluginImpl.this);
             managers.forEach(manager -> manager.start(context));
+
+            // Every plugin is loaded by now, so optional integrations can be wired
+            // without caring about load order.
+            io.kalo.integration.PlaceholderApiIntegration.registerIfPresent();
         }
     }
 }
