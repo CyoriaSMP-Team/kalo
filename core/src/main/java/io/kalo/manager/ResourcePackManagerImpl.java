@@ -205,6 +205,9 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         // type meant the last one to run erased the others' mappings.
         compiler.add(registries.item());
         compiler.add(registries.armor());
+        // Armor needs an attachable on top of its icon, or Bedrock draws the base
+        // material's armor instead of the custom one.
+        compiler.addArmor(registries.armor());
         // Skips whatever the Java compiler could not place, so the two platforms cannot
         // drift apart on which blocks exist.
         java.util.Set<String> blockSkip = java.util.Set.of();
@@ -240,6 +243,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         // custom items all map onto PAPER. Report what the reader actually wants.
         LOGGER.info("Generated Bedrock pack: " + result.itemCount() + " item(s) across "
                 + result.mappedCount() + " vanilla item(s), " + result.blockCount() + " block(s), "
+                + result.armorCount() + " worn armor piece(s), "
                 + result.pack().files().size() + " file(s)");
         if (result.skippedCount() > 0) {
             // Said out loud rather than silently dropped: a pack author who sees their

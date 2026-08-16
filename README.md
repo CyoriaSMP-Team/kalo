@@ -20,11 +20,12 @@ armor on Paper and Folia servers — no client mods, no player limits, no featur
 Bedrock output, because the content model is platform-neutral by design rather than by
 translation. That is the thing Kalo exists to do.
 
-> ⚠️ **Pre-alpha.** Items, blocks, furniture, armor and recipes work on Java, verified on a
-> live Paper 26.2 server. The Bedrock path is verified as far as Geyser: the extension
-> loads into Geyser 2.11.1 and its blocks reach Geyser's block palettes. No Bedrock client
-> has connected yet, so the last mile is unproven. Furniture is static (block-backed)
-> rather than entity-backed. See [the roadmap](#roadmap) for what is real and what is not.
+> ⚠️ **Pre-alpha.** Items, blocks, furniture, armor, recipes, sounds and glyphs work on
+> Java, verified on a live Paper 26.2 server. Bedrock is verified as far as Geyser: with
+> Geyser on the same server Kalo registers blocks through its API directly, no extension
+> and no file copying. No Bedrock client has connected yet, so the last mile is unproven.
+> Furniture is static (block-backed) rather than entity-backed. See
+> [the roadmap](#roadmap) for what is real and what is not.
 
 ## Four pillars
 
@@ -108,6 +109,11 @@ Armor needs two textures, and they are different things: the `model:` sprite is 
 in the hotbar, while `equipment:` is the sheet painted onto the player model. Leave
 `equipment:` out and the piece is named after itself; set `equipment: {enabled: false}`
 to keep the base material's vanilla armor texture.
+
+The same `equipment:` sheet drives **both platforms**. Java paints it onto the player
+through an equipment asset; Bedrock attaches a model and hides the vanilla layer beneath.
+Two mechanisms with nothing in common, one line of config — which is the whole reason the
+definition layer describes intent rather than either platform's output.
 
 ### Sounds and glyphs
 

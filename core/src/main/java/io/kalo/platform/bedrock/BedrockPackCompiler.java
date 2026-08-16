@@ -48,6 +48,7 @@ public final class BedrockPackCompiler {
     private final JsonArray mappedBlocks = new JsonArray();
     /** java content key -> Bedrock geometry identifier, for the extension to apply. */
     private final JsonObject geometries = new JsonObject();
+    private int attachables;
 
     private int skipped;
 
@@ -123,6 +124,61 @@ public final class BedrockPackCompiler {
         textureData.add(icon, texture);
 
         copyTexture(sprite.texture(), "textures/items/" + icon + ".png");
+    }
+
+    /**
+     * Adds armor: the attachable that puts it on the Bedrock player model.
+     *
+     * <p>Separate from {@link #add} because armor needs more than an icon. Java paints an
+     * equipment texture onto the player; Bedrock attaches a model and hides the vanilla
+     * layer beneath it. Same result, different mechanism — the icon still goes through
+     * {@code add} like any other item.</p>
+     */
+    public void addArmor(@NotNull Iterable<? extends io.kalo.content.armor.Armor> armors) {
+        for (io.kalo.content.armor.Armor armor : armors) {
+            io.kalo.content.armor.ArmorDefinition definition = armor.armorDefinition();
+
+            if (!definition.item().bedrock().enabled()) {
+                continue;
+            }
+            io.kalo.content.armor.ArmorDefinition.EquipmentTexture equipment = definition.equipment();
+            if (equipment == null) {
+                // Opted out of a custom worn appearance, so the base material's own armor
+                // is correct on Bedrock too.
+                continue;
+            }
+
+            Key key = definition.key();
+            Key source = definition.slot().usesLeggingsLayer() && equipment.leggings() != null
+                    ? equipment.leggings()
+                    : equipment.humanoid();
+            String textureName = source.namespace() + "_" + source.value();
+
+            pack.file(BedrockAttachable.attachablePath(key),
+                    Json.writable(BedrockAttachable.attachable(definition, textureName)));
+
+            // Java keeps armor sheets under textures/entity/equipment/<layer>/; Bedrock
+            // wants one flat textures/models/armor/ with a numbered suffix.
+            int layer = BedrockAttachable.textureLayer(definition.slot());
+            copyEquipmentTexture(source, definition.slot(),
+                    BedrockAttachable.texturePath(textureName, layer) + ".png");
+
+            attachables++;
+        }
+    }
+
+    /** Armor sheets live under a different root than item textures on the Java side. */
+    private void copyEquipmentTexture(@NotNull Key texture,
+                                      @NotNull io.kalo.content.armor.ArmorSlot slot,
+                                      @NotNull String destination) {
+        String layerDir = slot.usesLeggingsLayer() ? "humanoid_leggings" : "humanoid";
+        String source = "assets/" + texture.namespace() + "/textures/entity/equipment/"
+                + layerDir + "/" + texture.value() + ".png";
+
+        Writable content = javaSource.file(source);
+        if (content != null) {
+            pack.file(destination, content);
+        }
     }
 
     /**
@@ -319,7 +375,7 @@ public final class BedrockPackCompiler {
                 .mapToInt(entry -> entry.getValue().getAsJsonArray().size())
                 .sum();
         return new Result(pack, Json.writable(mappings), mappedItems.size(), itemDefinitions,
-                mappedBlocks.size(), skipped);
+                mappedBlocks.size(), attachables, skipped);
     }
 
     /**
@@ -330,11 +386,13 @@ public final class BedrockPackCompiler {
      * @param itemCount    how many custom items exist across them — the number a reader
      *                     expects, since a thousand custom items may all sit on PAPER
      * @param blockCount   how many custom blocks got a Bedrock appearance
+     * @param armorCount   how many armor pieces render on the Bedrock player model
      * @param skippedCount content Bedrock did not get, whether because it needs geometry
      *                     Kalo cannot produce or because Java could not place it either
      */
     public record Result(@NotNull ResourcePack pack, @NotNull Writable mappings,
-                         int mappedCount, int itemCount, int blockCount, int skippedCount) {
+                         int mappedCount, int itemCount, int blockCount, int armorCount,
+                         int skippedCount) {
     }
 
     private static @Nullable String plainName(@NotNull ItemDefinition definition) {

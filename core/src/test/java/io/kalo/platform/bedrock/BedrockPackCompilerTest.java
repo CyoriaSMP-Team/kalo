@@ -283,6 +283,118 @@ class BedrockPackCompilerTest {
     }
 
     @Test
+    void armorGetsAnAttachableSoItRendersOnTheBedrockPlayer() throws IOException {
+        // Without this Bedrock draws the base material's armor — a "custom helmet" that
+        // looks like plain netherite on everyone who plays from Bedrock.
+        ResourcePack java = javaPackWith("assets/testpack/textures/entity/equipment/humanoid/ruby.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addArmor(List.of(new StubArmor("ruby_helmet", io.kalo.content.armor.ArmorSlot.HEAD)));
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        assertEquals(1, result.armorCount());
+
+        JsonObject attachable = json(result.pack().file("attachables/testpack_ruby_helmet.json"))
+                .getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+
+        assertEquals("testpack:ruby_helmet", attachable.get("identifier").getAsString());
+        assertEquals("geometry.player_armor.helmet",
+                attachable.getAsJsonObject("geometry").get("default").getAsString());
+        // Hides the vanilla layer, or Bedrock draws both at once.
+        assertTrue(attachable.getAsJsonObject("scripts").get("parent_setup").getAsString()
+                .contains("helmet_layer_visible"), attachable.toString());
+
+        // Java keeps armor sheets under entity/equipment; Bedrock wants a flat directory.
+        assertNotNull(result.pack().file("textures/models/armor/testpack_ruby_1.png"));
+    }
+
+    @Test
+    void leggingsUseBedrocksSecondArmorSheet() throws IOException {
+        // The same split Java makes between its two layers, arrived at independently.
+        ResourcePack java = javaPackWith(
+                "assets/testpack/textures/entity/equipment/humanoid_leggings/ruby.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addArmor(List.of(new StubArmor("ruby_leggings", io.kalo.content.armor.ArmorSlot.LEGS)));
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        assertNotNull(result.pack().file("textures/models/armor/testpack_ruby_2.png"));
+        JsonObject description = json(result.pack().file("attachables/testpack_ruby_leggings.json"))
+                .getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+        assertEquals("textures/models/armor/testpack_ruby_2",
+                description.getAsJsonObject("textures").get("default").getAsString());
+    }
+
+    @Test
+    void armorThatOptedOutOfACustomLookGetsNoAttachable() throws IOException {
+        // The base material's own armor is the correct appearance there.
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/x.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addArmor(List.of(new StubArmor("plain_helmet", io.kalo.content.armor.ArmorSlot.HEAD, null)));
+
+        assertEquals(0, compiler.finish().armorCount());
+    }
+
+    private record StubArmor(io.kalo.content.armor.ArmorDefinition armorDefinition)
+            implements io.kalo.content.armor.Armor {
+
+        StubArmor(String name, io.kalo.content.armor.ArmorSlot slot) {
+            this(name, slot, new io.kalo.content.armor.ArmorDefinition.EquipmentTexture(
+                    Key.key("testpack", "ruby"), Key.key("testpack", "ruby")));
+        }
+
+        StubArmor(String name, io.kalo.content.armor.ArmorSlot slot,
+                  io.kalo.content.armor.ArmorDefinition.EquipmentTexture equipment) {
+            this(new io.kalo.content.armor.ArmorDefinition(
+                    ItemDefinition.builder(Key.key("testpack", name)).build(), slot, equipment));
+        }
+
+        @Override
+        public @NotNull ItemDefinition definition() {
+            return armorDefinition.item();
+        }
+
+        @Override
+        public @NotNull ImmutableItemStack itemStack() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean isSimilar(@NotNull org.bukkit.inventory.ItemStack itemStack) {
+            return false;
+        }
+
+        @Override
+        public @NotNull Collection<Feature> features() {
+            return List.of();
+        }
+
+        @Override
+        public @NotNull FeatureEventBus featureEventBus() {
+            return new FeatureEventBusImpl();
+        }
+
+        @Override
+        public @NotNull Key key() {
+            return armorDefinition.key();
+        }
+
+        @Override
+        public @NotNull String translationKey() {
+            return armorDefinition.translationKey();
+        }
+
+        @Override
+        public Item asItem() {
+            return this;
+        }
+    }
+
+    @Test
     void aPackWithNoBlocksEmitsNoBlockFiles() throws IOException {
         ResourcePack java = javaPackWith("assets/testpack/textures/item/ruby_sword.png");
 
