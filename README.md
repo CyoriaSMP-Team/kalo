@@ -147,6 +147,25 @@ model:
 | `/kalo give <player> <item>` | `kalo.command.give` |
 | `/kalo import <file>` | `kalo.command.import` |
 
+## Add-ons
+
+A third-party plugin can add its own content type — Kalo's own five are registered the
+same way, through the same registry:
+
+```java
+@EventHandler
+public void onRegistryInitialize(RegistryInitializeEvent event) {
+    event.getRegistries().types().register(MyType.KEY, new MyType());
+    event.getRegistries().features().register(MyFeature.KEY, new MyFeature.Factory());
+}
+```
+
+Use the default event priority. Kalo reads content packs at `HIGHEST`, which runs last, so
+a type registered at normal priority is in place before any pack is parsed.
+
+A `ContentType` parses its own YAML, owns its registry, and contributes its own resource
+pack assets — see `docs/IR_DESIGN.md` for the rule its definitions have to follow.
+
 ## PlaceholderAPI
 
 Registered automatically when PlaceholderAPI is installed; nothing to configure, and

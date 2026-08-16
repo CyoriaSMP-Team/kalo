@@ -40,6 +40,9 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
         globalRegistries.unlockAll();
         globalRegistries.clearAll();
+        // clearAll() empties the type registry as well, so the built-ins go back in
+        // before anything tries to read them.
+        ((GlobalRegistriesImpl) globalRegistries).registerBuiltinTypes();
         recipeType.clear();
         try {
             java.nio.file.Path stateFile =
@@ -89,23 +92,40 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
     public static final class GlobalRegistriesImpl extends RegistriesImpl implements GlobalRegistries {
         @Getter @Accessors(fluent = true)
-        private final Registry<ContentType<?>> types;
+        private final DirectWritableRegistry<ContentType<?>> types;
         @Getter @Accessors(fluent = true)
         private final DirectWritableRegistry<FeatureFactory<?>> features;
         @Getter @Accessors(fluent = true)
         private final DirectWritableRegistry<ContentsPack> contentsPacks;
 
+        private final io.kalo.platform.java.BlockStateAllocator blockStateAllocator;
+        private final RecipeType recipeType;
+
         private GlobalRegistriesImpl(@NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator,
                                     @NotNull RecipeType recipeType) {
-            Map<Key, ContentType<?>> typeMap = Map.of(
-                    ItemType.KEY, new ItemType(),
-                    BlockType.KEY, new BlockType(blockStateAllocator),
-                    FurnitureType.KEY, new FurnitureType(blockStateAllocator),
-                    ArmorType.KEY, new ArmorType(),
-                    RecipeType.KEY, recipeType);
-            this.types = create(new MappedRegistry<>(typeMap));
+            // Writable rather than a fixed map: add-ons register their own content types
+            // during RegistryInitializeEvent, before packs are read.
+            this.types = create(new DirectScalableRegistry<>());
+            this.blockStateAllocator = blockStateAllocator;
+            this.recipeType = recipeType;
+            registerBuiltinTypes();
             this.features = create(new DirectScalableRegistry<>());
             this.contentsPacks = create(new DirectScalableRegistry<>());
+        }
+
+        /**
+         * Puts Kalo's own content types back.
+         *
+         * <p>Needed after {@code clearAll()}, which now empties the type registry too:
+         * it became writable so add-ons could contribute, and a reload would otherwise
+         * leave the server with no content types at all.</p>
+         */
+        void registerBuiltinTypes() {
+            types.register(ItemType.KEY, new ItemType());
+            types.register(BlockType.KEY, new BlockType(blockStateAllocator));
+            types.register(FurnitureType.KEY, new FurnitureType(blockStateAllocator));
+            types.register(ArmorType.KEY, new ArmorType());
+            types.register(RecipeType.KEY, recipeType);
         }
 
         @Override
