@@ -32,7 +32,7 @@ translation. That is the thing Kalo exists to do.
 |---|---|
 | **Open Source** | MIT, no paid tier gating features |
 | **Community First** | No player caps, item caps, or premium converters |
-| **Paper / Folia** | Modern server API, current Minecraft |
+| **Paper / Folia** | Modern server API, current Minecraft — both verified on 26.2 |
 | **Java + Bedrock** | Cross-platform designed in, not bolted on |
 
 ## Content packs
@@ -235,7 +235,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 | Phase | Scope | State |
 |---|---|---|
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
-| **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
+| **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | ✅ five content types, hot reload and pack serving, verified on Paper **and Folia** 26.2; furniture is static, entity-backed mode pending |
 | **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | ✅ verified against Geyser 2.11.1: the extension loads and registers blocks into Geyser's palettes. A Bedrock client has not connected yet |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items, blocks, furniture and crafting recipes from both, reporting what did not carry over; non-crafting stations and placed-world migration pending |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | 🚧 PlaceholderAPI done; the others planned |
