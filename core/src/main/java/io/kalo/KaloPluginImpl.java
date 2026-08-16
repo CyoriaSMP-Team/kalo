@@ -3,9 +3,6 @@ package io.kalo;
 import io.kalo.manager.*;
 import lombok.Getter;
 import lombok.experimental.Accessors;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.server.ServerLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import io.kalo.platform.java.JavaBlockListener;
 
@@ -40,7 +37,20 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         getServer().getPluginManager().registerEvents(
                 new JavaBlockListener(registryManager.blockStateAllocator()), this);
 
-        getServer().getPluginManager().registerEvents(new ServerLoadListener(), this);
+        // Content loads here rather than on ServerLoadEvent, which is what Neko did.
+        // Geyser asks for custom blocks partway through its own enable — before
+        // ServerLoadEvent — so waiting meant handing it an empty registry and Bedrock
+        // players seeing none of the content.
+        //
+        // The cost is that an add-on registering its own content types must be enabled
+        // before Kalo, which it declares with `load: AFTER` on Kalo in its plugin.yml.
+        managers.forEach(manager -> manager.start(context));
+
+        // Subscribes to Geyser's block event. Must come after content is loaded, since
+        // Geyser may already be enabled and fire immediately.
+        io.kalo.integration.GeyserIntegration.registerIfPresent(this);
+
+        io.kalo.integration.PlaceholderApiIntegration.registerIfPresent();
     }
 
     @Override
@@ -62,21 +72,5 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         reloadableList.forEach(reloadable -> reloadable.end(context));
         reloadableList.forEach(reloadable -> reloadable.preload(context));
         reloadableList.forEach(reloadable -> reloadable.start(context));
-    }
-
-    private final class ServerLoadListener implements Listener {
-        @EventHandler
-        public void onServerLoad(ServerLoadEvent event) {
-            if (event.getType() == ServerLoadEvent.LoadType.RELOAD) {
-                return;
-            }
-
-            Context context = new Context(KaloPluginImpl.this);
-            managers.forEach(manager -> manager.start(context));
-
-            // Every plugin is loaded by now, so optional integrations can be wired
-            // without caring about load order.
-            io.kalo.integration.PlaceholderApiIntegration.registerIfPresent();
-        }
     }
 }

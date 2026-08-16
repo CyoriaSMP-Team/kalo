@@ -384,16 +384,29 @@ corpus of real packs, so treat a first import as a draft to review.
 
 ## Bedrock setup
 
-Two processes are involved, so there are two artifacts. The Paper plugin generates the
-Bedrock pack and mappings; the Geyser extension registers them.
+**If Geyser runs as a plugin on the same server — the usual setup — there is nothing to
+install and nothing to copy.** Kalo registers its blocks with Geyser directly through
+Geyser's own API:
 
-1. Run the server once so `plugins/Kalo/` contains `generated.mcpack` and
-   `bedrock-mappings.json`.
-2. Put `geyser-extension-<version>.jar` in Geyser's `extensions/` folder.
-3. Copy `bedrock-mappings.json` into `extensions/kalo/`.
-4. Serve `generated.mcpack` to Bedrock clients through Geyser's `packs/` folder.
+```
+[Kalo] Registering Kalo blocks with Geyser directly — no extension needed
+[Kalo] Registered 3 block(s) with Geyser natively
+```
 
-Geyser logs `[kalo] Registered N Kalo block(s) with Geyser` on startup when it worked.
+Serve `plugins/Kalo/generated.mcpack` to Bedrock clients through Geyser's `packs/` folder
+and that is the whole setup.
+
+Reading from the live registry rather than a file is the point: there is nothing in
+between to go stale, so regenerating content cannot leave Bedrock on an old copy.
+
+### Geyser running standalone
+
+A separate process cannot be reached from inside the server, so that setup still needs the
+extension:
+
+1. Put `geyser-extension-<version>.jar` in Geyser's `extensions/` folder.
+2. Copy `plugins/Kalo/bedrock-mappings.json` into `extensions/kalo/`, and again whenever
+   content changes.
 
 The extension does not fail when the mapping file is missing — Geyser often starts before
 the Paper side has generated one — it simply has nothing to register and says so.
