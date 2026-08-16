@@ -147,6 +147,22 @@ model:
 | `/kalo give <player> <item>` | `kalo.command.give` |
 | `/kalo import <file>` | `kalo.command.import` |
 
+## Building on an existing pack
+
+Most servers already ship a pack — a font, a HUD, retextured vanilla. Kalo used to replace
+it, forcing a choice between custom content and everything already built.
+
+```yaml
+# plugins/Kalo/config.yml
+base-pack: "base.zip"    # relative to plugins/Kalo/, or absolute
+```
+
+Kalo's generated files win a collision, because they are the half that has to agree with
+what the server sends clients — an item definition that disagrees with the `item_model`
+component renders as missing texture. Language files and block states merge **entry by
+entry** instead, since both packs' contents belong there: your translations survive, and a
+base pack cannot take over a note block state Kalo allocated to a custom block.
+
 ## Serving the pack
 
 Generating a pack is only half the job — without somewhere to fetch it from, the file sits

@@ -95,6 +95,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
             copyPackAssets(resourcePack);
             compileContentTypes(resourcePack);
+            mergeBasePack(resourcePack);
 
             generateBedrockPack(resourcePack);
 
@@ -124,6 +125,27 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
             LOGGER.log(Level.SEVERE, "Resource pack generation failed", throwable);
             return null;
         });
+    }
+
+    /**
+     * Folds in a pack the server already ships, if one is configured.
+     *
+     * <p>After content compilation on purpose: Kalo's generated files must win on a
+     * collision, since they are the half that has to agree with what the server sends.</p>
+     */
+    private static void mergeBasePack(@NotNull ResourcePack resourcePack) {
+        String configured = Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin
+                ? plugin.getConfig().getString("base-pack", "")
+                : "";
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+
+        File base = new File(configured);
+        if (!base.isAbsolute()) {
+            base = new File(Constants.dataFolder(), configured);
+        }
+        io.kalo.pack.PackMerger.merge(resourcePack, base);
     }
 
     private static @NotNull File generatedPackFile() {

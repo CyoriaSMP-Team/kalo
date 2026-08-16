@@ -1,5 +1,16 @@
 # Kalo configuration.
 
+# An existing resource pack to build on top of, relative to plugins/Kalo/ or absolute.
+#
+# Most servers already ship a pack — a font, a HUD, retextured vanilla — and Kalo's output
+# used to replace it, forcing a choice between custom content and everything already
+# built. Point this at that pack and both end up in the generated one.
+#
+# Kalo's generated files win on a collision, because they are the half that has to agree
+# with what the server sends clients. Language files and block states merge entry by entry
+# instead, since both packs' contents belong there.
+base-pack: ""
+
 # Serving the generated resource pack to players.
 #
 # Off by default on purpose: enabling it opens a port, and the address players need to
