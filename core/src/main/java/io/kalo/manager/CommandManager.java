@@ -2,8 +2,8 @@ package io.kalo.manager;
 
 import io.kalo.Kalo;
 import io.kalo.migration.ImportReport;
-import io.kalo.migration.ItemsAdderImporter;
-import io.kalo.migration.OraxenImporter;
+import io.kalo.migration.Importer;
+import io.kalo.migration.Importers;
 import io.kalo.utils.Plugins;
 import io.kalo.content.item.Item;
 import io.kalo.utils.Constants;
@@ -93,21 +93,17 @@ public final class CommandManager implements Managerial {
         try {
             YamlConfiguration config = YamlConfiguration.loadConfiguration(source);
 
-            // Detected rather than asked for: someone migrating knows which plugin they
-            // are leaving, but not necessarily which file format it wrote.
-            String converted;
-            if (ItemsAdderImporter.looksLikeItemsAdder(config)) {
-                sender.sendMessage(Component.text("Detected ItemsAdder format", NamedTextColor.GRAY));
-                converted = ItemsAdderImporter.convert(config, report);
-            } else if (looksLikeOraxenRecipes(config)) {
-                // Oraxen keeps recipes in their own folder, so the file gives no other
-                // hint about what it holds.
-                sender.sendMessage(Component.text("Detected Oraxen/Nexo recipes", NamedTextColor.GRAY));
-                converted = OraxenImporter.convertRecipes(config, "imported", report);
-            } else {
-                sender.sendMessage(Component.text("Detected Oraxen/Nexo items", NamedTextColor.GRAY));
-                converted = OraxenImporter.convert(config, "imported", report);
+            Importer importer = Importers.detect(config);
+            if (importer == null) {
+                // Better than picking one at random and producing plausible nonsense.
+                sender.sendMessage(Component.text(
+                        "Could not recognise this file's format. Supported: "
+                                + Importers.all().stream().map(Importer::name).collect(java.util.stream.Collectors.joining(", ")),
+                        NamedTextColor.RED));
+                return;
             }
+            sender.sendMessage(Component.text("Detected " + importer.name() + " format", NamedTextColor.GRAY));
+            String converted = importer.convert(config, "imported", report);
 
             File destination = new File(source.getParentFile(), source.getName() + ".kalo.yml");
             if (destination.exists()) {
@@ -130,20 +126,6 @@ public final class CommandManager implements Managerial {
             Plugins.logger().log(Level.WARNING, "Import of " + source + " failed", e);
             sender.sendMessage(Component.text("Import failed: " + e.getMessage(), NamedTextColor.RED));
         }
-    }
-
-    /**
-     * An Oraxen recipes file has entries with a {@code result} section, which an items
-     * file never does.
-     */
-    private static boolean looksLikeOraxenRecipes(@NotNull YamlConfiguration config) {
-        for (String key : config.getKeys(false)) {
-            var section = config.getConfigurationSection(key);
-            if (section != null && section.isConfigurationSection("result")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override

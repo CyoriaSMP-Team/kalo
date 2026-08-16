@@ -267,16 +267,31 @@ Output: `build/libs/Kalo-<version>.jar`
 - **`geyser-extension`** — runs inside Geyser, not Paper; registers Kalo's custom blocks
   so Bedrock renders them
 
-## Migrating from Oraxen, Nexo or ItemsAdder
+## Migrating from another plugin
+
+| From | Items | Blocks | Furniture | Recipes |
+|---|---|---|---|---|
+| **Oraxen** | ✅ | ✅ | ✅ | ✅ |
+| **Nexo** | ✅ | ✅ | ✅ | ✅ |
+| **ItemsAdder** | ✅ | ✅ | ✅ | ✅ |
+| **Neko** | ✅ | — | — | — |
+| **CraftEngine** | ✅ | ✅ | — | — |
 
 ```
 /kalo import plugins/Oraxen/items/weapons.yml
-/kalo import plugins/Oraxen/recipes/weapons.yml
 /kalo import plugins/ItemsAdder/contents/mypack/items.yml
+/kalo import plugins/Nexo/items/weapons.yml
 ```
 
-The format is detected, not asked for. The result is written as `<file>.kalo.yml` next to
-the source, never overwriting.
+The format is detected, not asked for, and detection is **scored** rather than
+first-match — these formats overlap (Nexo is an Oraxen fork; several are plain YAML maps
+of content keys) so the most confident reader wins. A file nothing recognises is refused
+rather than guessed at, because plausible nonsense is worse than a clear no.
+
+The result is written as `<file>.kalo.yml` next to the source, never overwriting.
+
+An add-on can support a format Kalo does not ship with:
+`Importers.register(new MyVendorImporter())`.
 
 What matters more than what converts is what does not. Both plugins drive their own
 behaviour systems — Oraxen's `Mechanics`, ItemsAdder's `behaviours` — which Kalo expresses
