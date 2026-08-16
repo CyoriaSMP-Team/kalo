@@ -95,9 +95,23 @@ public final class BlockType implements ContentType<Block> {
         }
     }
 
+    /** Blocks the Java compiler could not place, so Bedrock can skip them too. */
+    private volatile java.util.Set<String> uncompilable = java.util.Set.of();
+
     @Override
     public void compilePack(@NotNull ResourcePack resourcePack, @NotNull Iterable<Block> contents) {
-        JavaBlockCompiler.compileBlocks(resourcePack, contents, allocator);
+        uncompilable = JavaBlockCompiler.compileBlocks(resourcePack, contents, allocator).keySet();
+    }
+
+    /**
+     * Keys that failed to compile on Java.
+     *
+     * <p>Bedrock must skip these too. Registering a block on one platform and not the
+     * other means a Bedrock player sees something a Java player standing beside them does
+     * not, which is the exact opposite of what this project is for.</p>
+     */
+    public @NotNull java.util.Set<String> uncompilable() {
+        return uncompilable;
     }
 
     public static @NotNull BlockDefinition parseDefinition(@NotNull Key key, @NotNull ConfigurationSection config) {

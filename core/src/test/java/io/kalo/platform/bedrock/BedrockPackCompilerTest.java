@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -133,7 +134,7 @@ class BedrockPackCompilerTest {
 
         BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(vanilla)));
 
-        assertEquals(0, result.mappedCount(), "Bedrock already draws vanilla items correctly");
+        assertEquals(0, result.itemCount(), "Bedrock already draws vanilla items correctly");
         assertEquals(0, result.skippedCount(), "and this is not a gap, so it is not a skip");
     }
 
@@ -147,7 +148,7 @@ class BedrockPackCompilerTest {
 
         BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(custom)));
 
-        assertEquals(0, result.mappedCount());
+        assertEquals(0, result.itemCount());
         assertEquals(1, result.skippedCount());
     }
 
@@ -159,7 +160,7 @@ class BedrockPackCompilerTest {
                 .bedrock(new BedrockOptions(false, null))
                 .build();
 
-        assertEquals(0, compile(java, List.of(new StubItem(off))).mappedCount());
+        assertEquals(0, compile(java, List.of(new StubItem(off))).itemCount());
     }
 
     @Test
@@ -186,7 +187,7 @@ class BedrockPackCompilerTest {
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
 
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
-        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7);
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7, Set.of());
         BedrockPackCompiler.Result result = compiler.finish();
 
         assertEquals(1, result.blockCount());
@@ -212,7 +213,7 @@ class BedrockPackCompilerTest {
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
 
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
-        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7);
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7, Set.of());
 
         JsonObject mappings = json(compiler.finish().mappings());
         JsonObject record = mappings.getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
@@ -235,7 +236,7 @@ class BedrockPackCompilerTest {
                         .model(new io.kalo.content.block.definition.BlockModelDefinition.Custom(
                                 Key.key("testpack", "block/chair"),
                                 Map.of("all", Key.key("testpack", "block/chair"))))
-                        .build())), key -> 4);
+                        .build())), key -> 4, Set.of());
         BedrockPackCompiler.Result result = compiler.finish();
 
         assertEquals(1, result.blockCount(), "a custom model should no longer be skipped");
@@ -260,9 +261,25 @@ class BedrockPackCompilerTest {
                 io.kalo.content.block.definition.BlockDefinition.builder(Key.key("testpack", "plain"))
                         .model(new io.kalo.content.block.definition.BlockModelDefinition.Custom(
                                 Key.key("testpack", "block/plain"), Map.of()))
-                        .build())), key -> 5);
+                        .build())), key -> 5, Set.of());
 
         assertEquals(1, compiler.finish().skippedCount());
+    }
+
+    @Test
+    void aBlockJavaCouldNotPlaceIsSkippedOnBedrockToo() throws IOException {
+        // Registering on one platform and not the other means a Bedrock player sees a
+        // block the Java player beside them does not — the opposite of the point.
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/ruby_block.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 1,
+                Set.of("testpack:ruby_block"));
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        assertEquals(0, result.blockCount());
+        assertEquals(1, result.skippedCount());
     }
 
     @Test

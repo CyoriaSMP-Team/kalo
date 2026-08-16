@@ -99,6 +99,11 @@ are persisted in `plugins/Kalo/block-states.json` and never reused — a placed 
 stored as only its borrowed vanilla state, so a shifting assignment would silently turn
 every already-placed block into something else.
 
+**There are 799 of those states**, which is the hard ceiling on blocks and furniture
+combined. Past it, Kalo names each block it could not place and the reason, and skips it
+on Bedrock too — a block on one platform and not the other is worse than a block on
+neither. Items have no such limit; they use the item-model system.
+
 Armor needs two textures, and they are different things: the `model:` sprite is the icon
 in the hotbar, while `equipment:` is the sheet painted onto the player model. Leave
 `equipment:` out and the piece is named after itself; set `equipment: {enabled: false}`

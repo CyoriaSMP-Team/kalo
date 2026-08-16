@@ -139,10 +139,18 @@ public final class BedrockPackCompiler {
      *                  extension can translate a placed block without re-deriving it
      */
     public void addBlocks(@NotNull Iterable<? extends Block> blocks,
-                          @NotNull java.util.function.Function<Key, Integer> allocator) {
+                          @NotNull java.util.function.Function<Key, Integer> allocator,
+                          @NotNull java.util.Set<String> skip) {
         for (Block block : blocks) {
             BlockDefinition definition = block.definition();
             if (!definition.bedrock().enabled()) {
+                continue;
+            }
+            if (skip.contains(definition.key().asString())) {
+                // Java could not place this block, so Bedrock must not either. Registering
+                // on one platform and not the other means a Bedrock player sees something
+                // the Java player beside them does not.
+                skipped++;
                 continue;
             }
 
@@ -307,19 +315,26 @@ public final class BedrockPackCompiler {
             mappings.add("kalo:geometries", geometries);
         }
 
-        return new Result(pack, Json.writable(mappings), mappedItems.size(), mappedBlocks.size(), skipped);
+        int itemDefinitions = mappedItems.entrySet().stream()
+                .mapToInt(entry -> entry.getValue().getAsJsonArray().size())
+                .sum();
+        return new Result(pack, Json.writable(mappings), mappedItems.size(), itemDefinitions,
+                mappedBlocks.size(), skipped);
     }
 
     /**
      * @param pack        the Bedrock pack, ready to be written as {@code .mcpack}
      * @param mappings    the Geyser mapping file, which lives beside the pack rather
      *                    than inside it
-     * @param mappedCount how many vanilla items carry at least one custom definition
-     * @param blockCount  how many custom blocks got a Bedrock appearance
-     * @param skippedCount content that needs Bedrock geometry Kalo cannot yet produce
+     * @param mappedCount  how many vanilla items carry at least one custom definition
+     * @param itemCount    how many custom items exist across them — the number a reader
+     *                     expects, since a thousand custom items may all sit on PAPER
+     * @param blockCount   how many custom blocks got a Bedrock appearance
+     * @param skippedCount content Bedrock did not get, whether because it needs geometry
+     *                     Kalo cannot produce or because Java could not place it either
      */
     public record Result(@NotNull ResourcePack pack, @NotNull Writable mappings,
-                         int mappedCount, int blockCount, int skippedCount) {
+                         int mappedCount, int itemCount, int blockCount, int skippedCount) {
     }
 
     private static @Nullable String plainName(@NotNull ItemDefinition definition) {

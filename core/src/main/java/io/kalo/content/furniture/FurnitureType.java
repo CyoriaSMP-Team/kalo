@@ -56,10 +56,17 @@ public final class FurnitureType implements ContentType<Furniture> {
         }
     }
 
+    private volatile java.util.Set<String> uncompilable = java.util.Set.of();
+
     @Override
     public void compilePack(@NotNull ResourcePack resourcePack, @NotNull Iterable<Furniture> contents) {
         List<io.kalo.content.block.Block> blocks = new ArrayList<>();
         contents.forEach(blocks::add);
-        JavaBlockCompiler.compileBlocks(resourcePack, blocks, allocator);
+        uncompilable = JavaBlockCompiler.compileBlocks(resourcePack, blocks, allocator).keySet();
+    }
+
+    /** See {@link io.kalo.content.block.BlockType#uncompilable()}. */
+    public @NotNull java.util.Set<String> uncompilable() {
+        return uncompilable;
     }
 }

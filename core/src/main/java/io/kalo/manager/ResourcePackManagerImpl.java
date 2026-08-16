@@ -182,8 +182,25 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         // type meant the last one to run erased the others' mappings.
         compiler.add(registries.item());
         compiler.add(registries.armor());
-        compiler.addBlocks(registries.block(), blockStates::get);
-        compiler.addBlocks(registries.furniture(), blockStates::get);
+        // Skips whatever the Java compiler could not place, so the two platforms cannot
+        // drift apart on which blocks exist.
+        java.util.Set<String> blockSkip = java.util.Set.of();
+        java.util.Set<String> furnitureSkip = java.util.Set.of();
+        if (Kalo.plugin().registryManager() instanceof RegistryManagerImpl impl) {
+            blockSkip = impl.registries().types().get(io.kalo.content.block.BlockType.KEY)
+                    .filter(io.kalo.content.block.BlockType.class::isInstance)
+                    .map(io.kalo.content.block.BlockType.class::cast)
+                    .map(io.kalo.content.block.BlockType::uncompilable)
+                    .orElse(java.util.Set.of());
+            furnitureSkip = impl.registries().types().get(io.kalo.content.furniture.FurnitureType.KEY)
+                    .filter(io.kalo.content.furniture.FurnitureType.class::isInstance)
+                    .map(io.kalo.content.furniture.FurnitureType.class::cast)
+                    .map(io.kalo.content.furniture.FurnitureType::uncompilable)
+                    .orElse(java.util.Set.of());
+        }
+
+        compiler.addBlocks(registries.block(), blockStates::get, blockSkip);
+        compiler.addBlocks(registries.furniture(), blockStates::get, furnitureSkip);
 
         BedrockPackCompiler.Result result = compiler.finish();
 
@@ -196,8 +213,11 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
             return;
         }
 
-        LOGGER.info("Successfully generated Bedrock pack (" + result.pack().files().size() + " files, "
-                + result.mappedCount() + " mapped vanilla items, " + result.blockCount() + " blocks)");
+        // mappedCount is distinct vanilla items, which reads like a failure when 1000
+        // custom items all map onto PAPER. Report what the reader actually wants.
+        LOGGER.info("Generated Bedrock pack: " + result.itemCount() + " item(s) across "
+                + result.mappedCount() + " vanilla item(s), " + result.blockCount() + " block(s), "
+                + result.pack().files().size() + " file(s)");
         if (result.skippedCount() > 0) {
             // Said out loud rather than silently dropped: a pack author who sees their
             // item on Java but not on Bedrock deserves to know why.

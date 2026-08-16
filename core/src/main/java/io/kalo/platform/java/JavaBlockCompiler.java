@@ -60,12 +60,14 @@ public final class JavaBlockCompiler {
     private JavaBlockCompiler() {
     }
 
-    public static void compileBlocks(@NotNull ResourcePack pack,
-                                     @NotNull Iterable<Block> blocks,
-                                     @NotNull BlockStateAllocator allocator) {
+    /** @return the blocks that could not be compiled, by key, with the reason */
+    public static Map<String, String> compileBlocks(@NotNull ResourcePack pack,
+                                                    @NotNull Iterable<Block> blocks,
+                                                    @NotNull BlockStateAllocator allocator) {
         // index -> model key of the custom block occupying it
         Map<Integer, Key> occupied = new TreeMap<>();
         Map<String, String> translations = new TreeMap<>();
+        Map<String, String> failed = new TreeMap<>();
 
         for (Block block : blocks) {
             try {
@@ -81,7 +83,11 @@ public final class JavaBlockCompiler {
 
                 translations.put(definition.translationKey(), humanize(definition.key().value()));
             } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Failed to compile pack assets for a block", e);
+                // Named, with the reason. 104 identical "failed to compile a block" lines
+                // tell a server owner nothing about which block or why.
+                String key = keyOf(block);
+                failed.put(key, e.getMessage() != null ? e.getMessage() : e.toString());
+                LOGGER.warning("Could not compile block " + key + ": " + e.getMessage());
             }
         }
 
@@ -89,6 +95,20 @@ public final class JavaBlockCompiler {
 
         if (!translations.isEmpty()) {
             writeTranslations(pack, translations);
+        }
+
+        if (!failed.isEmpty()) {
+            LOGGER.warning(failed.size() + " block(s) did not make it into the pack and will not "
+                    + "render for any player");
+        }
+        return failed;
+    }
+
+    private static @NotNull String keyOf(@NotNull Block block) {
+        try {
+            return block.definition().key().asString();
+        } catch (Exception e) {
+            return "<unreadable>";
         }
     }
 
