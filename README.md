@@ -20,12 +20,11 @@ armor on Paper and Folia servers — no client mods, no player limits, no featur
 Bedrock output, because the content model is platform-neutral by design rather than by
 translation. That is the thing Kalo exists to do.
 
-> ⚠️ **Pre-alpha.** Items, blocks, furniture and armor work on Java and are verified on a
-> live server. The Bedrock path — `.mcpack`, Geyser mappings, geometry conversion, and an
-> extension that registers blocks — is written and unit-tested but has **not** been run
-> against a live Geyser instance yet, so treat it as unproven. Furniture is static
-> (block-backed) rather than entity-backed. See [the roadmap](#roadmap) for what is real
-> and what is not.
+> ⚠️ **Pre-alpha.** Items, blocks, furniture, armor and recipes work on Java, verified on a
+> live Paper 26.2 server. The Bedrock path is verified as far as Geyser: the extension
+> loads into Geyser 2.11.1 and its blocks reach Geyser's block palettes. No Bedrock client
+> has connected yet, so the last mile is unproven. Furniture is static (block-backed)
+> rather than entity-backed. See [the roadmap](#roadmap) for what is real and what is not.
 
 ## Four pillars
 
@@ -180,7 +179,7 @@ every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHAS
 |---|---|---|
 | **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
 | **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | 🚧 all four types work; furniture is static, entity-backed mode pending |
-| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | 🚧 items, cube blocks and custom-model blocks all compile, including Java→Bedrock geometry conversion; not yet verified against a live Geyser |
+| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | ✅ verified against Geyser 2.11.1: the extension loads and registers blocks into Geyser's palettes. A Bedrock client has not connected yet |
 | **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items, blocks, furniture and crafting recipes from both, reporting what did not carry over; non-crafting stations and placed-world migration pending |
 | **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | planned |
 | **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | planned |
@@ -257,6 +256,8 @@ Bedrock pack and mappings; the Geyser extension registers them.
 2. Put `geyser-extension-<version>.jar` in Geyser's `extensions/` folder.
 3. Copy `bedrock-mappings.json` into `extensions/kalo/`.
 4. Serve `generated.mcpack` to Bedrock clients through Geyser's `packs/` folder.
+
+Geyser logs `[kalo] Registered N Kalo block(s) with Geyser` on startup when it worked.
 
 The extension does not fail when the mapping file is missing — Geyser often starts before
 the Paper side has generated one — it simply has nothing to register and says so.

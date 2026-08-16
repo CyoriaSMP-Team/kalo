@@ -1,4 +1,7 @@
-api: 1.0.0
+# The Geyser API version this extension is built against, not the old Base API
+# version — Geyser warns that the latter is deprecated. Keep it in step with the
+# org.geysermc.geyser:api dependency in build.gradle.kts.
+api: 2.11.1
 id: kalo
 name: Kalo
 main: io.kalo.geyser.KaloExtension
