@@ -228,6 +228,7 @@ public final class OraxenImporter {
                                      @NotNull ImportReport report) {
         Map<String, Object> converted = new LinkedHashMap<>();
         converted.put("type", "block");
+        converted.put("java", Map.of("mode", "virtual"));
 
         Map<String, Object> display = new LinkedHashMap<>();
         String name = firstNonNull(item.getString("displayname"), item.getString("display_name"),

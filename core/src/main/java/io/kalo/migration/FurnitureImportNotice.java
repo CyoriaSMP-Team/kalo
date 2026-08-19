@@ -9,9 +9,9 @@ import org.jetbrains.annotations.NotNull;
  * frame, with barrier blocks standing in for a hitbox. That buys free rotation, hitboxes
  * of any shape, seats, and models larger than one block.</p>
  *
- * <p>Kalo's furniture is a block borrowing a note block state. It is far cheaper at
- * runtime and survives a restart with no entity bookkeeping, but it occupies exactly one
- * block and faces exactly one way.</p>
+ * <p>Kalo's virtual furniture is one anchored display occupying exactly one block. It
+ * survives a restart through persistent entity data, but it still faces exactly one way
+ * and does not carry over arbitrary seats or multi-block hitboxes.</p>
  *
  * <p>So a furniture import is a genuine downgrade in capability, not a format change.
  * Producing something that merely looks converted would be the worst outcome: the server
@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 public final class FurnitureImportNotice {
 
     public static final String STATIC_ONLY =
-            "Kalo furniture is a single static block, not an entity. Rotation, custom hitboxes, "
+            "Kalo furniture is a single static block backed by an anchored display. Rotation, custom hitboxes, "
                     + "seats and multi-block models do NOT carry over — the shape and name come "
                     + "across, the behaviour does not. Check every piece before going live.";
 

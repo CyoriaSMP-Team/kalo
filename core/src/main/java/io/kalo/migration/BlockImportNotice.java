@@ -5,11 +5,10 @@ import org.jetbrains.annotations.NotNull;
 /**
  * The warning that matters most in a block migration.
  *
- * <p>Oraxen, ItemsAdder and Kalo all store a placed custom block as nothing more than a
- * vanilla note block in some state, and each of them decides on its own which state means
- * which block. Converting a <em>config</em> therefore does not convert a <em>world</em>:
- * the definitions come across, but every block already placed still sits in the state the
- * old plugin assigned, which Kalo will read as a different block or as no block at all.</p>
+ * <p>Oraxen and ItemsAdder store a placed custom block in their own carrier/entity format.
+ * Converting a <em>config</em> therefore does not convert a <em>world</em>: the definitions
+ * come across, but every block already placed still belongs to the old plugin and must be
+ * reviewed or replaced before the old plugin is removed.</p>
  *
  * <p>This is the single most expensive thing to discover after the fact, so the importer
  * says it every time rather than burying it in documentation.</p>
@@ -17,9 +16,10 @@ import org.jetbrains.annotations.NotNull;
 public final class BlockImportNotice {
 
     public static final String WORLD_NOT_MIGRATED =
-            "Blocks already placed in the world are NOT migrated. Kalo assigns its own note "
-                    + "block states, so existing blocks will read as the wrong block until they are "
-                    + "replaced. Migrate a copy of the world, or re-place them, before going live.";
+            "Blocks already placed in the world are NOT migrated. Kalo cannot safely infer "
+                    + "another plugin's carrier/entity records, so review or replace them before "
+                    + "removing the old plugin. Migrate a copy of the world, or re-place them, "
+                    + "before going live.";
 
     private BlockImportNotice() {
     }

@@ -7,6 +7,7 @@ import io.kalo.content.block.definition.BlockBehaviour;
 import io.kalo.content.block.definition.BlockCarrier;
 import io.kalo.content.block.definition.BlockDefinition;
 import io.kalo.content.block.definition.BlockModelDefinition;
+import io.kalo.content.block.definition.JavaBlockMode;
 import io.kalo.content.block.definition.JavaBlockOptions;
 import io.kalo.content.feature.FeatureArguments;
 import io.kalo.content.feature.FeatureBuilder;
@@ -137,9 +138,13 @@ public final class BlockType implements ContentType<Block> {
 
         ConfigurationSection java = config.getConfigurationSection("java");
         if (java != null) {
+            String modeValue = java.getString("mode", "native");
+            JavaBlockMode mode = JavaBlockMode.valueOf(modeValue.toUpperCase(Locale.ROOT));
             String carrier = java.getString("carrier");
             if (carrier != null) {
-                builder.java(new JavaBlockOptions(BlockCarrier.valueOf(carrier.toUpperCase(Locale.ROOT))));
+                builder.java(new JavaBlockOptions(mode, BlockCarrier.fromId(carrier)));
+            } else if (mode == JavaBlockMode.VIRTUAL) {
+                builder.java(JavaBlockOptions.virtual());
             }
         }
 

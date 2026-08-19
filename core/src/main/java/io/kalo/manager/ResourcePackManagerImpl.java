@@ -190,12 +190,12 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
     private static void generateBedrockPack(@NotNull ResourcePack javaPack) {
         Registries registries = RegistryManager.GlobalRegistries.registries();
 
-        // The Java carrier state each block sits in, so the Geyser extension can
-        // translate a placed block without re-deriving the allocation.
+        // Native Java carrier states are exported for the Geyser mapping; virtual blocks
+        // intentionally have no finite state and are labelled by BedrockPackCompiler.
         java.util.Map<net.kyori.adventure.key.Key, Integer> blockStates = new java.util.HashMap<>();
         if (Kalo.plugin().registryManager() instanceof RegistryManagerImpl impl) {
-            impl.blockStateAllocator().assignments().forEach((key, index) ->
-                    blockStates.put(net.kyori.adventure.key.Key.key(key), index));
+            impl.blockStateAllocator().assignments().forEach((key, assignment) ->
+                    blockStates.put(net.kyori.adventure.key.Key.key(key), assignment.state()));
         }
 
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, PACK_DESCRIPTION));

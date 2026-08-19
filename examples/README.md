@@ -23,12 +23,12 @@ Exercises every content path currently implemented.
 
 | Content | Covers |
 |---|---|
-| `ruby_block` | `cube_all` model, hardness, tool requirement |
-| `oak_chair`, `ruby_pedestal` | furniture, which shares the block carrier — proves both types coexist in the one shared `note_block.json` |
+| `ruby_block` | `cube_all` model, hardness, tool requirement, virtual placement |
+| `oak_chair`, `ruby_pedestal` | virtual furniture, persistent ItemDisplay + invisible anchor |
 
-Both borrow note block states. Placed blocks are stored as nothing but their borrowed
-vanilla state, so `plugins/Kalo/block-states.json` records the assignment and is written
-through on every new one.
+The example uses `java.mode: virtual`, so these blocks do not consume a finite carrier
+state. The anchor and display survive chunk saves; `plugins/Kalo/block-states.json` is
+only needed for content explicitly using `java.mode: native`.
 
 ### Armor — `configs/armor.yml`
 
@@ -47,7 +47,6 @@ After the server starts, the generated pack is at `run/plugins/Kalo/generated.zi
 
 ```
 pack.mcmeta                                              pack_format 88
-assets/minecraft/blockstates/note_block.json             all 800 states
 assets/testpack/items/*.json                             one per item, block and armor piece
 assets/testpack/models/item/*.json                       generated sprites
 assets/testpack/models/block/*.json                      cube models

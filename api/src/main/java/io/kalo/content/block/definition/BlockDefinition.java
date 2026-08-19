@@ -10,8 +10,9 @@ import org.jetbrains.annotations.NotNull;
  *
  * <p>Same contract as {@link io.kalo.content.item.definition.ItemDefinition}: nothing in
  * {@link #display()}, {@link #model()} or {@link #behaviour()} names a platform concept.
- * The Java compiler decides which vanilla block state to borrow; a Bedrock compiler
- * registers a real custom block through Geyser and borrows nothing.</p>
+ * The Java compiler chooses either a borrowed vanilla state or a virtual anchor/display
+ * backend; a Bedrock compiler registers a real custom block through Geyser and borrows
+ * nothing.</p>
  */
 public record BlockDefinition(
         @NotNull Key key,

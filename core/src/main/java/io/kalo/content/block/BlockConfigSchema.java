@@ -1,7 +1,10 @@
 package io.kalo.content.block;
 
 import io.kalo.config.ConfigSchema;
+import io.kalo.content.block.definition.BlockCarrier;
 import org.bukkit.configuration.ConfigurationSection;
+
+import java.util.Arrays;
 
 public final class BlockConfigSchema implements ConfigSchema {
 
@@ -29,6 +32,24 @@ public final class BlockConfigSchema implements ConfigSchema {
             double hardness = behaviour.getDouble("hardness");
             if (hardness < 0 && hardness != -1d) {
                 result.failed("hardness must be >= 0, or -1 for unbreakable; got " + hardness);
+            }
+        }
+
+        ConfigurationSection java = config.getConfigurationSection("java");
+        if (java != null) {
+            String mode = java.getString("mode", "native");
+            if (mode == null || (!mode.equalsIgnoreCase("native") && !mode.equalsIgnoreCase("virtual"))) {
+                result.failed("java.mode must be 'native' or 'virtual'; got " + mode);
+            }
+
+            String carrier = java.getString("carrier");
+            if (carrier != null) {
+                try {
+                    BlockCarrier.fromId(carrier);
+                } catch (IllegalArgumentException e) {
+                    result.failed("java.carrier is not a supported carrier: " + carrier
+                            + "; expected one of " + Arrays.toString(BlockCarrier.values()));
+                }
             }
         }
 

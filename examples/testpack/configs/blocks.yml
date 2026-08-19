@@ -3,12 +3,14 @@ ruby_block:
   display:
     name: "<red>Ruby Block</red>"
     lore:
-      - "<gray>Borrows a note block state.</gray>"
+      - "<gray>Uses Kalo's virtual block backend.</gray>"
   model:
     cube_all: "block/ruby_block"
   behaviour:
     hardness: 3.0
     requires_tool: true
+  java:
+    mode: virtual
 
 # Furniture shares the block carrier and the same model pipeline; it is a
 # distinct content type so it can grow its own behaviour later.

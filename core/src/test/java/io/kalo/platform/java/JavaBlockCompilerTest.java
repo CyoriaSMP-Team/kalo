@@ -30,6 +30,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JavaBlockCompilerTest {
@@ -117,6 +118,48 @@ class JavaBlockCompilerTest {
         // Ships in the pack's assets/ and is copied verbatim.
         assertTrue(pack.files().containsKey("assets/testpack/items/chair.json"));
         assertEquals(null, pack.file("assets/testpack/models/block/chair.json"));
+    }
+
+    @Test
+    void virtualBlocksDoNotConsumeAStateButStillGetAnItemDefinition() throws IOException {
+        ResourcePack pack = pack();
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        BlockDefinition definition = BlockDefinition.builder(Key.key("testpack", "unlimited"))
+                .model(new BlockModelDefinition.CubeAll(Key.key("testpack", "block/unlimited")))
+                .java(JavaBlockOptions.virtual())
+                .build();
+
+        JavaBlockCompiler.compileBlocks(pack, List.of(new StubBlock(definition)), allocator);
+
+        assertNull(allocator.assignmentOf(definition.key()),
+                "virtual content must not consume a finite native state");
+        assertNotNull(pack.file("assets/testpack/items/unlimited.json"));
+        assertNotNull(pack.file("assets/testpack/models/block/unlimited.json"));
+        assertNull(pack.file(JavaBlockCompiler.NOTE_BLOCK_STATES_PATH),
+                "a virtual-only pass should not generate a carrier blockstates file");
+    }
+
+    @Test
+    void switchingAnExistingNativeKeyToVirtualKeepsItsLegacyStateRenderable() throws IOException {
+        ResourcePack pack = pack();
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        Key key = Key.key("testpack", "legacy");
+        allocator.allocate(key, BlockCarrier.NOTE_BLOCK);
+        BlockDefinition definition = BlockDefinition.builder(key)
+                .model(new BlockModelDefinition.CubeAll(Key.key("testpack", "block/legacy")))
+                .java(JavaBlockOptions.virtual())
+                .build();
+
+        JavaBlockCompiler.compileBlocks(pack, List.of(new StubBlock(definition)), allocator);
+
+        JsonObject variants = json(pack, JavaBlockCompiler.NOTE_BLOCK_STATES_PATH)
+                .getAsJsonObject("variants");
+        String customModel = variants.entrySet().stream()
+                .map(entry -> entry.getValue().getAsJsonObject().get("model").getAsString())
+                .filter(model -> model.equals("testpack:block/legacy"))
+                .findFirst()
+                .orElse(null);
+        assertEquals("testpack:block/legacy", customModel);
     }
 
     @Test

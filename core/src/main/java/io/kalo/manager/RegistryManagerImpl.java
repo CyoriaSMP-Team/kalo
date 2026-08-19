@@ -32,7 +32,7 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
     private static final Logger LOGGER = Logger.getLogger(RegistryManagerImpl.class.getName());
 
     private final io.kalo.platform.java.BlockStateAllocator blockStateAllocator =
-            new io.kalo.platform.java.BlockStateAllocator(io.kalo.content.block.definition.BlockCarrier.NOTE_BLOCK);
+            new io.kalo.platform.java.BlockStateAllocator();
     private final RecipeType recipeType = new RecipeType();
     private final SoundType soundType = new SoundType();
     private final GlyphType glyphType = new GlyphType();

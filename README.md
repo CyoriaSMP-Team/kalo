@@ -24,7 +24,8 @@ translation. That is the thing Kalo exists to do.
 > Java, verified on a live Paper 26.2 server. Bedrock is verified as far as Geyser: with
 > Geyser on the same server Kalo registers blocks through its API directly, no extension
 > and no file copying. No Bedrock client has connected yet, so the last mile is unproven.
-> Furniture is static (block-backed) rather than entity-backed. See
+> Java blocks now have a virtual mode that removes the finite carrier-state ceiling, but
+> its live placement/break/chunk lifecycle still needs the final smoke pass. See
 > [the roadmap](#roadmap) for what is real and what is not.
 
 ## Four pillars
@@ -83,6 +84,8 @@ ruby_block:
   behaviour:
     hardness: 3.0
     requires_tool: true
+  java:
+    mode: virtual                    # unlimited content ids; ItemDisplay + anchor
 
 ruby_helmet:
   type: armor
@@ -95,15 +98,37 @@ ruby_helmet:
     base_material: NETHERITE_HELMET
 ```
 
-Blocks and furniture borrow note block states, so they need no client mod. Assignments
-are persisted in `plugins/Kalo/block-states.json` and never reused — a placed block is
-stored as only its borrowed vanilla state, so a shifting assignment would silently turn
-every already-placed block into something else.
+The recommended mode is **virtual**. It uses an invisible Barrier anchor for collision and
+a persistent `ItemDisplay` for the model. The display stores the Kalo key in its entity PDC,
+so content ids do not consume Note Block or Tripwire states. The item model and block model
+are still generated normally, so the same YAML definition drives inventory, placement and
+the Java resource pack.
 
-**There are 799 of those states**, which is the hard ceiling on blocks and furniture
-combined. Past it, Kalo names each block it could not place and the reason, and skips it
-on Bedrock too — a block on one platform and not the other is worse than a block on
-neither. Items have no such limit; they use the item-model system.
+For backwards compatibility, omitting `java.mode` keeps the original native backend. New
+packs should declare `mode: virtual` explicitly; existing native worlds can then be moved
+one key at a time without changing their saved appearance.
+
+```yaml
+java:
+  mode: virtual
+```
+
+Virtual mode removes the **state-count** ceiling, not every physical trade-off: a server
+still pays for one persistent display entity per placed block, and entity-backed content
+does not automatically inherit redstone, piston, fluid or other native block behaviour.
+That is why native mode remains available when vanilla block mechanics matter:
+
+```yaml
+java:
+  mode: native
+  carrier: NOTE_BLOCK               # or TRIPWIRE for non-solid decorative content
+```
+
+Native assignments are persisted in `plugins/Kalo/block-states.json` and never reused.
+The default Note Block carrier has **799 usable states** and Tripwire adds 63, for 862
+native blocks/furniture in total. Existing native assignments remain stable; new content
+that needs more capacity should use virtual mode instead of trying to add another fragile
+carrier.
 
 Armor needs two textures, and they are different things: the `model:` sprite is the icon
 in the hotbar, while `equipment:` is the sheet painted onto the player model. Leave
@@ -184,7 +209,8 @@ model:
 |---|---|
 | `/kalo reload` | `kalo.command.reload` |
 | `/kalo give <player> <item>` | `kalo.command.give` |
-| `/kalo import <file>` | `kalo.command.import` |
+| `/kalo import <plugin>` | `kalo.command.import` |
+| `/kalo import file <path>` | `kalo.command.import` |
 
 ## Asset validation
 
@@ -348,9 +374,24 @@ Output: `build/libs/Kalo-<version>.jar`
 | **CraftEngine** | ✅ | ✅ | — | — |
 
 ```
-/kalo import plugins/Oraxen/items/weapons.yml
-/kalo import plugins/ItemsAdder/contents/mypack/items.yml
-/kalo import plugins/Nexo/items/weapons.yml
+/kalo import Oraxen
+/kalo import ItemsAdder
+/kalo import Nexo
+```
+
+Kalo autocompletes installed plugins that contain a recognised content file. The command
+scans the selected plugin's data folder, detects Nexo/ItemsAdder/Oraxen/CraftEngine/Neko
+files, creates `plugins/Kalo/packs/<plugin>/`, writes the converted configs into its
+`configs/` folder, and prints the migration report. Copy the source textures/models into
+that pack's `assets/` folder, then run `/kalo reload`.
+
+`/kalo impor <plugin>` is accepted as a short alias too.
+
+For a plugin that is not installed, or a single file you want to review first, use the
+explicit path form:
+
+```
+/kalo import file plugins/Oraxen/items/weapons.yml
 ```
 
 The format is detected, not asked for, and detection is **scored** rather than

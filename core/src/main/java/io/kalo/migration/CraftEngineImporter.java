@@ -113,6 +113,10 @@ public final class CraftEngineImporter implements Importer {
         Map<String, Object> converted = new LinkedHashMap<>();
         converted.put("type", kaloType);
 
+        if (kaloType.equals("block") || kaloType.equals("furniture")) {
+            converted.put("java", Map.of("mode", "virtual"));
+        }
+
         ConfigurationSection data = content.getConfigurationSection("data");
 
         Map<String, Object> display = new LinkedHashMap<>();

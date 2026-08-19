@@ -20,8 +20,9 @@ import java.util.Objects;
 /**
  * Compiles a {@link BlockDefinition} into the item players hold and place.
  *
- * <p>The item is a note block carrying the block's own model, so the thing in the hotbar
- * matches the thing that appears in the world.</p>
+ * <p>The item uses Note Block as a stable placement token and carries the block's own
+ * item-model component, so the thing in the hotbar matches the thing that appears in the
+ * world. Virtual mode reuses this exact stack as its {@code ItemDisplay} payload.</p>
  */
 public final class JavaBlockItemCompiler {
 

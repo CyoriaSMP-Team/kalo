@@ -236,6 +236,7 @@ public final class ItemsAdderImporter {
                                      @NotNull ImportReport report) {
         Map<String, Object> converted = new LinkedHashMap<>();
         converted.put("type", "block");
+        converted.put("java", Map.of("mode", "virtual"));
 
         String name = block.getString("display_name", block.getString("displayname"));
         if (name != null) {

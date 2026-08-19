@@ -26,10 +26,16 @@ public record KaloMappings(List<BlockEntry> blocks) {
      *
      * @param javaKey          the Kalo content key, e.g. {@code mypack:ruby_block}
      * @param bedrockId        the Bedrock block identifier to register
-     * @param javaCarrierState which of the note block states this block occupies on Java;
-     *                         {@code null} when the plugin had not assigned one yet
+     * @param javaCarrierState which native carrier state this block occupies on Java;
+     *                         {@code null} for virtual blocks or before allocation
+     * @param javaMode         {@code native} or {@code virtual}; old mapping files default
+     *                         to {@code native}
      */
-    public record BlockEntry(String javaKey, String bedrockId, Integer javaCarrierState) {
+    public record BlockEntry(String javaKey, String bedrockId, Integer javaCarrierState,
+                             String javaMode) {
+        public BlockEntry(String javaKey, String bedrockId, Integer javaCarrierState) {
+            this(javaKey, bedrockId, javaCarrierState, "native");
+        }
     }
 
     public static KaloMappings empty() {
@@ -77,8 +83,10 @@ public record KaloMappings(List<BlockEntry> blocks) {
                 Integer state = entry.has("java_carrier_state") && !entry.get("java_carrier_state").isJsonNull()
                         ? entry.get("java_carrier_state").getAsInt()
                         : null;
+                String mode = string(entry, "java_mode");
 
-                blocks.add(new BlockEntry(javaKey, bedrockId, state));
+                blocks.add(new BlockEntry(javaKey, bedrockId, state,
+                        mode == null || mode.isBlank() ? "native" : mode));
             }
         }
 

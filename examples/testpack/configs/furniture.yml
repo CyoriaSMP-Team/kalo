@@ -11,5 +11,7 @@ ruby_pedestal:
   behaviour:
     hardness: 2.0
     requires_tool: false
+  java:
+    mode: virtual
   bedrock:
     enabled: true

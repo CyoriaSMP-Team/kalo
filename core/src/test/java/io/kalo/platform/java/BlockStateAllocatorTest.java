@@ -3,51 +3,200 @@ package io.kalo.platform.java;
 import io.kalo.content.block.definition.BlockCarrier;
 import net.kyori.adventure.key.Key;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BlockStateAllocatorTest {
 
+    private static Key key(String name) {
+        return Key.key("testpack", name);
+    }
+
     @Test
-    void encodeAndDecodeRoundTrip() {
-        for (int instrument = 0; instrument < 16; instrument++) {
-            for (int note = 0; note < 25; note++) {
-                for (boolean powered : new boolean[]{false, true}) {
-                    var expected = new BlockStateAllocator.NoteBlockState(instrument, note, powered);
-                    assertEquals(expected, BlockStateAllocator.decode(BlockStateAllocator.encode(expected)));
-                }
-            }
+    void theSameBlockAlwaysGetsTheSameState() {
+        BlockStateAllocator allocator = new BlockStateAllocator();
+
+        var first = allocator.allocate(key("ruby"), BlockCarrier.NOTE_BLOCK);
+        assertEquals(first, allocator.allocate(key("ruby"), BlockCarrier.NOTE_BLOCK));
+    }
+
+    @Test
+    void differentBlocksNeverShareAState() {
+        BlockStateAllocator allocator = new BlockStateAllocator();
+
+        assertNotEquals(allocator.allocate(key("a"), BlockCarrier.NOTE_BLOCK),
+                allocator.allocate(key("b"), BlockCarrier.NOTE_BLOCK));
+    }
+
+    @Test
+    void theVanillaStateIsNeverHandedOut() {
+        // State 0 stays free so an untouched vanilla block still renders normally.
+        BlockStateAllocator allocator = new BlockStateAllocator();
+
+        for (int i = 0; i < 50; i++) {
+            assertTrue(allocator.allocate(key("b" + i), BlockCarrier.NOTE_BLOCK).state() > 0);
         }
     }
 
     @Test
-    void assignmentsSurviveSaveAndNewBlocksUseNextState() throws Exception {
-        var first = new BlockStateAllocator(BlockCarrier.NOTE_BLOCK);
-        Key ruby = Key.key("testpack", "ruby");
-        Key sapphire = Key.key("testpack", "sapphire");
-        assertEquals(1, first.allocate(ruby));
+    void afullCarrierFallsThroughToTheNextRatherThanFailing() {
+        // Running out of one kind of state should not mean running out of blocks.
+        BlockStateAllocator allocator = new BlockStateAllocator();
 
-        var file = Files.createTempFile("kalo-block-states", ".json");
-        first.save(file);
+        int noteBlockCapacity = BlockCarrier.NOTE_BLOCK.usableStateCount();
+        for (int i = 0; i < noteBlockCapacity; i++) {
+            allocator.allocate(key("b" + i), BlockCarrier.NOTE_BLOCK);
+        }
 
-        var second = new BlockStateAllocator(BlockCarrier.NOTE_BLOCK);
-        second.load(file);
-        assertEquals(1, second.allocate(ruby));
-        assertEquals(2, second.allocate(sapphire));
+        var overflow = allocator.allocate(key("one_too_many"), BlockCarrier.NOTE_BLOCK);
+        assertEquals(BlockCarrier.TRIPWIRE, overflow.carrier());
     }
 
     @Test
-    void malformedLoadDoesNotPartiallyReplaceAssignments() throws Exception {
-        var allocator = new BlockStateAllocator(BlockCarrier.NOTE_BLOCK);
-        Key existing = Key.key("testpack", "existing");
-        assertEquals(1, allocator.allocate(existing));
+    void exhaustingEveryCarrierIsReportedWithACount() {
+        BlockStateAllocator allocator = new BlockStateAllocator();
 
-        var file = Files.createTempFile("kalo-block-states-invalid", ".json");
-        Files.writeString(file, "{\"other:block\": 2, \"duplicate:block\": 2}");
-        assertThrows(Exception.class, () -> allocator.load(file));
-        assertEquals(1, allocator.allocate(existing));
-        assertEquals(2, allocator.allocate(Key.key("testpack", "new")));
+        int total = BlockCarrier.NOTE_BLOCK.usableStateCount() + BlockCarrier.TRIPWIRE.usableStateCount();
+        for (int i = 0; i < total; i++) {
+            allocator.allocate(key("b" + i), BlockCarrier.NOTE_BLOCK);
+        }
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> allocator.allocate(key("nowhere"), BlockCarrier.NOTE_BLOCK));
+        assertTrue(error.getMessage().contains("Ran out"), error.getMessage());
+    }
+
+    @Test
+    void assignmentsSurviveSaveAndLoad(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("block-states.json");
+
+        BlockStateAllocator first = new BlockStateAllocator();
+        var ruby = first.allocate(key("ruby"), BlockCarrier.NOTE_BLOCK);
+        var chair = first.allocate(key("chair"), BlockCarrier.TRIPWIRE);
+        first.save(file);
+
+        BlockStateAllocator second = new BlockStateAllocator();
+        second.load(file);
+
+        assertEquals(ruby, second.assignmentOf(key("ruby")));
+        assertEquals(chair, second.assignmentOf(key("chair")));
+    }
+
+    @Test
+    void newBlocksTakeFreshStatesAfterAReload(@TempDir Path dir) throws IOException {
+        // A state that has been used is never handed to a different block, even once the
+        // block that had it is gone: a world may still be full of them.
+        Path file = dir.resolve("block-states.json");
+
+        BlockStateAllocator first = new BlockStateAllocator();
+        var ruby = first.allocate(key("ruby"), BlockCarrier.NOTE_BLOCK);
+        first.save(file);
+
+        BlockStateAllocator second = new BlockStateAllocator();
+        second.load(file);
+        var fresh = second.allocate(key("added_later"), BlockCarrier.NOTE_BLOCK);
+
+        assertNotEquals(ruby.state(), fresh.state());
+    }
+
+    @Test
+    void thePersistedFormatNamesItsCarrier(@TempDir Path dir) throws IOException {
+        // The whole point of the format: a bare index would be ambiguous the moment a
+        // second carrier existed, and every already-placed block would be reinterpreted.
+        Path file = dir.resolve("block-states.json");
+
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        allocator.allocate(key("ruby"), BlockCarrier.TRIPWIRE);
+        allocator.save(file);
+
+        String json = Files.readString(file, StandardCharsets.UTF_8);
+        assertTrue(json.contains("TRIPWIRE"), json);
+        assertTrue(json.contains("\"state\""), json);
+    }
+
+    @Test
+    void aFileFromBeforeCarriersStillMeansNoteBlock(@TempDir Path dir) throws IOException {
+        // Servers that ran an earlier Kalo must keep their blocks looking the way they did.
+        Path file = dir.resolve("block-states.json");
+        Files.writeString(file, "{\"testpack:ruby\":7,\"testpack:chair\":3}", StandardCharsets.UTF_8);
+
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        allocator.load(file);
+
+        assertEquals(new BlockStateAllocator.Assignment(BlockCarrier.NOTE_BLOCK, 7),
+                allocator.assignmentOf(key("ruby")));
+        assertEquals(new BlockStateAllocator.Assignment(BlockCarrier.NOTE_BLOCK, 3),
+                allocator.assignmentOf(key("chair")));
+    }
+
+    @Test
+    void anUpgradedFileDoesNotReuseTheOldStates(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("block-states.json");
+        Files.writeString(file, "{\"testpack:ruby\":7}", StandardCharsets.UTF_8);
+
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        allocator.load(file);
+        var fresh = allocator.allocate(key("new"), BlockCarrier.NOTE_BLOCK);
+
+        assertNotEquals(7, fresh.state());
+    }
+
+    @Test
+    void aMalformedFileLeavesExistingAssignmentsAlone(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("block-states.json");
+        Files.writeString(file, "{\"testpack:ruby\":{\"carrier\":\"NOT_A_CARRIER\",\"state\":1}}",
+                StandardCharsets.UTF_8);
+
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        var before = allocator.allocate(key("kept"), BlockCarrier.NOTE_BLOCK);
+
+        assertThrows(IOException.class, () -> allocator.load(file));
+        assertEquals(before, allocator.assignmentOf(key("kept")));
+    }
+
+    @Test
+    void twoBlocksClaimingOneStateIsRejected(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("block-states.json");
+        Files.writeString(file, "{\"a\":{\"carrier\":\"NOTE_BLOCK\",\"state\":1},"
+                + "\"b\":{\"carrier\":\"NOTE_BLOCK\",\"state\":1}}", StandardCharsets.UTF_8);
+
+        assertThrows(IOException.class, () -> new BlockStateAllocator().load(file));
+    }
+
+    @Test
+    void writingThroughOnAllocationSurvivesACrash(@TempDir Path dir) throws IOException {
+        // Assignments are made during pack generation; only saving at shutdown would lose
+        // them if the server died in between, and the next boot would reassign.
+        Path file = dir.resolve("block-states.json");
+
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        allocator.attach(file);
+        var ruby = allocator.allocate(key("ruby"), BlockCarrier.NOTE_BLOCK);
+
+        BlockStateAllocator afterCrash = new BlockStateAllocator();
+        afterCrash.load(file);
+        assertEquals(ruby, afterCrash.assignmentOf(key("ruby")));
+    }
+
+    @Test
+    void groupingByCarrierIsWhatTheCompilerConsumes() {
+        BlockStateAllocator allocator = new BlockStateAllocator();
+        allocator.allocate(key("solid"), BlockCarrier.NOTE_BLOCK);
+        allocator.allocate(key("flat"), BlockCarrier.TRIPWIRE);
+
+        var grouped = allocator.byCarrier();
+        assertNotNull(grouped.get(BlockCarrier.NOTE_BLOCK));
+        assertNotNull(grouped.get(BlockCarrier.TRIPWIRE));
+        assertTrue(grouped.get(BlockCarrier.TRIPWIRE).containsValue("testpack:flat"));
     }
 }

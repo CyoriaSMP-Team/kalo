@@ -191,8 +191,9 @@ public final class BedrockPackCompiler {
      * that is written out for the extension to consume at runtime. The resource pack can
      * only supply the look; registration itself happens inside Geyser.</p>
      *
-     * @param allocator supplies the Java carrier state each block occupies, so the
-     *                  extension can translate a placed block without re-deriving it
+     * @param allocator supplies the Java carrier state each native block occupies, so the
+     *                  extension can translate a placed block without re-deriving it;
+     *                  virtual blocks deliberately have no carrier state
      */
     public void addBlocks(@NotNull Iterable<? extends Block> blocks,
                           @NotNull java.util.function.Function<Key, Integer> allocator,
@@ -229,9 +230,13 @@ public final class BedrockPackCompiler {
             JsonObject record = new JsonObject();
             record.addProperty("java_key", key.asString());
             record.addProperty("bedrock_identifier", bedrockId);
-            Integer state = allocator.apply(key);
-            if (state != null) {
-                record.addProperty("java_carrier_state", state);
+            record.addProperty("java_mode", definition.java().mode().name().toLowerCase(Locale.ROOT));
+            if (definition.java().mode()
+                    == io.kalo.content.block.definition.JavaBlockMode.NATIVE) {
+                Integer state = allocator.apply(key);
+                if (state != null) {
+                    record.addProperty("java_carrier_state", state);
+                }
             }
             mappedBlocks.add(record);
         }

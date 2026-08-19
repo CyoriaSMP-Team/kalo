@@ -43,6 +43,7 @@ class KaloMappingsTest {
         assertEquals("testpack:ruby_block", entry.javaKey());
         assertEquals("testpack:ruby_block", entry.bedrockId());
         assertEquals(1, entry.javaCarrierState());
+        assertEquals("native", entry.javaMode());
     }
 
     @Test
@@ -59,6 +60,17 @@ class KaloMappingsTest {
                 """);
 
         assertNull(mappings.blocks().get(0).javaCarrierState());
+        assertEquals("native", mappings.blocks().get(0).javaMode());
+    }
+
+    @Test
+    void virtualModeIsPreservedWithoutAJavaCarrierState() throws IOException {
+        KaloMappings mappings = parse("""
+                {"kalo:blocks":[{"java_key":"a:b","bedrock_identifier":"a:b","java_mode":"virtual"}]}
+                """);
+
+        assertNull(mappings.blocks().get(0).javaCarrierState());
+        assertEquals("virtual", mappings.blocks().get(0).javaMode());
     }
 
     @Test

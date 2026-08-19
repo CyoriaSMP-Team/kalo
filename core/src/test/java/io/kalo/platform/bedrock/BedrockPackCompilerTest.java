@@ -220,7 +220,28 @@ class BedrockPackCompilerTest {
 
         assertEquals("testpack:ruby_block", record.get("java_key").getAsString());
         assertEquals("testpack:ruby_block", record.get("bedrock_identifier").getAsString());
+        assertEquals("native", record.get("java_mode").getAsString());
         assertEquals(7, record.get("java_carrier_state").getAsInt());
+    }
+
+    @Test
+    void virtualBlockRecordHasNoFiniteJavaCarrierState() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/unlimited.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        io.kalo.content.block.definition.BlockDefinition definition =
+                io.kalo.content.block.definition.BlockDefinition.builder(Key.key("testpack", "unlimited"))
+                        .model(new io.kalo.content.block.definition.BlockModelDefinition.CubeAll(
+                                Key.key("testpack", "block/unlimited")))
+                        .java(io.kalo.content.block.definition.JavaBlockOptions.virtual())
+                        .build();
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(definition)), key -> 99, Set.of());
+
+        JsonObject record = json(compiler.finish().mappings())
+                .getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
+        assertEquals("virtual", record.get("java_mode").getAsString());
+        assertFalse(record.has("java_carrier_state"));
     }
 
     @Test
