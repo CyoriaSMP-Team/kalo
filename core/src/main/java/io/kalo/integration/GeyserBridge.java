@@ -55,6 +55,9 @@ import java.util.logging.Level;
  */
 public final class GeyserBridge {
 
+    private static final java.util.concurrent.atomic.AtomicReference<CachedPack> CACHED_PACK =
+            new java.util.concurrent.atomic.AtomicReference<>();
+
     private GeyserBridge() {
     }
 
@@ -280,18 +283,47 @@ public final class GeyserBridge {
         return packs.stream().anyMatch(pack -> pack.uuid().equals(candidate.uuid()));
     }
 
-    /** Reads the manifest through Geyser's supported path codec. */
+    /**
+     * Reads the manifest through Geyser's supported path codec, once per generated pack.
+     *
+     * <p>This is called on every Bedrock connection as well as at startup. Re-reading and
+     * re-parsing the archive per joining player is real work at a thousand items, so the
+     * result is held until the file changes — identity, not age, decides: a regenerated
+     * pack has a new size or timestamp and invalidates the cache on its own.</p>
+     */
     private static @Nullable ResourcePack generatedPack() {
         Path path = new java.io.File(Constants.dataFolder(), "generated.mcpack").toPath();
-        if (!Files.isRegularFile(path)) {
+
+        long size;
+        long modified;
+        try {
+            if (!Files.isRegularFile(path)) {
+                CACHED_PACK.set(null);
+                return null;
+            }
+            size = Files.size(path);
+            modified = Files.getLastModifiedTime(path).toMillis();
+        } catch (java.io.IOException e) {
+            Plugins.logger().log(Level.WARNING, "Could not stat " + path, e);
             return null;
         }
+
+        CachedPack cached = CACHED_PACK.get();
+        if (cached != null && cached.size() == size && cached.modified() == modified) {
+            return cached.pack();
+        }
+
         try {
-            return ResourcePack.create(PackCodec.path(path));
+            ResourcePack pack = ResourcePack.create(PackCodec.path(path));
+            CACHED_PACK.set(new CachedPack(pack, size, modified));
+            return pack;
         } catch (Exception e) {
             Plugins.logger().log(Level.WARNING, "Could not open " + path + " as a Bedrock resource pack", e);
             return null;
         }
+    }
+
+    private record CachedPack(@NotNull ResourcePack pack, long size, long modified) {
     }
 
     private static boolean bedrockOutputEnabled() {

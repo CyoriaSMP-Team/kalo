@@ -512,7 +512,7 @@ only been written — the middle column is the one worth reading before you inst
 
 | | |
 |---|---|
-| Bedrock geometry for custom models | Sprite items and `cube_all` blocks convert; hand-authored Blockbench models are skipped with a warning |
+| Bedrock geometry for custom **item** models | Only sprite items reach Bedrock; an item with a hand-authored model is skipped and counted in the generation warning. Blocks and furniture are fine — `BedrockGeometry` converts their custom models already |
 | Real server-side block registration | Would still need a borrowed visual state on vanilla clients — see the `BlockCarrier` javadoc |
 
 ## License
