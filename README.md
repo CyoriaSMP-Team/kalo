@@ -460,14 +460,21 @@ Geyser's own API:
 
 ```
 [Kalo] Registering Kalo items, blocks and resource pack with Geyser directly — no extension needed
-[Kalo] Registered and mapped 3 block(s) with Geyser natively
+[Kalo] Registered and mapped 2 block(s) with Geyser natively; 1 virtual block(s) render as entities instead
+[Kalo] Registered 8 item(s) with Geyser natively
+[Kalo] Registered generated.mcpack with Geyser
 ```
 
 Items, blocks **and `generated.mcpack` itself** are handed to Geyser through its own API,
-so there is no pack to copy either. That is the whole setup.
+so there is no pack to copy either. That is the whole setup, and it is the configuration a
+Bedrock player has actually been through.
 
 Reading from the live registry rather than a file is the point: there is nothing in
 between to go stale, so regenerating content cannot leave Bedrock on an old copy.
+
+Geyser reports its own tally on the next lines, and it should match. If Kalo says it
+registered blocks and Geyser does not count them, the two disagree and nothing will render
+— that is worth reading rather than scrolling past.
 
 ### Geyser running standalone
 
@@ -488,35 +495,46 @@ instead — then there is nothing to copy at all.
 
 ## Roadmap
 
-Kalo is pre-alpha. This table is the honest split between what has been run and what has
-only been written — the middle column is the one worth reading before you install it.
+Kalo is pre-alpha. This is the honest split between what has been run and what has only
+been written. The second and third tables are the ones worth reading before you install it.
 
-### Works, exercised on a running server
+### Verified on a running server
 
-| | Notes |
+| | Where |
 |---|---|
-| Items, blocks, furniture, armor | Java side, Paper 26.2 + Folia |
+| Items, blocks, furniture, armor | Java: Paper 26.2 + Folia |
 | All recipe stations | crafting, furnace, blast, smoker, campfire, stonecutting, smithing |
 | Sounds and glyphs | |
 | Virtual blocks | persistent index, chunk load/unload, explosion handling |
 | `/kalo migrate-world` | dry-run |
 | Resource pack generation | deterministic zip, item-definition format |
+| **Bedrock, as a player sees it** | A Bedrock player on a live Geyser 2.11.2 + Floodgate server confirmed custom item icons, native blocks placed and mined, and worn armor rendering |
 
-### Implemented but **not verified end to end**
+Getting that last row took five release candidates. The registration never ran at all;
+blocks were named inconsistently between the two paths; armor pointed at a geometry
+Bedrock does not define; block items fell back to note blocks; native blocks could not be
+mined by anyone. **Every one of those was green in CI**, and two were held in place by the
+tests themselves. Treat the rest of this page accordingly.
+
+### Implemented, never actually run
 
 | | What is missing |
 |---|---|
-| ~~Bedrock, as a player sees it~~ | **Verified.** A Bedrock player on a live Geyser + Floodgate server confirmed custom item icons, native blocks placed and broken, and worn armor rendering. Finding that out took five release candidates: the registration never ran, blocks were named inconsistently, armor pointed at a geometry Bedrock does not define, block items fell back to note blocks, and native blocks could not be mined at all. Every one of those was green in CI. |
-| ~~Bedrock virtual blocks~~ | **Confirmed not to work.** A virtual block is an `ItemDisplay` entity, which Geyser does not put on a Bedrock client, and it overrides no block state so it cannot be mapped either. Native blocks are unaffected — see [docs/VIRTUAL_BLOCKS.md](docs/VIRTUAL_BLOCKS.md) |
-| Standalone-Geyser path | The mapping files generate on a real server and match Geyser's documented format, but the copy-the-files setup has not been run against a real standalone Geyser |
-| The 1.21.4 end of the version range | One jar spans 1.21.4 → 26.2 and `pack_format` auto-selects per version, but testing has happened on 26.2 only |
-| Oraxen / ItemsAdder import | Written against documented formats, never run against a real pack. Treat any import as a draft to review. |
+| Standalone-Geyser path | The mapping files generate on a real server and match Geyser's documented format, but nobody has copied them into a separate Geyser process and watched it work |
+| The 1.21.4 end of the version range | One jar spans 1.21.4 → 26.2. It has been run on 26.2 and 1.21.11; the bottom of the range is untested |
+| Oraxen / ItemsAdder import | Written against documented formats, never run against a real pack. Treat any import as a draft to review |
+
+### Known not to work
+
+| | |
+|---|---|
+| **Virtual blocks on Bedrock** | A Bedrock player sees nothing where one is placed, and this is structural rather than a bug: a virtual block is an `ItemDisplay` entity, which Geyser does not put on a Bedrock client, and it overrides no Java block state so it cannot be mapped either. Native blocks are unaffected. **On a server with Bedrock players, the 893 native states are the real ceiling** — see [docs/VIRTUAL_BLOCKS.md](docs/VIRTUAL_BLOCKS.md) |
 
 ### Not built
 
 | | |
 |---|---|
-| Verified `pack_format` for 1.21.5 – 1.21.10 | 1.21.4 (46), 1.21.11 (75) and 26.2 (88) have been read out of real client jars. The versions between still get a guess plus a console warning saying so. Read `pack_version.resource_major` from that version's client jar and add it to `PackFormats` |
+| Verified `pack_format` for 1.21.5 – 1.21.10 | 1.21.4 (46), 1.21.11 (75) and 26.2 (88) are read out of real client jars. The versions between get the nearest number in their family plus a console warning saying it is a guess. Read `pack_version.resource_major` from that version's client jar and add it to `PackFormats` |
 | Bedrock geometry for custom **item** models | Only sprite items reach Bedrock; an item with a hand-authored model is skipped and counted in the generation warning. Blocks and furniture are fine — `BedrockGeometry` converts their custom models already |
 | Real server-side block registration | Would still need a borrowed visual state on vanilla clients — see the `BlockCarrier` javadoc |
 
