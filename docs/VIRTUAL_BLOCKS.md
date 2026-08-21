@@ -3,9 +3,19 @@
 Kalo has two Java representations for custom blocks:
 
 | Mode | World representation | Capacity | Use when |
-|---|---|---:|---|
-| `virtual` | invisible Barrier anchor + persistent `ItemDisplay` | state-unlimited | ordinary decorative blocks and furniture |
-| `native` | spare Note Block/Tripwire/Scaffolding state | 893 current states | redstone, piston, fluid or other vanilla block mechanics |
+|---|---|---|---|
+| `native` *(default, preferred)* | a spare state of a real vanilla block | **893** — Note Block 799 + Tripwire 63 + Scaffolding 31, filled in that order | **almost always** |
+| `virtual` | invisible Barrier anchor + persistent `ItemDisplay` | unlimited content keys | the carriers are full, or a block needs more visual freedom than a borrowed state allows |
+
+**Prefer `native`.** A native block *is* a block: the server treats it as one, it costs no
+entity, and vanilla mechanics apply to it. A virtual block is an entity wearing a block's
+appearance, and everything that follows from that — tracking bandwidth, client rendering
+cost, no redstone or piston behaviour — is the price. Reach for `virtual` when native runs
+out of room, not as the starting point.
+
+There is no third option that is "more native" than borrowing a state. A vanilla client
+can only draw states it already knows, so even a real server-side block registration would
+still need a visual state to be shown as — see the `BlockCarrier` javadoc.
 
 ## Configuration
 
@@ -25,15 +35,31 @@ Persistent Data Container, which is the source of truth for break, drop, interac
 reload resolution. Both the anchor and the display are persistent, so the representation
 does not depend on an in-memory map or a block-state allocation.
 
-If `java.mode` is omitted, Kalo keeps `native` for backwards compatibility with existing
-packs and worlds. New packs should opt into `virtual` explicitly.
+If `java.mode` is omitted, Kalo uses `native`. That is both the backwards-compatible
+choice for existing packs and worlds and the recommended one for new packs — `virtual` is
+an explicit opt-in.
+
+### When the carriers fill up
+
+`BlockStateAllocator.allocate()` walks `FILL_ORDER` and spills into the next carrier when
+one is full, so running out of note block states does not mean failure. When every carrier
+is exhausted it throws:
+
+```
+Ran out of block states after <n> custom blocks; carriers available: [NOTE_BLOCK, TRIPWIRE, SCAFFOLDING]
+```
+
+That message is the signal to move the *decorative* blocks in the pack to `virtual` and
+leave the mechanically meaningful ones on `native`. It is not a reason to convert
+everything — already-placed native blocks keep their assigned state, which is never reused.
 
 ## Trade-offs
 
 “Unlimited” means unlimited content keys, not unlimited server resources. Each placed
 virtual block is an entity and therefore costs entity storage, tracking bandwidth and
 client rendering. Virtual blocks also do not become native redstone/piston/fluid blocks
-automatically. If a definition needs those vanilla mechanics, opt into native mode:
+automatically. If a definition needs those vanilla mechanics, leave it on native mode and
+pick the carrier explicitly:
 
 ```yaml
 java:

@@ -23,12 +23,20 @@ Exercises every content path currently implemented.
 
 | Content | Covers |
 |---|---|
-| `ruby_block` | `cube_all` model, hardness, tool requirement, virtual placement |
-| `oak_chair`, `ruby_pedestal` | virtual furniture, persistent ItemDisplay + invisible anchor |
+| `ruby_block` | `cube_all` model, hardness, tool requirement, **native** placement |
+| `oak_chair` | native furniture on the default carrier |
+| `ruby_pedestal` | **virtual** furniture: hand-authored model, persistent ItemDisplay + invisible anchor |
 
-The example uses `java.mode: virtual`, so these blocks do not consume a finite carrier
-state. The anchor and display survive chunk saves; `plugins/Kalo/block-states.json` is
-only needed for content explicitly using `java.mode: native`.
+The pack deliberately covers both backends, because a real pack mixes them.
+
+`ruby_block` and `oak_chair` declare no `java.mode`, so they are **native** — each takes a
+state from the Note Block carrier and is recorded in `plugins/Kalo/block-states.json`.
+That is the default and the mode to prefer: a real block the server treats as a block.
+
+`ruby_pedestal` opts into `java.mode: virtual`, which trades the state for a persistent
+`ItemDisplay` and an invisible anchor. Both survive chunk saves. Virtual is the answer to
+running out of the 893 native states, not the starting point — see
+[docs/VIRTUAL_BLOCKS.md](../docs/VIRTUAL_BLOCKS.md).
 
 ### Armor — `configs/armor.yml`
 

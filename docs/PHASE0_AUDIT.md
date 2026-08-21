@@ -3,6 +3,13 @@
 Audit of the Neko codebase as the bootstrap for **Kalo**.
 Date: 2026-08-16 · Commit: `971732d` · 62 source files, 48 commits, last activity 2026-03-27.
 
+> **This is a historical snapshot, not current guidance.** It records what the codebase
+> looked like on the day Kalo forked from Neko, and its conclusions were acted on. Several
+> have since been superseded — most notably the Java 25 / calendar-versioned-Paper
+> recommendation in §2.1, which was later reversed to a Java 21 toolchain compiled against
+> the 1.21.4 API so that one jar spans 1.21.4 → 26.x. For how the build works **now**, read
+> `CLAUDE.md`. Do not update this file; write a new one.
+
 ---
 
 ## 1. Verdict

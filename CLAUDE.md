@@ -20,16 +20,20 @@ original copyright notice stays in `LICENSE`.
 Gradle with Kotlin DSL. Key properties in `gradle.properties`:
 
 - `plugin_version` — plugin version
-- `minecraft_version` — target Minecraft version (`26.2`)
-- `paper_api_version` — exact Paper artifact (`26.2.build.112-stable`)
-- `paper_plugin_api_version` — `api-version` written into `paper-plugin.yml`
+- `minecraft_version` — the server `runServer` / `runFolia` boots locally (`26.2`)
+- `paper_api_version` — the Paper API artifact compiled against (`1.21.4-R0.1-SNAPSHOT`)
+- `paper_plugin_api_version` — `api-version` written into `paper-plugin.yml` (`1.21.4`)
 
-**Minecraft uses calendar versioning now** (26.1, 26.2 — not 1.21.x), and Paper artifacts
-are build-pinned rather than `-R0.1-SNAPSHOT`. Bumping the version means updating both
-`minecraft_version` and `paper_api_version`.
+**Compile low, run high.** Kalo compiles against the **1.21.4** Paper API and runs on
+everything from 1.21.4 up to current 26.x. `minecraft_version` only picks the test server;
+it is not what the plugin is built against. Raising `paper_api_version` to a calendar-
+versioned artifact (`26.2.build.112-stable`) would buy newer API at the cost of the older
+half of the supported range — that is a product decision, not a routine bump.
 
-**Java 25 is the floor.** Minecraft 26.x will not run on less. The foojay resolver in
-`settings.gradle.kts` provisions the toolchain automatically.
+**Java 21 is the floor, not 25.** `standard-conventions.gradle.kts` pins the toolchain to
+21 deliberately: Paper 1.21.4 runs on Java 21, and a jar compiled for 25 refuses to start
+there. CI builds on a Java 25 JDK, but the bytecode it emits is 21. The foojay resolver in
+`settings.gradle.kts` provisions whatever toolchain is missing.
 
 ### Common Commands
 
@@ -71,14 +75,29 @@ Output: `build/libs/Kalo-{version}.jar`
   (→ pack assets), `JavaRecipeCompiler` (→ Bukkit recipes), `BlockStateAllocator`,
   `JavaBlockListener`
 - `platform.bedrock` — `BedrockPackCompiler` (→ `.mcpack` + Geyser mappings),
-  `BedrockGeometry` (Java model → Bedrock geometry), `BedrockPackWriter`
+  `BedrockGeometry` (Java model → Bedrock geometry), `BedrockPackWriter`,
+  `BedrockBlockRegistration` / `BedrockRegistrationSnapshot` (what the compiler decided,
+  handed to whoever registers it)
+- `integration` — `GeyserBridge`, which registers blocks, items and the generated pack
+  with Geyser **directly through its API** when Geyser shares this JVM. This is the
+  primary Bedrock path; see Architecture below.
 - `migration` — `OraxenImporter`, `ItemsAdderImporter`, `ImportReport`
 - `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
 
 ### `geyser-extension` — runs inside Geyser, not Paper
 
-Registers Kalo's custom blocks through Geyser's API. It shares a **file format** with the
-plugin (`bedrock-mappings.json`), never classes — the two are different processes.
+The fallback for servers that run Geyser as a **separate process**, which `GeyserBridge`
+cannot reach. It reads `bedrock-mappings.json` and registers the same content.
+
+The two halves are different processes, so they can only meet at a file — never at a live
+object. That constraint is not negotiable. What they *may* share is source: code compiled
+into both jars independently crosses no process boundary.
+
+> ⚠️ Today they share neither. `GeyserBridge` and `KaloExtension` each carry their own
+> copy of the Geyser-API calls, and the copies have already drifted — `hardness`,
+> `geometry` and empty-material handling differ, and only `GeyserBridge` registers the
+> resource pack. Folding both onto one shared implementation is planned work; until then,
+> **any change to one must be mirrored in the other**.
 
 ## Architecture
 
@@ -98,16 +117,50 @@ Never let a platform type leak upward into the definition.
 `JavaPackCompilerTest.javaOptionsIsTheOnlyPlaceMaterialAppears` and its block counterpart
 exist to fail loudly if that rule is broken.
 
+### Bedrock registration is native first, file second
+
+Registering content with Geyser has two paths, and they are not equal partners:
+
+| | `GeyserBridge` (core) | `KaloExtension` (geyser-extension) |
+|---|---|---|
+| When | Geyser is a plugin in this JVM — the usual setup | Geyser is a separate process |
+| Source of truth | the live registries | `bedrock-mappings.json` on disk |
+| Installation | nothing to install, nothing to copy | second jar + copy the file on every change |
+
+**The native path defines what correct means.** Reading from the live registry is the
+point: there is no file in between to go stale, so regenerating content cannot leave
+Bedrock rendering an old copy. The file path exists only because a separate process cannot
+be reached, and it must reproduce the native path's behaviour — never invent its own.
+
+`bedrock-mappings.json` is written unconditionally whenever Bedrock output is compiled,
+not only for standalone setups, so the fallback is always ready.
+
 ### Custom blocks borrow vanilla states
 
-Java cannot add a block without a client mod, so a custom block is a note block in a state
-the pack tells the client to render differently. `BlockStateAllocator` assigns those
-states, **persists them, and never reuses one**: a placed block is stored as only its
+Java cannot add a block a vanilla client will render, so a custom block is a vanilla block
+placed in a state the pack tells the client to draw differently. `BlockCarrier` owns which
+vanilla block is borrowed and all of its state maths — nothing outside that enum should
+know a note block has 25 notes. `BlockStateAllocator` assigns states across the carriers in
+`FILL_ORDER` (`NOTE_BLOCK` → `TRIPWIRE` → `SCAFFOLDING`), spilling into the next carrier
+when one fills and throwing `IllegalStateException` only once all of them are exhausted.
+`FILL_ORDER` is append-only: reordering scatters new assignments unpredictably.
+
+It **persists assignments and never reuses one**: a placed block is stored as only its
 borrowed state, so a shifting assignment silently turns every already-placed block into
 something else. Assignments are written through on allocation, not just at shutdown.
 
 `JavaBlockListener` suppresses the three ways vanilla fights this: instrument
 recomputation on neighbour updates, right-click tuning, and note playing.
+
+`java.mode: virtual` swaps the borrowed state for a Barrier anchor plus a persistent
+`ItemDisplay`. It buys unlimited content keys and pays in entities, and it is not a real
+redstone/piston/fluid block. `native` is both the default and the recommendation —
+`virtual` is the answer to running out of states, not the starting point. See
+`docs/VIRTUAL_BLOCKS.md`.
+
+Borrowing survives even if Kalo ever registers real blocks server-side: a vanilla client
+can only draw states it already knows, so a real block would still need a visual state to
+be shown as. See the `BlockCarrier` javadoc.
 
 ### Shared output files must be merged, not replaced
 
@@ -159,7 +212,8 @@ bypasses that lands content in `minecraft:` and collides across packs.
 
 ## Conventions
 
-- Java 25, Lombok for accessors on implementation classes
+- Java 21 language level (see Build System — the floor is 21, not 25), Lombok for
+  accessors on implementation classes
 - `@NotNull` / `@Nullable` on API surfaces
 - Never swallow exceptions during pack loading — a content creator's typo must produce a
   message naming the file and the problem

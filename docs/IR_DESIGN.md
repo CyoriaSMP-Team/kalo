@@ -3,10 +3,14 @@
 The intermediate representation that makes "define once, compile to Java **and** Bedrock"
 structurally possible rather than aspirational.
 
-> **Status:** implemented for items in `io.kalo.content.item.definition`, with the Java
-> compilers in `io.kalo.platform.java`. Blocks, furniture and armor follow the same
-> pattern. The Bedrock compiler is Phase 2 — `BedrockOptions` already exists so that it
-> is an addition rather than a re-architecture.
+> **Status:** implemented. Items, blocks, furniture, armor and recipes each have a
+> definition in `io.kalo.content.*.definition`, the Java compilers live in
+> `io.kalo.platform.java`, and the Bedrock compiler landed in `io.kalo.platform.bedrock`.
+>
+> The claim this document made — that adding Bedrock would be an addition rather than a
+> re-architecture — held: `BedrockOptions` was already there and no definition changed to
+> accommodate it. What has **not** happened is end-to-end verification of the Bedrock
+> output against a real client; see the roadmap in the README.
 
 ---
 
@@ -42,7 +46,7 @@ compiler makes its own platform decisions from that intent independently.
                       ▼                             ▼
              ┌─────────────────┐          ┌───────────────────┐
              │  JavaCompiler   │          │  BedrockCompiler  │
-             │  (Phase 1)      │          │  (Phase 2)        │
+             │                 │          │                   │
              └────────┬────────┘          └─────────┬─────────┘
                       │                             │
         ┌─────────────┴──────────┐        ┌─────────┴──────────┐
@@ -192,12 +196,12 @@ keeping, and it survives this intact.
 1. ✅ Land `ItemDefinition` + `ModelDefinition` and re-point `ItemType` at them.
 2. ✅ Write `JavaItemCompiler` (definition → `ItemStack`) and `JavaPackCompiler`
    (definition → pack assets). **This is the first change a user can see in-game.**
-3. Blocks, furniture, armor each add a `*Definition` and a case in both compilers.
-4. Phase 2 adds `BedrockCompiler` against an IR that already exists and is already
-   exercised by four content types — no rewrite, no translator.
+3. ✅ Blocks, furniture, armor each add a `*Definition` and a case in both compilers.
+4. ✅ Add `BedrockCompiler` against an IR that already exists and is already exercised by
+   four content types — no rewrite, no translator.
 
-Step 4 is the whole point. Everything before it is done in service of making it a normal
-week's work rather than a re-architecture.
+Step 4 was the whole point, and it landed as a normal week's work rather than a
+re-architecture. That is the evidence for this document's thesis, not a promise of it.
 
 `JavaPackCompilerTest` includes a test named `javaOptionsIsTheOnlyPlaceMaterialAppears`,
 which exists to make the rule at the top of this document fail loudly if someone

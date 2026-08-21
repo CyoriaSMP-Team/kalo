@@ -6,8 +6,8 @@
 
 *Build once. Play everywhere.*
 
-[![Java](https://img.shields.io/badge/Java-25-orange?style=flat-square&logo=openjdk)](https://openjdk.org/)
-[![Paper](https://img.shields.io/badge/Paper-26.2-green?style=flat-square&logo=papermc)](https://papermc.io/)
+[![Java](https://img.shields.io/badge/Java-21%2B-orange?style=flat-square&logo=openjdk)](https://openjdk.org/)
+[![Paper](https://img.shields.io/badge/Paper-1.21.4%20%E2%86%92%2026.2-green?style=flat-square&logo=papermc)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-supported-success?style=flat-square)](https://papermc.io/software/folia)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
@@ -79,8 +79,8 @@ ruby_block:
   behaviour:
     hardness: 3.0
     requires_tool: true
-  java:
-    mode: virtual                    # unlimited content ids; ItemDisplay + anchor
+  # java.mode defaults to `native` — a real vanilla block state. Switch to
+  # `virtual` (ItemDisplay + anchor) once the 893 native states run out.
 
 ruby_helmet:
   type: armor
@@ -93,25 +93,9 @@ ruby_helmet:
     base_material: NETHERITE_HELMET
 ```
 
-The recommended mode is **virtual**. It uses an invisible Barrier anchor for collision and
-a persistent `ItemDisplay` for the model. The display stores the Kalo key in its entity PDC,
-so content ids do not consume Note Block or Tripwire states. The item model and block model
-are still generated normally, so the same YAML definition drives inventory, placement and
-the Java resource pack.
-
-For backwards compatibility, omitting `java.mode` keeps the original native backend. New
-packs should declare `mode: virtual` explicitly; existing native worlds can then be moved
-one key at a time without changing their saved appearance.
-
-```yaml
-java:
-  mode: virtual
-```
-
-Virtual mode removes the **state-count** ceiling, not every physical trade-off: a server
-still pays for one persistent display entity per placed block, and entity-backed content
-does not automatically inherit redstone, piston, fluid or other native block behaviour.
-That is why native mode remains available when vanilla block mechanics matter:
+The default mode is **native**, and it is the one to prefer. A native block is a real
+vanilla block placed in a spare state that the pack tells the client to draw differently —
+so the server treats it as a block, it costs no entity, and vanilla mechanics apply to it.
 
 ```yaml
 java:
@@ -119,11 +103,29 @@ java:
   carrier: NOTE_BLOCK               # or TRIPWIRE for non-solid decorative content
 ```
 
-Native assignments are persisted in `plugins/Kalo/block-states.json` and never reused.
-The default Note Block carrier has **799 usable states**, Tripwire adds 63 and Scaffolding adds 31, for **893**
-native blocks/furniture in total. Existing native assignments remain stable; new content
-that needs more capacity should use virtual mode instead of trying to add another fragile
-carrier.
+Assignments are persisted in `plugins/Kalo/block-states.json` and never reused. Note Block
+gives **799 usable states**, Tripwire adds 63 and Scaffolding adds 31 — **893** native
+blocks and furniture in total, filled in that order.
+
+**Virtual mode is what you reach for when those run out.** It swaps the borrowed state for
+an invisible Barrier anchor plus a persistent `ItemDisplay` holding the Kalo key in its
+entity PDC, which removes the state ceiling entirely:
+
+```yaml
+java:
+  mode: virtual
+```
+
+It removes the **state-count** ceiling, not every trade-off. A server pays for one
+persistent display entity per placed block — storage, tracking bandwidth and client
+rendering — and entity-backed content does not inherit redstone, piston, fluid or other
+native block behaviour. Either way the item model and block model are generated normally,
+so the same YAML drives inventory, placement and the Java resource pack.
+
+A sensible pack at scale mixes the two: mechanically meaningful blocks stay `native`,
+bulk decorative content goes `virtual`. Existing native worlds can be moved one key at a
+time — a key switched to virtual keeps its old state in the generated pack as a legacy
+read path, so already-placed blocks do not change appearance.
 
 Armor needs two textures, and they are different things: the `model:` sprite is the icon
 in the hotbar, while `equipment:` is the sheet painted onto the player model. Leave
@@ -372,8 +374,8 @@ Output: `build/libs/Kalo-<version>.jar`
 
 - **`api`** — public API: content model, definitions, registries, features, pack model
 - **`core`** — implementation: managers, compilers, pack writer, commands
-- **`geyser-extension`** — runs inside Geyser, not Paper; registers Kalo's custom blocks
-  so Bedrock renders them
+- **`geyser-extension`** — runs inside Geyser, not Paper. Only needed when Geyser is a
+  separate process; when it shares the server JVM, `core` registers with Geyser directly
 
 ## Migrating from another plugin
 
@@ -452,27 +454,66 @@ install and nothing to copy.** Kalo registers its blocks with Geyser directly th
 Geyser's own API:
 
 ```
-[Kalo] Registering Kalo blocks with Geyser directly — no extension needed
-[Kalo] Registered 3 block(s) with Geyser natively
+[Kalo] Registering Kalo items, blocks and resource pack with Geyser directly — no extension needed
+[Kalo] Registered and mapped 3 block(s) with Geyser natively
 ```
 
-Serve `plugins/Kalo/generated.mcpack` to Bedrock clients through Geyser's `packs/` folder
-and that is the whole setup.
+Items, blocks **and `generated.mcpack` itself** are handed to Geyser through its own API,
+so there is no pack to copy either. That is the whole setup.
 
 Reading from the live registry rather than a file is the point: there is nothing in
 between to go stale, so regenerating content cannot leave Bedrock on an old copy.
 
 ### Geyser running standalone
 
-A separate process cannot be reached from inside the server, so that setup still needs the
-extension:
+A separate process cannot be reached from inside the server, so that setup needs the
+extension and needs the two generated files carried across by hand:
 
 1. Put `geyser-extension-<version>.jar` in Geyser's `extensions/` folder.
 2. Copy `plugins/Kalo/bedrock-mappings.json` into `extensions/kalo/`, and again whenever
    content changes.
+3. Copy `plugins/Kalo/generated.mcpack` into Geyser's `packs/` folder, and again whenever
+   content changes. **Skipping this registers the blocks but leaves them untextured** —
+   the extension does not attach the pack the way the in-process path does.
 
 The extension does not fail when the mapping file is missing — Geyser often starts before
 the Paper side has generated one — it simply has nothing to register and says so.
+
+Every copy step here is a chance to serve stale content. If you can run Geyser as a plugin
+on the server, do that instead.
+
+## Roadmap
+
+Kalo is pre-alpha. This table is the honest split between what has been run and what has
+only been written — the middle column is the one worth reading before you install it.
+
+### Works, exercised on a running server
+
+| | Notes |
+|---|---|
+| Items, blocks, furniture, armor | Java side, Paper 26.2 + Folia |
+| All recipe stations | crafting, furnace, blast, smoker, campfire, stonecutting, smithing |
+| Sounds and glyphs | |
+| Virtual blocks | persistent index, chunk load/unload, explosion handling |
+| `/kalo migrate-world` | dry-run |
+| Resource pack generation | deterministic zip, item-definition format |
+
+### Implemented but **not verified end to end**
+
+| | What is missing |
+|---|---|
+| **Bedrock, everything** | No Bedrock client has ever connected. Registration code runs and the pack compiles, but nothing has confirmed a Bedrock player sees an item icon, a placed block, or worn armor. This is the single biggest gap between what Kalo claims and what Kalo has proven. |
+| Bedrock virtual blocks | Placement and `ItemDisplay` rendering unconfirmed — see [docs/VIRTUAL_BLOCKS.md](docs/VIRTUAL_BLOCKS.md) |
+| Standalone-Geyser path | The extension is written and unit-tested, but the full copy-the-files setup has not been run |
+| The 1.21.4 end of the version range | One jar spans 1.21.4 → 26.2 and `pack_format` auto-selects per version, but testing has happened on 26.2 only |
+| Oraxen / ItemsAdder import | Written against documented formats, never run against a real pack. Treat any import as a draft to review. |
+
+### Not built
+
+| | |
+|---|---|
+| Bedrock geometry for custom models | Sprite items and `cube_all` blocks convert; hand-authored Blockbench models are skipped with a warning |
+| Real server-side block registration | Would still need a borrowed visual state on vanilla clients — see the `BlockCarrier` javadoc |
 
 ## License
 
