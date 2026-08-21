@@ -253,7 +253,19 @@ public final class VirtualBlockStore implements AutoCloseable {
         }
     }
 
-    private void writeSnapshot(@NotNull Path file) throws IOException {
+    /**
+     * Snapshot and write are one atomic step, and {@link #flush()} shares this monitor.
+     *
+     * <p>Without that, the debounced writer and a shutdown flush overlap: the writer takes
+     * its snapshot, a player places a block, flush snapshots the newer state and moves it
+     * into place, and then the writer's older snapshot lands on top. Both moves are atomic,
+     * so nothing is corrupt — the last blocks placed before shutdown simply disappear.</p>
+     *
+     * <p>Taking the snapshot inside the lock is what makes it hold: whichever writer runs
+     * second necessarily sees state at least as new as the one that ran first.</p>
+     */
+    // Package-private so VirtualBlockStoreTest can prove the two writers serialise.
+    synchronized void writeSnapshot(@NotNull Path file) throws IOException {
         List<WorldSnapshot> snapshot = snapshot();
         Path parent = file.getParent();
         if (parent != null) {

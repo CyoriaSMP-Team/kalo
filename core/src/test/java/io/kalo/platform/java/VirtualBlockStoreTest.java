@@ -6,6 +6,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -59,6 +62,58 @@ class VirtualBlockStoreTest {
                     read.get(world, i & 31, -64 + (i % 384), i >> 5));
         }
         read.close();
+    }
+
+    /**
+     * The debounced writer and a shutdown flush must not overlap.
+     *
+     * <p>flush() was synchronized and writeSnapshot was not, so the two shared no monitor:
+     * the writer could snapshot, a player place a block, flush write the newer state, and
+     * then the writer's older snapshot land on top of it. Both moves are atomic, so nothing
+     * ends up corrupt — the last blocks placed before shutdown just disappear.</p>
+     *
+     * <p>Asserted as mutual exclusion rather than by racing the two writers: the window is
+     * a few milliseconds wide, so a timing-based test passes with the bug present and
+     * claims coverage it does not have.</p>
+     */
+    @Test
+    void snapshotWritesAreMutuallyExclusive(@TempDir Path temp) throws Exception {
+        UUID world = UUID.randomUUID();
+        Path file = temp.resolve("virtual-blocks.kvb");
+
+        VirtualBlockStore store = new VirtualBlockStore();
+        store.load(file);
+        store.put(world, 0, 64, 0, "bench:stone");
+
+        CountDownLatch entered = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread writer;
+
+        synchronized (store) {
+            writer = new Thread(() -> {
+                entered.countDown();
+                try {
+                    store.writeSnapshot(file);
+                } catch (Throwable t) {
+                    failure.set(t);
+                }
+            });
+            writer.start();
+
+            assertTrue(entered.await(2, TimeUnit.SECONDS), "writer thread never started");
+            writer.join(250);
+            assertTrue(writer.isAlive(),
+                    "writeSnapshot ran while another writer held the store monitor");
+        }
+
+        writer.join(2_000);
+        assertNull(failure.get());
+        store.close();
+
+        VirtualBlockStore reloaded = new VirtualBlockStore();
+        reloaded.load(file);
+        assertEquals("bench:stone", reloaded.get(world, 0, 64, 0));
+        reloaded.close();
     }
 
     @Test
