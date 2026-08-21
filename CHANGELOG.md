@@ -6,7 +6,7 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
-## 0.1.0-rc.1
+## 0.1.0-rc.2
 
 ### Fixed
 
@@ -29,6 +29,10 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   shutdown flush shared no lock, so an older snapshot could land on top of a newer one.
 - `PackFormats` returned a pack_format for 1.21.5 through 1.21.11 as if it had been
   verified. It had not; it now says when it is guessing.
+- **The PlaceholderAPI expansion never registered on any server that had PlaceholderAPI.**
+  A Paper plugin's classloader is isolated, so the hook's supertype could not resolve and
+  the guarded call failed with `NoClassDefFoundError` every time. It now declares the
+  classpath edge, the way the Geyser dependency already did.
 
 ### Changed
 
