@@ -11,6 +11,7 @@ import io.kalo.content.item.Item;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
 import io.kalo.pack.Json;
+import io.kalo.platform.java.BlockStateAllocator;
 import io.kalo.pack.ResourcePack;
 import io.kalo.pack.Writable;
 import net.kyori.adventure.key.Key;
@@ -207,16 +208,18 @@ public final class BedrockPackCompiler {
      * needs to register them.
      *
      * <p>Bedrock has real custom blocks rather than borrowed states, so nothing here
-     * mirrors the note block carrier the Java side uses. What does have to cross over is
-     * the pairing — which Java block key corresponds to which Bedrock identifier — so
-     * that is written out for the extension to consume at runtime. The resource pack can
-     * only supply the look; registration itself happens inside Geyser.</p>
+     * mirrors the carrier the Java side uses. What does have to cross over is the pairing
+     * — which Java block state corresponds to which Bedrock identifier — because that is
+     * what Geyser overrides. The resource pack can only supply the look; registration
+     * itself happens inside Geyser.</p>
      *
-     * @param allocator supplies the Java carrier state each block occupies, so the
-     *                  extension can translate a placed block without re-deriving it
+     * @param allocator supplies the carrier and state each block occupies. The carrier is
+     *                  part of the answer, not decoration: a block that spilled onto
+     *                  tripwire or scaffolding is not a note block, and naming it as one
+     *                  would override a Java state that was never placed.
      */
     public void addBlocks(@NotNull Iterable<? extends Block> blocks,
-                          @NotNull java.util.function.Function<Key, Integer> allocator,
+                          @NotNull java.util.function.Function<Key, BlockStateAllocator.Assignment> allocator,
                           @NotNull java.util.Set<String> skip) {
         for (Block block : blocks) {
             BlockDefinition definition = block.definition();
@@ -259,11 +262,13 @@ public final class BedrockPackCompiler {
             record.add("material_instances", materialJson);
             JavaBlockMode javaMode = definition.java().mode();
             record.addProperty("java_mode", javaMode.name().toLowerCase(Locale.ROOT));
-            Integer state = javaMode == JavaBlockMode.NATIVE ? allocator.apply(key) : null;
+            BlockStateAllocator.Assignment assignment =
+                    javaMode == JavaBlockMode.NATIVE ? allocator.apply(key) : null;
             String javaIdentifier = null;
-            if (state != null) {
-                record.addProperty("java_carrier_state", state);
-                javaIdentifier = GeyserBlockState.javaIdentifier(state);
+            if (assignment != null) {
+                record.addProperty("java_carrier", assignment.carrier().name());
+                record.addProperty("java_carrier_state", assignment.state());
+                javaIdentifier = GeyserBlockState.javaIdentifier(assignment);
                 record.addProperty("java_identifier", javaIdentifier);
             }
             String displayName = plainName(definition.display().name());

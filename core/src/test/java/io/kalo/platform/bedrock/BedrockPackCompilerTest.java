@@ -12,11 +12,13 @@ import io.kalo.content.item.definition.DisplayProperties;
 import io.kalo.content.item.definition.ItemBehaviour;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
+import io.kalo.content.block.definition.BlockCarrier;
 import io.kalo.pack.PackFormats;
 import io.kalo.pack.PackMeta;
 import io.kalo.pack.ResourcePack;
 import io.kalo.pack.ResourcePackImpl;
 import io.kalo.pack.Writable;
+import io.kalo.platform.java.BlockStateAllocator;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
@@ -37,6 +39,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BedrockPackCompilerTest {
+
+    /** Most cases only care about the state index, so name the default carrier once. */
+    private static BlockStateAllocator.Assignment note(int state) {
+        return new BlockStateAllocator.Assignment(BlockCarrier.NOTE_BLOCK, state);
+    }
 
     private static ResourcePack javaPackWith(String texturePath) {
         ResourcePack java = new ResourcePackImpl(PackMeta.of(PackFormats.CURRENT, "java"));
@@ -239,7 +246,7 @@ class BedrockPackCompilerTest {
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
 
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
-        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7, Set.of());
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> note(7), Set.of());
         BedrockPackCompiler.Result result = compiler.finish();
 
         assertEquals(1, result.blockCount());
@@ -278,7 +285,7 @@ class BedrockPackCompilerTest {
                 .build();
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
-        compiler.addBlocks(List.of(new StubBlock(definition)), key -> 9, Set.of());
+        compiler.addBlocks(List.of(new StubBlock(definition)), key -> note(9), Set.of());
 
         BedrockPackCompiler.Result result = compiler.finish();
         JsonObject textures = json(result.pack().file("blocks.json"))
@@ -313,7 +320,7 @@ class BedrockPackCompilerTest {
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
 
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
-        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 7, Set.of());
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> note(7), Set.of());
 
         JsonObject mappings = json(compiler.finish().mappings());
         JsonObject record = mappings.getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
@@ -340,7 +347,7 @@ class BedrockPackCompilerTest {
                         .java(io.kalo.content.block.definition.JavaBlockOptions.virtual())
                         .build();
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
-        compiler.addBlocks(List.of(new StubBlock(definition)), key -> 99, Set.of());
+        compiler.addBlocks(List.of(new StubBlock(definition)), key -> note(99), Set.of());
 
         JsonObject record = json(compiler.finish().mappings())
                 .getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
@@ -361,7 +368,7 @@ class BedrockPackCompilerTest {
                         .model(new io.kalo.content.block.definition.BlockModelDefinition.Custom(
                                 Key.key("testpack", "block/chair"),
                                 Map.of("all", Key.key("testpack", "block/chair"))))
-                        .build())), key -> 4, Set.of());
+                        .build())), key -> note(4), Set.of());
         BedrockPackCompiler.Result result = compiler.finish();
 
         assertEquals(1, result.blockCount(), "a custom model should no longer be skipped");
@@ -392,7 +399,7 @@ class BedrockPackCompilerTest {
                 io.kalo.content.block.definition.BlockDefinition.builder(Key.key("testpack", "plain"))
                         .model(new io.kalo.content.block.definition.BlockModelDefinition.Custom(
                                 Key.key("testpack", "block/plain"), Map.of()))
-                        .build())), key -> 5, Set.of());
+                        .build())), key -> note(5), Set.of());
 
         assertEquals(1, compiler.finish().skippedCount());
     }
@@ -413,7 +420,7 @@ class BedrockPackCompilerTest {
                         .model(new io.kalo.content.block.definition.BlockModelDefinition.Custom(
                                 Key.key("testpack", "block/parent_only"),
                                 Map.of("all", Key.key("testpack", "block/good"))))
-                        .build())), key -> key.value().equals("good") ? 1 : 2, Set.of());
+                        .build())), key -> key.value().equals("good") ? note(1) : note(2), Set.of());
 
         BedrockPackCompiler.Result result = compiler.finish();
         // Runtime publication is deliberately separate: the manager performs it only
@@ -434,7 +441,7 @@ class BedrockPackCompilerTest {
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
 
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
-        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> 1,
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> note(1),
                 Set.of("testpack:ruby_block"));
         BedrockPackCompiler.Result result = compiler.finish();
 
