@@ -86,13 +86,19 @@ jobs:
             echo KALO_EOF
           } >> "$GITHUB_OUTPUT"
 
+      # The changelog is the point of the step above, and this is the channel most people
+      # read. --generate-notes alone published a commit list and left the written notes for
+      # Modrinth and Hangar only.
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
+          CHANGELOG: ${{ steps.changelog.outputs.body }}
         run: |
+          printf '%s\n' "$CHANGELOG" > release-notes.md
           gh release create "$TAG" \
             --title "$TAG" \
+            --notes-file release-notes.md \
             --generate-notes \
             --target "${{ github.sha }}" \
             build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar
