@@ -29,13 +29,13 @@ class BedrockRegistrationSnapshotTest {
     @Test
     void aPublishedGenerationIsWhatTheBridgeReads() {
         var generation = BedrockRegistrationSnapshot.beginGeneration();
-        BedrockRegistrationSnapshot.publishSuccess(generation, List.of(block("mypack:ruby")));
+        BedrockRegistrationSnapshot.publishSuccess(generation, List.of(block("mypack:ruby")), List.of());
 
-        Optional<List<BedrockBlockRegistration>> read =
+        Optional<BedrockRegistrationSnapshot.Registrations> read =
                 BedrockRegistrationSnapshot.await(Duration.ofSeconds(1));
         assertTrue(read.isPresent());
-        assertEquals(1, read.get().size());
-        assertEquals("mypack:ruby", read.get().getFirst().javaKey());
+        assertEquals(1, read.get().blocks().size());
+        assertEquals("mypack:ruby", read.get().blocks().getFirst().javaKey());
     }
 
     /**
@@ -49,12 +49,12 @@ class BedrockRegistrationSnapshotTest {
         BedrockRegistrationSnapshot.publishFailure(generation);
 
         long start = System.nanoTime();
-        Optional<List<BedrockBlockRegistration>> read =
+        Optional<BedrockRegistrationSnapshot.Registrations> read =
                 BedrockRegistrationSnapshot.await(Duration.ofSeconds(5));
         long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
 
         assertTrue(read.isPresent());
-        assertTrue(read.get().isEmpty());
+        assertTrue(read.get().blocks().isEmpty());
         assertTrue(elapsedMillis < 1_000, "await blocked for " + elapsedMillis + "ms");
     }
 
@@ -68,12 +68,12 @@ class BedrockRegistrationSnapshotTest {
         var stale = BedrockRegistrationSnapshot.beginGeneration();
         var current = BedrockRegistrationSnapshot.beginGeneration();
 
-        BedrockRegistrationSnapshot.publishSuccess(stale, List.of(block("mypack:stale")));
-        BedrockRegistrationSnapshot.publishSuccess(current, List.of(block("mypack:current")));
+        BedrockRegistrationSnapshot.publishSuccess(stale, List.of(block("mypack:stale")), List.of());
+        BedrockRegistrationSnapshot.publishSuccess(current, List.of(block("mypack:current")), List.of());
 
-        Optional<List<BedrockBlockRegistration>> read =
+        Optional<BedrockRegistrationSnapshot.Registrations> read =
                 BedrockRegistrationSnapshot.await(Duration.ofSeconds(1));
         assertTrue(read.isPresent());
-        assertEquals("mypack:current", read.get().getFirst().javaKey());
+        assertEquals("mypack:current", read.get().blocks().getFirst().javaKey());
     }
 }

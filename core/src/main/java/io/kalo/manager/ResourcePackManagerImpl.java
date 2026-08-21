@@ -360,7 +360,8 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         // Nothing published this until now: GeyserBridge waited out its timeout on every
         // startup and registered no blocks at all, which is why custom blocks never
         // reached a Bedrock client.
-        BedrockRegistrationSnapshot.publishSuccess(result.generation(), result.registrations());
+        BedrockRegistrationSnapshot.publishSuccess(result.generation(),
+                result.registrations(), result.itemRegistrations());
 
         // mappedCount is distinct vanilla items, which reads like a failure when 1000
         // custom items all map onto PAPER. Report what the reader actually wants.

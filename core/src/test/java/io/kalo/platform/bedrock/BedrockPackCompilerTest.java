@@ -390,6 +390,38 @@ class BedrockPackCompilerTest {
                 "blocks.json is keyed by " + blocks.keySet() + ", not by the registered identifier");
     }
 
+    /**
+     * A block needs an item definition of its own, or Bedrock shows what its Java base
+     * material is — and JavaBlockItemCompiler places every block from a NOTE_BLOCK stack,
+     * so a real Bedrock player saw a note block in the hotbar for every custom block, each
+     * indistinguishable from the next.
+     */
+    @Test
+    void everyBlockGetsAnItemDefinitionOfItsOwn() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/ruby_block.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> note(7), Set.of());
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        JsonObject items = json(result.itemMappings()).getAsJsonObject("items");
+        assertTrue(items.has("minecraft:note_block"),
+                "block items ride on NOTE_BLOCK, matching JavaBlockItemCompiler");
+
+        JsonObject entry = items.getAsJsonArray("minecraft:note_block").get(0).getAsJsonObject();
+        // The item_model is what lets every block share one vanilla item without colliding.
+        assertEquals("testpack:ruby_block", entry.get("model").getAsString());
+        assertEquals("testpack_ruby_block_item",
+                entry.getAsJsonObject("bedrock_options").get("icon").getAsString());
+        assertNotNull(result.pack().file("textures/items/testpack_ruby_block_item.png"),
+                "the icon has to exist in the flat item atlas Bedrock resolves through");
+
+        // The in-process bridge registers from this same list rather than re-deriving it.
+        assertEquals(1, result.itemRegistrations().size());
+        assertEquals("minecraft:note_block", result.itemRegistrations().getFirst().javaItem());
+    }
+
     @Test
     void virtualBlockRecordHasNoFiniteJavaCarrierState() throws IOException {
         ResourcePack java = javaPackWith("assets/testpack/textures/block/unlimited.png");
@@ -479,10 +511,10 @@ class BedrockPackCompilerTest {
         BedrockPackCompiler.Result result = compiler.finish();
         // Runtime publication is deliberately separate: the manager performs it only
         // after the .mcpack and mapping file have both been written successfully.
-        BedrockRegistrationSnapshot.publishSuccess(result.generation(), result.registrations());
+        BedrockRegistrationSnapshot.publishSuccess(result.generation(), result.registrations(), result.itemRegistrations());
 
         List<BedrockBlockRegistration> registrations = BedrockRegistrationSnapshot
-                .await(Duration.ZERO).orElseThrow();
+                .await(Duration.ZERO).orElseThrow().blocks();
         assertEquals(List.of("testpack:good"),
                 registrations.stream().map(BedrockBlockRegistration::javaKey).toList());
     }

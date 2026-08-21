@@ -5,6 +5,7 @@ import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
 import io.kalo.manager.RegistryManager;
 import io.kalo.platform.bedrock.BedrockBlockRegistration;
+import io.kalo.platform.bedrock.BedrockItemRegistration;
 import io.kalo.platform.bedrock.BedrockRegistrationSnapshot;
 import io.kalo.utils.Constants;
 import io.kalo.utils.Plugins;
@@ -115,7 +116,7 @@ public final class GeyserBridge {
 
         int registered = 0;
         int virtual = 0;
-        for (BedrockBlockRegistration block : snapshot.get()) {
+        for (BedrockBlockRegistration block : snapshot.get().blocks()) {
             try {
                 if (block.javaIdentifier() == null) {
                     // A virtual block is an ItemDisplay entity, not a block state, so there
@@ -141,65 +142,53 @@ public final class GeyserBridge {
                 + (virtual > 0 ? "; " + virtual + " virtual block(s) render as entities instead" : ""));
     }
 
-    /** Registers the same Geyser v2 definitions that the standalone mapping file carries. */
+    /**
+     * Registers exactly the item definitions the compiler emitted.
+     *
+     * <p>This used to walk the live registries and re-derive every field — base material,
+     * icon, components — duplicating the decision the compiler had already made for the
+     * mapping file. Two copies of one decision drift, and one of them had already gone
+     * missing entirely: block items were never registered at all here, so a Bedrock player
+     * saw a note block in the hotbar for every custom block.</p>
+     */
     private static void onDefineCustomItems(@NotNull GeyserDefineCustomItemsEvent event) {
         if (!bedrockOutputEnabled()) {
             return;
         }
+        var snapshot = BedrockRegistrationSnapshot.await(Duration.ofSeconds(30));
+        if (snapshot.isEmpty()) {
+            Plugins.logger().warning("Kalo's Bedrock compiler did not finish before Geyser froze its"
+                    + " custom-item registry; no items were registered");
+            return;
+        }
+
         int registered = 0;
-        for (Item item : allItems()) {
-            ItemDefinition definition = item.definition();
-            if (!definition.bedrock().enabled()
-                    || definition.model() instanceof ModelDefinition.Vanilla
-                    || !(definition.model() instanceof ModelDefinition.Sprite)) {
-                continue;
-            }
-
+        for (BedrockItemRegistration item : snapshot.get().items()) {
             try {
-                var key = definition.key();
-                String bedrockId = key.asString();
-                String icon = definition.bedrock().iconOverride() != null
-                        ? definition.bedrock().iconOverride()
-                        : key.namespace() + "_" + key.value();
-                String javaIdentifier = "minecraft:"
-                        + definition.java().baseMaterial().name().toLowerCase(Locale.ROOT);
-
                 CustomItemDefinition.Builder custom = CustomItemDefinition.builder(
-                                Identifier.of(bedrockId), Identifier.of(key.asString()))
-                        .bedrockOptions(CustomItemBedrockOptions.builder().icon(icon))
-                        .component(JavaItemDataComponents.MAX_STACK_SIZE,
-                                definition.behaviour().maxStackSize());
+                                Identifier.of(item.bedrockIdentifier()), Identifier.of(item.model()))
+                        .bedrockOptions(CustomItemBedrockOptions.builder().icon(item.icon()))
+                        .component(JavaItemDataComponents.MAX_STACK_SIZE, item.maxStackSize());
 
-                if (definition.display().name() != null) {
-                    custom.displayName(PlainTextComponentSerializer.plainText()
-                            .serialize(definition.display().name()));
+                if (item.displayName() != null) {
+                    custom.displayName(item.displayName());
                 }
-                if (definition.behaviour().maxDurability() != null) {
-                    custom.component(JavaItemDataComponents.MAX_DAMAGE,
-                            definition.behaviour().maxDurability());
+                if (item.maxDamage() != null) {
+                    custom.component(JavaItemDataComponents.MAX_DAMAGE, item.maxDamage());
                 }
-                if (definition.display().enchantmentGlint()) {
+                if (item.enchantmentGlint()) {
                     custom.component(JavaItemDataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
                 }
 
-                event.register(Identifier.of(javaIdentifier), custom.build());
+                event.register(Identifier.of(item.javaItem()), custom.build());
                 registered++;
             } catch (Exception e) {
                 Plugins.logger().log(Level.WARNING,
-                        "Could not register " + definition.key().asString() + " with Geyser", e);
+                        "Could not register " + item.bedrockIdentifier() + " with Geyser", e);
             }
         }
 
         Plugins.logger().info("Registered " + registered + " item(s) with Geyser natively");
-    }
-
-    private static @NotNull Iterable<Item> allItems() {
-        RegistryManager.GlobalRegistries registries = RegistryManager.GlobalRegistries.registries();
-
-        List<Item> items = new ArrayList<>();
-        registries.item().forEach(items::add);
-        registries.armor().forEach(items::add);
-        return items;
     }
 
     private static @NotNull CustomBlockData build(@NotNull BedrockBlockRegistration block) {

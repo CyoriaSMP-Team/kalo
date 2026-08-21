@@ -33,13 +33,13 @@ public final class BedrockRegistrationSnapshot {
      * An older overlapping generation cannot overwrite the current one.
      */
     public static void publishSuccess(@NotNull Generation generation,
-                                      @NotNull List<BedrockBlockRegistration> registrations) {
+                                      @NotNull List<BedrockBlockRegistration> blocks,
+                                      @NotNull List<BedrockItemRegistration> items) {
         State state = CURRENT.get();
         if (!state.generation().equals(generation)) {
             return;
         }
-        List<BedrockBlockRegistration> immutable = List.copyOf(registrations);
-        state.ready().complete(immutable);
+        state.ready().complete(new Registrations(List.copyOf(blocks), List.copyOf(items)));
     }
 
     /**
@@ -54,15 +54,14 @@ public final class BedrockRegistrationSnapshot {
         if (!state.generation().equals(generation)) {
             return;
         }
-        state.ready().complete(List.of());
+        state.ready().complete(new Registrations(List.of(), List.of()));
     }
 
     /**
      * Returns the latest successful compilation, waiting for the first one when Geyser
      * reaches its palette event before Kalo's asynchronous compiler has finished.
      */
-    public static @NotNull Optional<List<BedrockBlockRegistration>> await(
-            @NotNull Duration timeout) {
+    public static @NotNull Optional<Registrations> await(@NotNull Duration timeout) {
         State state = CURRENT.get();
         try {
             return Optional.of(state.ready().get(timeout.toMillis(), TimeUnit.MILLISECONDS));
@@ -74,11 +73,16 @@ public final class BedrockRegistrationSnapshot {
         }
     }
 
+    /** Everything one compile decided Bedrock should be told about. */
+    public record Registrations(@NotNull List<BedrockBlockRegistration> blocks,
+                                @NotNull List<BedrockItemRegistration> items) {
+    }
+
     /** Opaque token tying durable output to the compiler generation that produced it. */
     public record Generation(long id) {
     }
 
     private record State(Generation generation,
-                         CompletableFuture<List<BedrockBlockRegistration>> ready) {
+                         CompletableFuture<Registrations> ready) {
     }
 }

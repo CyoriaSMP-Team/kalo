@@ -56,6 +56,7 @@ public final class BedrockPackCompiler {
     /** java content key -> Bedrock geometry identifier, for the extension to apply. */
     private final JsonObject geometries = new JsonObject();
     private final List<BedrockBlockRegistration> blockRegistrations = new ArrayList<>();
+    private final List<BedrockItemRegistration> itemRegistrations = new ArrayList<>();
     private int attachables;
 
     private int skipped;
@@ -137,15 +138,96 @@ public final class BedrockPackCompiler {
         definitions.add(mapping);
         mappedItems.add(javaItem, definitions);
 
-        // Bedrock resolves item icons through a flat atlas keyed by shorthand, not by
-        // path, so the texture is copied to a flat location and registered here.
+        itemRegistrations.add(new BedrockItemRegistration(
+                javaItem, bedrockId, key.asString(), icon, displayName,
+                definition.behaviour().maxStackSize(), definition.behaviour().maxDurability(),
+                definition.display().enchantmentGlint()));
+
+        registerItemTexture(icon, sprite.texture());
+    }
+
+    /**
+     * Bedrock resolves item icons through a flat atlas keyed by shorthand, not by path, so
+     * the texture is copied to a flat location and registered here.
+     */
+    private void registerItemTexture(@NotNull String icon, @NotNull Key texture) {
         JsonArray paths = new JsonArray();
         paths.add("textures/items/" + icon);
-        JsonObject texture = new JsonObject();
-        texture.add("textures", paths);
-        textureData.add(icon, texture);
+        JsonObject entry = new JsonObject();
+        entry.add("textures", paths);
+        textureData.add(icon, entry);
 
-        copyTexture(sprite.texture(), "textures/items/" + icon + ".png");
+        copyTexture(texture, "textures/items/" + icon + ".png");
+    }
+
+    /**
+     * The item form of a block, so a Bedrock player holds the block rather than a note
+     * block.
+     *
+     * <p>Without this the block's item falls back to its Java base material, and
+     * {@code JavaBlockItemCompiler} places every block from a {@code NOTE_BLOCK} stack —
+     * so a Bedrock player saw a note block in the hotbar for every custom block, and every
+     * block looked identical to every other. Geyser matches on the {@code item_model} that
+     * compiler stamps, which is what lets them all share the one vanilla item without
+     * colliding.</p>
+     *
+     * <p>The icon is the block's own face texture drawn flat. A Bedrock client can render a
+     * true block preview instead, but that needs the item tied to the custom block's
+     * identifier rather than given its own, and a flat icon is the half that is verified.</p>
+     */
+    private void addBlockItem(@NotNull BlockDefinition definition, @NotNull String shorthand) {
+        Key icon = iconTextureFor(definition);
+        if (icon == null) {
+            return;
+        }
+        Key key = definition.key();
+        // Must stay in step with JavaBlockItemCompiler, which hardcodes NOTE_BLOCK for
+        // every block whatever carrier the block itself borrows.
+        String javaItem = "minecraft:note_block";
+        String bedrockId = key.namespace() + ":" + key.value();
+        String iconKey = shorthand + "_item";
+
+        JsonObject mapping = new JsonObject();
+        mapping.addProperty("type", "definition");
+        mapping.addProperty("model", key.asString());
+        mapping.addProperty("bedrock_identifier", bedrockId);
+        JsonObject bedrockOptions = new JsonObject();
+        bedrockOptions.addProperty("icon", iconKey);
+        mapping.add("bedrock_options", bedrockOptions);
+
+        String displayName = plainName(definition.display().name());
+        if (displayName != null) {
+            mapping.addProperty("display_name", displayName);
+        }
+        JsonObject components = new JsonObject();
+        components.addProperty("minecraft:max_stack_size", 64);
+        mapping.add("components", components);
+
+        JsonArray definitions = mappedItems.has(javaItem)
+                ? mappedItems.getAsJsonArray(javaItem)
+                : new JsonArray();
+        definitions.add(mapping);
+        mappedItems.add(javaItem, definitions);
+
+        itemRegistrations.add(new BedrockItemRegistration(
+                javaItem, bedrockId, key.asString(), iconKey, displayName, 64, null, false));
+
+        registerItemTexture(iconKey, icon);
+    }
+
+    /** The face a block's flat inventory icon is drawn from. */
+    private static @Nullable Key iconTextureFor(@NotNull BlockDefinition definition) {
+        return switch (definition.model()) {
+            case BlockModelDefinition.CubeAll cubeAll -> cubeAll.texture();
+            case BlockModelDefinition.Cube cube -> cubeFaceTexture(cube.faces(), "up");
+            case BlockModelDefinition.Custom custom -> {
+                if (custom.textures().isEmpty()) {
+                    yield null;
+                }
+                Map<String, Key> sorted = new TreeMap<>(custom.textures());
+                yield sorted.containsKey("all") ? sorted.get("all") : sorted.values().iterator().next();
+            }
+        };
     }
 
     /**
@@ -291,6 +373,7 @@ public final class BedrockPackCompiler {
             blockRegistrations.add(new BedrockBlockRegistration(
                     key.asString(), bedrockId, javaIdentifier, geometry, displayName,
                     hardness, materials));
+            addBlockItem(definition, shorthand);
         }
     }
 
@@ -495,7 +578,7 @@ public final class BedrockPackCompiler {
         return new Result(pack, Json.writable(itemMappings), Json.writable(blockMappings()),
                 mappedItems.size(), itemDefinitions,
                 blockRegistrations.size(), attachables, skipped, generation,
-                List.copyOf(blockRegistrations));
+                List.copyOf(blockRegistrations), List.copyOf(itemRegistrations));
     }
 
     /**
@@ -565,9 +648,11 @@ public final class BedrockPackCompiler {
                          int mappedCount, int itemCount, int blockCount, int armorCount,
                          int skippedCount,
                          @NotNull BedrockRegistrationSnapshot.Generation generation,
-                         @NotNull List<BedrockBlockRegistration> registrations) {
+                         @NotNull List<BedrockBlockRegistration> registrations,
+                         @NotNull List<BedrockItemRegistration> itemRegistrations) {
         public Result {
             registrations = List.copyOf(registrations);
+            itemRegistrations = List.copyOf(itemRegistrations);
         }
     }
 

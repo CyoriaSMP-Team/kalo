@@ -74,7 +74,16 @@ legacy read path while all new placements use the virtual backend.
 
 ## Bedrock
 
-The Bedrock compiler emits a real custom-block definition for both modes and labels the
-mapping with `java_mode`. Native entries additionally carry `java_carrier_state`; virtual
-entries intentionally do not. The Bedrock side still needs an end-to-end Geyser client
-smoke test for placement and entity rendering before that path is called certified.
+**Virtual blocks do not render on Bedrock.** A Bedrock player sees nothing where one is
+placed — confirmed on a live Geyser server, not inferred.
+
+The reason is structural. A virtual block is an `ItemDisplay` entity on Java, and Geyser
+has no translation that puts a Java display entity on a Bedrock client. There is no Java
+block state for it to override either, so it cannot appear in the custom-block mapping:
+the mapping is keyed by the state being replaced, and a virtual block replaces none.
+
+Native blocks are unaffected and render correctly, item icons and all.
+
+So the trade-off in the table above is sharper than it looks: `virtual` buys unlimited
+content keys and costs Bedrock support entirely. On a server with Bedrock players, treat
+the 893 native states as the real ceiling for anything they must be able to see.
