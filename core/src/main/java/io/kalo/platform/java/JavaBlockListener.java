@@ -200,13 +200,24 @@ public final class JavaBlockListener implements Listener {
         return display;
     }
 
-    /** Stops vanilla rewriting a carrier or virtual anchor out from under custom content. */
+    /**
+     * Stops vanilla rewriting a carrier or virtual anchor out from under custom content.
+     *
+     * <p>Only where custom content actually is. Cancelling on the material alone reached
+     * every note block, tripwire and scaffolding on the server, Kalo's or not — so vanilla
+     * scaffolding stopped collapsing when unsupported and tripwire stopped updating, on
+     * any server that merely had Kalo installed.</p>
+     *
+     * <p>The material test stays as a cheap gate: physics fires constantly and almost
+     * nothing is a carrier, so the identity lookup is only paid for on the few that are.</p>
+     */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onPhysics(BlockPhysicsEvent event) {
         org.bukkit.block.Block block = event.getBlock();
-        if (isCarrier(event.getChangedType())
-                || isCarrier(block.getType())
-                || virtualId(block) != null) {
+        if (!isCarrier(block.getType()) && block.getType() != VIRTUAL_ANCHOR) {
+            return;
+        }
+        if (resolve(block) != null) {
             event.setCancelled(true);
         }
     }

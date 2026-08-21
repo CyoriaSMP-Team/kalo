@@ -6,7 +6,7 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
-## 0.1.0-rc.5
+## 0.1.0-rc.6
 
 ### Fixed
 
@@ -52,6 +52,10 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   wrong the same way, and the test asserted the broken string.
 - **Every custom block showed as a note block in the hotbar.** Blocks had no Bedrock item
   definition, so they fell back to their Java base material, which is always `NOTE_BLOCK`.
+- **Kalo broke vanilla physics for every note block, tripwire and scaffolding on the
+  server.** `onPhysics` cancelled on the carrier *material* rather than on Kalo content, so
+  merely installing the plugin stopped vanilla scaffolding collapsing when unsupported and
+  stopped tripwire updating — for blocks Kalo had nothing to do with.
 - **Native custom blocks could not be broken by anyone.** `onInteract` cancelled the whole
   `PlayerInteractEvent` to stop note-block tuning, which also swallowed
   `LEFT_CLICK_BLOCK` — where mining starts. That is the standard trick for making a block
