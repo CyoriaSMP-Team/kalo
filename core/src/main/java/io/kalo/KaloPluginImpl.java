@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 import org.bukkit.plugin.java.JavaPlugin;
 import io.kalo.platform.java.JavaBlockListener;
+import io.kalo.platform.java.JavaRecipeListener;
 
 import java.util.List;
 
@@ -36,6 +37,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         managers.forEach(manager -> manager.preload(context));
         getServer().getPluginManager().registerEvents(
                 new JavaBlockListener(registryManager.blockStateAllocator()), this);
+        getServer().getPluginManager().registerEvents(new JavaRecipeListener(), this);
 
         // Content loads here rather than on ServerLoadEvent, which is what Neko did.
         // Geyser asks for custom blocks partway through its own enable — before
@@ -50,13 +52,22 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         // Geyser may already be enabled and fire immediately.
         io.kalo.integration.GeyserIntegration.registerIfPresent(this);
 
-        io.kalo.integration.PlaceholderApiIntegration.registerIfPresent();
+        io.kalo.integration.PlaceholderApiIntegration.initialize(this);
     }
 
     @Override
     public void onDisable() {
         Context context = new Context(this);
-        managers.forEach(manager -> manager.end(context));
+        // Stop optional-dependency callbacks before any registry or pack state they can
+        // observe begins tearing down.
+        io.kalo.integration.GeyserIntegration.unregister();
+        io.kalo.integration.PlaceholderApiIntegration.unregister();
+
+        // Unwind in reverse dependency order: commands and pack generation stop before
+        // the content and registries they read are torn down.
+        for (int i = managers.size() - 1; i >= 0; i--) {
+            managers.get(i).end(context);
+        }
 
         Kalo.unregisterPlugin();
     }
@@ -69,7 +80,15 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
                 .toList();
 
         Context context = new Context(this);
-        reloadableList.forEach(reloadable -> reloadable.end(context));
+        for (int i = reloadableList.size() - 1; i >= 0; i--) {
+            reloadableList.get(i).end(context);
+        }
+
+        // `/kalo reload` promises to reload Kalo's configuration as well as its packs.
+        // Without this, edits to base-pack, Bedrock mode, or pack hosting were ignored
+        // until the whole server restarted.
+        reloadConfig();
+
         reloadableList.forEach(reloadable -> reloadable.preload(context));
         reloadableList.forEach(reloadable -> reloadable.start(context));
     }

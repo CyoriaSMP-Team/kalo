@@ -30,6 +30,9 @@ public final class Files {
         try (Stream<Path> walk = java.nio.file.Files.walk(rootPath)) {
             return walk.filter(java.nio.file.Files::isRegularFile)
                     .filter(path -> matches(path, extensions))
+                    // File-system walk order is unspecified. Stable ordering makes
+                    // duplicate-definition diagnostics and generated output reproducible.
+                    .sorted()
                     .map(Path::toFile)
                     .toList();
         } catch (IOException e) {

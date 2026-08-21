@@ -5,7 +5,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Platform-neutral block mechanics.
  *
- * @param hardness     how long the block takes to break; {@code -1} is unbreakable
+ * @param hardness     finite break-time factor; {@code -1} is unbreakable
  * @param requiresTool whether breaking without the correct tool yields no drop
  */
 public record BlockBehaviour(
@@ -13,8 +13,9 @@ public record BlockBehaviour(
         boolean requiresTool
 ) {
     public BlockBehaviour {
-        if (hardness < 0 && hardness != -1f) {
-            throw new IllegalArgumentException("hardness must be >= 0, or -1 for unbreakable; got " + hardness);
+        if (!Float.isFinite(hardness) || (hardness < 0 && hardness != -1f)) {
+            throw new IllegalArgumentException(
+                    "hardness must be finite and >= 0, or -1 for unbreakable; got " + hardness);
         }
     }
 

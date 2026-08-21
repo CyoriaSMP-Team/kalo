@@ -18,7 +18,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -39,6 +43,7 @@ public final class BedrockPackCompiler {
 
     private final ResourcePack javaSource;
     private final ResourcePack pack;
+    private final BedrockRegistrationSnapshot.Generation generation;
 
     private final JsonObject textureData = new JsonObject();
     private final JsonObject mappedItems = new JsonObject();
@@ -48,6 +53,7 @@ public final class BedrockPackCompiler {
     private final JsonArray mappedBlocks = new JsonArray();
     /** java content key -> Bedrock geometry identifier, for the extension to apply. */
     private final JsonObject geometries = new JsonObject();
+    private final List<BedrockBlockRegistration> blockRegistrations = new ArrayList<>();
     private int attachables;
 
     private int skipped;
@@ -55,6 +61,7 @@ public final class BedrockPackCompiler {
     public BedrockPackCompiler(@NotNull ResourcePack javaSource, @NotNull ResourcePack pack) {
         this.javaSource = javaSource;
         this.pack = pack;
+        this.generation = BedrockRegistrationSnapshot.beginGeneration();
     }
 
     /** Adds one content type's items to the mapping. Safe to call repeatedly. */
@@ -93,7 +100,14 @@ public final class BedrockPackCompiler {
         mapping.addProperty("type", "definition");
         mapping.addProperty("model", key.asString());
         mapping.addProperty("bedrock_identifier", bedrockId);
-        mapping.addProperty("icon", icon);
+
+        // Geyser v2 reads platform-specific presentation fields from
+        // `bedrock_options`. A top-level `icon` is accepted by Gson but ignored by the
+        // mapping reader, whose fallback changes `testpack:ruby_sword` into
+        // `testpack.ruby_sword`; that does not match the atlas key generated below.
+        JsonObject bedrockOptions = new JsonObject();
+        bedrockOptions.addProperty("icon", icon);
+        mapping.add("bedrock_options", bedrockOptions);
 
         String displayName = plainName(definition);
         if (displayName != null) {
@@ -105,7 +119,13 @@ public final class BedrockPackCompiler {
         JsonObject components = new JsonObject();
         components.addProperty("minecraft:max_stack_size", definition.behaviour().maxStackSize());
         if (definition.behaviour().maxDurability() != null) {
-            components.addProperty("minecraft:durability", definition.behaviour().maxDurability());
+            // This section describes the Java component patch Geyser matches, not the
+            // Bedrock component it eventually synthesises. `minecraft:durability` is
+            // not a Java data component and makes Geyser reject the whole definition.
+            components.addProperty("minecraft:max_damage", definition.behaviour().maxDurability());
+        }
+        if (definition.display().enchantmentGlint()) {
+            components.addProperty("minecraft:enchantment_glint_override", true);
         }
         mapping.add("components", components);
 
@@ -191,9 +211,8 @@ public final class BedrockPackCompiler {
      * that is written out for the extension to consume at runtime. The resource pack can
      * only supply the look; registration itself happens inside Geyser.</p>
      *
-     * @param allocator supplies the Java carrier state each native block occupies, so the
-     *                  extension can translate a placed block without re-deriving it;
-     *                  virtual blocks deliberately have no carrier state
+     * @param allocator supplies the Java carrier state each block occupies, so the
+     *                  extension can translate a placed block without re-deriving it
      */
     public void addBlocks(@NotNull Iterable<? extends Block> blocks,
                           @NotNull java.util.function.Function<Key, Integer> allocator,
@@ -230,15 +249,38 @@ public final class BedrockPackCompiler {
             JsonObject record = new JsonObject();
             record.addProperty("java_key", key.asString());
             record.addProperty("bedrock_identifier", bedrockId);
-            record.addProperty("java_mode", definition.java().mode().name().toLowerCase(Locale.ROOT));
-            if (definition.java().mode()
-                    == io.kalo.content.block.definition.JavaBlockMode.NATIVE) {
-                Integer state = allocator.apply(key);
-                if (state != null) {
-                    record.addProperty("java_carrier_state", state);
-                }
+            // blocks.json lives in the resource pack; these names live in the block
+            // behaviour sent by Geyser. Both halves are required, and the texture names
+            // must point at the exact terrain-atlas shorthands generated above.
+            Map<String, String> materials = blockMaterialInstances(definition, shorthand);
+            JsonObject materialJson = new JsonObject();
+            materials.forEach(materialJson::addProperty);
+            record.add("material_instances", materialJson);
+            Integer state = allocator.apply(key);
+            String javaIdentifier = null;
+            if (state != null) {
+                record.addProperty("java_carrier_state", state);
+                // The standalone extension cannot interpret Kalo's internal integer on
+                // its own. Geyser's override API needs the complete Java state string.
+                javaIdentifier = GeyserBlockState.javaIdentifier(state);
+                record.addProperty("java_identifier", javaIdentifier);
             }
+            String displayName = plainName(definition.display().name());
+            if (displayName != null) {
+                record.addProperty("display_name", displayName);
+            }
+            float hardness = definition.behaviour().unbreakable()
+                    ? Float.MAX_VALUE
+                    : definition.behaviour().hardness();
+            record.addProperty("hardness", hardness);
+            String geometry = definition.model() instanceof BlockModelDefinition.Custom
+                    ? BedrockGeometry.identifierFor(key.namespace(), key.value())
+                    : "minecraft:geometry.full_block";
+            record.addProperty("geometry", geometry);
             mappedBlocks.add(record);
+            blockRegistrations.add(new BedrockBlockRegistration(
+                    key.asString(), bedrockId, javaIdentifier, geometry, displayName,
+                    hardness, materials));
         }
     }
 
@@ -254,25 +296,92 @@ public final class BedrockPackCompiler {
             }
             case BlockModelDefinition.Cube cube -> {
                 JsonObject faces = new JsonObject();
-                cube.faces().forEach((face, texture) -> {
+                // Java's authoring shape allows an `all` fallback plus `top`/`bottom`
+                // aliases. Bedrock's blocks.json does not expand those: `side` means
+                // only the four lateral faces, and `particle` is not a face at all.
+                // Resolve every rendered face explicitly so top and bottom cannot be
+                // left untextured.
+                for (String face : java.util.List.of(
+                        "down", "up", "north", "south", "west", "east")) {
+                    Key texture = cubeFaceTexture(cube.faces(), face);
                     String faceShorthand = shorthand + "_" + face;
                     registerTerrainTexture(faceShorthand, texture);
                     faces.addProperty(bedrockFace(face), faceShorthand);
-                });
+                }
                 return faces;
             }
             case BlockModelDefinition.Custom custom -> {
                 // A hand-authored Java model: convert its shape to Bedrock geometry and
                 // register whatever textures it declares.
+                if (custom.textures().isEmpty()) {
+                    // The shape may be convertible, but Geyser cannot build a material
+                    // instance without a texture slot. Silently emitting an unregistered
+                    // shorthand produces the purple/black missing texture in-game.
+                    return null;
+                }
                 JsonObject geometry = convertGeometry(definition, custom);
                 if (geometry == null) {
                     return null;
                 }
-                custom.textures().forEach((slot, texture) ->
-                        registerTerrainTexture(shorthand + "_" + slot, texture));
-                return new com.google.gson.JsonPrimitive(shorthand);
+                Map<String, Key> sorted = new TreeMap<>(custom.textures());
+                sorted.forEach((slot, texture) -> registerTerrainTexture(
+                        shorthand + "_" + BedrockGeometry.materialName(slot), texture));
+
+                // blocks.json requires a valid fallback even though named geometry faces
+                // use the explicit material instances in the Geyser registration.
+                String fallbackSlot = sorted.containsKey("all")
+                        ? "all"
+                        : sorted.keySet().iterator().next();
+                return new com.google.gson.JsonPrimitive(
+                        shorthand + "_" + BedrockGeometry.materialName(fallbackSlot));
             }
         }
+    }
+
+    /**
+     * Material name -> terrain-atlas shorthand consumed by Geyser's block API.
+     *
+     * <p>The generated resource pack alone cannot fill this behaviour component. An
+     * absent texture makes Geyser fall back to the block identifier, which differs from
+     * Kalo's underscore-separated atlas keys.</p>
+     */
+    private static @NotNull Map<String, String> blockMaterialInstances(
+            @NotNull BlockDefinition definition, @NotNull String shorthand) {
+        Map<String, String> materials = new TreeMap<>();
+        switch (definition.model()) {
+            case BlockModelDefinition.CubeAll ignored -> materials.put("*", shorthand);
+            case BlockModelDefinition.Cube ignored -> {
+                for (String face : java.util.List.of(
+                        "down", "up", "north", "south", "west", "east")) {
+                    materials.put(face, shorthand + "_" + face);
+                }
+            }
+            case BlockModelDefinition.Custom custom -> {
+                new TreeMap<>(custom.textures()).forEach((slot, ignored) -> {
+                    String material = BedrockGeometry.materialName(slot);
+                    materials.put(material, shorthand + "_" + material);
+                });
+            }
+        }
+        return Map.copyOf(materials);
+    }
+
+    private static @NotNull Key cubeFaceTexture(@NotNull java.util.Map<String, Key> textures,
+                                                 @NotNull String face) {
+        Key texture = switch (face) {
+            case "down" -> textures.getOrDefault("down", textures.get("bottom"));
+            case "up" -> textures.getOrDefault("up", textures.get("top"));
+            default -> textures.get(face);
+        };
+        if (texture == null) {
+            texture = textures.get("all");
+        }
+        if (texture == null) {
+            // BlockModelDefinition.Cube validates this invariant. Keeping the guard here
+            // makes failures from third-party implementations descriptive.
+            throw new IllegalArgumentException("cube has no texture for face '" + face + "'");
+        }
+        return texture;
     }
 
     /**
@@ -380,7 +489,8 @@ public final class BedrockPackCompiler {
                 .mapToInt(entry -> entry.getValue().getAsJsonArray().size())
                 .sum();
         return new Result(pack, Json.writable(mappings), mappedItems.size(), itemDefinitions,
-                mappedBlocks.size(), attachables, skipped);
+                mappedBlocks.size(), attachables, skipped, generation,
+                List.copyOf(blockRegistrations));
     }
 
     /**
@@ -397,14 +507,23 @@ public final class BedrockPackCompiler {
      */
     public record Result(@NotNull ResourcePack pack, @NotNull Writable mappings,
                          int mappedCount, int itemCount, int blockCount, int armorCount,
-                         int skippedCount) {
+                         int skippedCount,
+                         @NotNull BedrockRegistrationSnapshot.Generation generation,
+                         @NotNull List<BedrockBlockRegistration> registrations) {
+        public Result {
+            registrations = List.copyOf(registrations);
+        }
     }
 
     private static @Nullable String plainName(@NotNull ItemDefinition definition) {
-        if (definition.display().name() == null) {
-            return null;
-        }
-        return PlainTextComponentSerializer.plainText().serialize(definition.display().name());
+        return plainName(definition.display().name());
+    }
+
+    private static @Nullable String plainName(
+            @Nullable net.kyori.adventure.text.Component component) {
+        return component == null
+                ? null
+                : PlainTextComponentSerializer.plainText().serialize(component);
     }
 
     private static @NotNull JsonObject manifest() {

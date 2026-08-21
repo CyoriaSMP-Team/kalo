@@ -3,6 +3,7 @@ package io.kalo.platform.java;
 import io.kalo.content.armor.Armor;
 import io.kalo.content.armor.ArmorDefinition;
 import io.kalo.content.armor.ArmorSlot;
+import io.kalo.content.item.Item;
 import net.kyori.adventure.key.Key;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.EquipmentSlot;
@@ -27,8 +28,12 @@ public final class JavaArmorItemCompiler {
     }
 
     public static @NotNull ItemStack compile(@NotNull Armor armor) {
-        ItemStack itemStack = JavaItemCompiler.compile(armor);
-        ArmorDefinition definition = armor.armorDefinition();
+        return compile(armor, armor.armorDefinition());
+    }
+
+    /** Compiles against an explicit definition so ArmorImpl can finish its stack in its super constructor. */
+    public static @NotNull ItemStack compile(@NotNull Item item, @NotNull ArmorDefinition definition) {
+        ItemStack itemStack = JavaItemCompiler.compileBase(item);
 
         itemStack.editMeta(meta -> {
             EquippableComponent equippable = meta.getEquippable();
@@ -43,6 +48,8 @@ public final class JavaArmorItemCompiler {
             meta.setEquippable(equippable);
         });
 
+        // Features must observe the final wearable stack, exactly once.
+        JavaItemCompiler.fireGenerationEvent(item, itemStack);
         return itemStack;
     }
 

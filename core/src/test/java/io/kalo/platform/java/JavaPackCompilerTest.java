@@ -124,6 +124,42 @@ class JavaPackCompilerTest {
     }
 
     @Test
+    void separateItemPassesMergeTheirLanguageEntries() throws IOException {
+        ResourcePack pack = pack();
+
+        JavaPackCompiler.compileItems(pack, List.of(new StubItem(sprite("testpack", "ruby"))));
+        JavaPackCompiler.compileItems(pack, List.of(new StubItem(sprite("testpack", "sapphire"))));
+
+        JsonObject language = json(pack, "assets/testpack/lang/en_us.json");
+        assertEquals("Ruby", language.get("item.testpack.ruby").getAsString());
+        assertEquals("Sapphire", language.get("item.testpack.sapphire").getAsString());
+    }
+
+    @Test
+    void itemCompilationKeepsTranslationsWrittenByAnotherContentType() throws IOException {
+        ResourcePack pack = pack();
+        pack.file("assets/testpack/lang/en_us.json",
+                Writable.string("{\"block.testpack.ruby_block\":\"Ruby Block\"}"));
+
+        JavaPackCompiler.compileItems(pack, List.of(new StubItem(sprite("testpack", "ruby_item"))));
+
+        JsonObject language = json(pack, "assets/testpack/lang/en_us.json");
+        assertEquals("Ruby Block", language.get("block.testpack.ruby_block").getAsString());
+        assertEquals("Ruby Item", language.get("item.testpack.ruby_item").getAsString());
+    }
+
+    @Test
+    void dottedNamespacesAreNotTruncatedWhenChoosingTheLanguagePath() throws IOException {
+        ResourcePack pack = pack();
+
+        JavaPackCompiler.compileItems(pack, List.of(new StubItem(sprite("test.pack", "ruby"))));
+
+        JsonObject language = json(pack, "assets/test.pack/lang/en_us.json");
+        assertEquals("Ruby", language.get("item.test.pack.ruby").getAsString());
+        assertFalse(pack.files().containsKey("assets/test/lang/en_us.json"));
+    }
+
+    @Test
     void oneBadItemDoesNotStopTheRest() {
         ResourcePack pack = pack();
 

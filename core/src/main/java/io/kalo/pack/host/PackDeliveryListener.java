@@ -38,16 +38,17 @@ public final class PackDeliveryListener implements Listener {
     }
 
     public void send(@NotNull Player player) {
-        if (!host.available()) {
+        PackHost.Snapshot snapshot = host.snapshot();
+        if (snapshot == null) {
             return;
         }
         try {
             ResourcePackInfo info = ResourcePackInfo.resourcePackInfo()
                     // Derived from the URL so the same pack keeps the same id across
                     // joins, and a regenerated one gets a new id.
-                    .id(UUID.nameUUIDFromBytes(host.url().getBytes(java.nio.charset.StandardCharsets.UTF_8)))
-                    .uri(URI.create(host.url()))
-                    .hash(host.sha1())
+                    .id(UUID.nameUUIDFromBytes(snapshot.url().getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                    .uri(URI.create(snapshot.url()))
+                    .hash(snapshot.sha1())
                     .build();
 
             player.sendResourcePacks(ResourcePackRequest.resourcePackRequest()

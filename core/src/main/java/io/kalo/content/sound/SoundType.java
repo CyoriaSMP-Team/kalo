@@ -9,7 +9,6 @@ import io.kalo.pack.ResourcePack;
 import io.kalo.platform.java.JavaSoundCompiler;
 import io.kalo.registry.Registries;
 import io.kalo.utils.Constants;
-import io.kalo.utils.Plugins;
 import net.kyori.adventure.key.Key;
 import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +38,8 @@ import java.util.logging.Level;
  */
 public final class SoundType implements ContentType<Item> {
     public static final Key KEY = Key.key(Constants.PLUGIN_ID, "sound");
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger(SoundType.class.getName());
 
     private final Map<Key, SoundDefinition> sounds = new ConcurrentHashMap<>();
 
@@ -62,10 +63,14 @@ public final class SoundType implements ContentType<Item> {
                         @NotNull ConfigurationSection config) {
         Key key = pack.key(config.getName());
         try {
-            sounds.put(key, parse(key, config));
+            SoundDefinition definition = parse(key, config);
+            if (sounds.putIfAbsent(key, definition) != null) {
+                LOGGER.warning("Duplicate sound '" + key.asString() + "'; keeping the first definition");
+                return false;
+            }
             return true;
         } catch (Exception e) {
-            Plugins.logger().log(Level.WARNING,
+            LOGGER.log(Level.WARNING,
                     "Failed to load sound '" + key.asString() + "': " + e.getMessage(), e);
             return false;
         }
@@ -76,6 +81,9 @@ public final class SoundType implements ContentType<Item> {
 
         for (Object entry : config.getList("sounds", List.of())) {
             if (entry instanceof String path) {
+                if (path.isBlank()) {
+                    throw new IllegalArgumentException("a sound file path cannot be blank");
+                }
                 files.add(SoundDefinition.SoundFile.of(resolve(key.namespace(), path)));
             } else if (entry instanceof Map<?, ?> map) {
                 Object file = map.get("file");
@@ -84,9 +92,13 @@ public final class SoundType implements ContentType<Item> {
                 }
                 files.add(new SoundDefinition.SoundFile(
                         resolve(key.namespace(), file.toString()),
-                        number(map.get("volume"), 1.0f),
-                        number(map.get("pitch"), 1.0f),
-                        (int) number(map.get("weight"), 1f)));
+                        number(map, "volume", 1.0f),
+                        number(map, "pitch", 1.0f),
+                        integer(map, "weight", 1)));
+            } else {
+                throw new IllegalArgumentException(
+                        "a sound entry must be a file path or a section, got "
+                                + (entry == null ? "null" : entry.getClass().getSimpleName()));
             }
         }
 
@@ -99,8 +111,31 @@ public final class SoundType implements ContentType<Item> {
                 SoundCategory.fromId(category));
     }
 
-    private static float number(Object value, float fallback) {
-        return value instanceof Number n ? n.floatValue() : fallback;
+    private static float number(@NotNull Map<?, ?> values, @NotNull String key, float fallback) {
+        Object value = values.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        if (!(value instanceof Number number)) {
+            throw new IllegalArgumentException("sound " + key + " must be a number");
+        }
+        return number.floatValue();
+    }
+
+    private static int integer(@NotNull Map<?, ?> values, @NotNull String key, int fallback) {
+        Object value = values.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        if (!(value instanceof Number number)) {
+            throw new IllegalArgumentException("sound " + key + " must be an integer");
+        }
+        double numeric = number.doubleValue();
+        if (!Double.isFinite(numeric) || numeric != Math.rint(numeric)
+                || numeric < Integer.MIN_VALUE || numeric > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("sound " + key + " must be an integer");
+        }
+        return (int) numeric;
     }
 
     private static @NotNull Key resolve(@NotNull String fallbackNamespace, @NotNull String value) {

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -147,6 +148,17 @@ class OraxenImporterTest {
     }
 
     @Test
+    void aBlockOnlyMaterialCannotBecomeAnItemBaseMaterial() {
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("water_item:\n  material: WATER\n", report);
+
+        assertEquals(1, report.failed().size());
+        assertTrue(report.failed().getFirst().contains("not an obtainable item"),
+                report.failed().toString());
+        assertNull(out.get("water_item"));
+    }
+
+    @Test
     void loreCarriesOver() {
         ImportReport report = new ImportReport();
         YamlConfiguration out = convert("""
@@ -179,6 +191,49 @@ class OraxenImporterTest {
 
         assertEquals("block", out.getString("ruby_block.type"));
         assertEquals("block/ruby_block", out.getString("ruby_block.model.cube_all"));
+        assertEquals(3.0, out.getDouble("ruby_block.behaviour.hardness"), 1e-9);
+    }
+
+    @Test
+    void unsupportedKnownItemOptionsAreNotSilentlyDiscarded() {
+        ImportReport report = new ImportReport();
+        convert("""
+                ruby:
+                  material: PAPER
+                  unbreakable: true
+                  color: 255,0,0
+                  custom_model_data: 42
+                """, report);
+
+        String unsupported = report.unsupported().toString();
+        assertTrue(unsupported.contains("ruby.unbreakable"), unsupported);
+        assertTrue(unsupported.contains("ruby.color"), unsupported);
+        assertTrue(unsupported.contains("ruby.custom_model_data"), unsupported);
+    }
+
+    @Test
+    void unsupportedBlockMechanicsAndPackOptionsAreReportedIndividually() {
+        ImportReport report = new ImportReport();
+        convert("""
+                ruby_block:
+                  material: PAPER
+                  unbreakable: true
+                  Pack:
+                    textures: [block/ruby.png]
+                    parent_model: block/cube_column
+                  Mechanics:
+                    noteblock:
+                      hardness: 4
+                      light: 12
+                      drop:
+                        best_tools: [PICKAXE]
+                """, report);
+
+        String unsupported = report.unsupported().toString();
+        assertTrue(unsupported.contains("ruby_block.unbreakable"), unsupported);
+        assertTrue(unsupported.contains("Pack.parent_model"), unsupported);
+        assertTrue(unsupported.contains("noteblock.light"), unsupported);
+        assertTrue(unsupported.contains("noteblock.drop"), unsupported);
     }
 
     @Test

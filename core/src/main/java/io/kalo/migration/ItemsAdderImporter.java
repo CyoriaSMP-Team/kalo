@@ -8,7 +8,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -40,9 +39,12 @@ import java.util.Set;
  */
 public final class ItemsAdderImporter {
 
-    private static final Set<String> KNOWN_ITEM_KEYS = Set.of(
-            "display_name", "displayname", "lore", "resource", "durability",
-            "permission", "enable_light", "specific_properties"
+    private static final Set<String> CONVERTED_ITEM_KEYS = Set.of(
+            "display_name", "displayname", "lore", "resource", "durability"
+    );
+
+    private static final Set<String> CONVERTED_RESOURCE_KEYS = Set.of(
+            "material", "generate", "textures", "texture", "model_path"
     );
 
     private ItemsAdderImporter() {
@@ -137,10 +139,7 @@ public final class ItemsAdderImporter {
         // ItemsAdder puts the base material inside `resource`, unlike Oraxen.
         String material = resource != null ? resource.getString("material") : null;
         if (material != null) {
-            Material parsed = Material.matchMaterial(material.toUpperCase(Locale.ROOT));
-            if (parsed == null) {
-                throw new IllegalArgumentException("unknown material '" + material + "'");
-            }
+            Material parsed = MigrationMaterials.item(material);
             converted.put("java", Map.of("base_material", parsed.name()));
         }
 
@@ -153,6 +152,14 @@ public final class ItemsAdderImporter {
             converted.put("behaviour", behaviour);
         }
 
+        reportResourceKeys(key, resource, report);
+        if (durability != null) {
+            for (String child : durability.getKeys(false)) {
+                if (!child.equals("max_custom_durability")) {
+                    report.unsupported(key + ".durability." + child);
+                }
+            }
+        }
         reportUnknownKeys(key, item, report);
 
         output.createSection(key, converted);
@@ -167,6 +174,10 @@ public final class ItemsAdderImporter {
 
         String modelPath = resource.getString("model_path");
         if (modelPath != null) {
+            if (resource.contains("generate") && resource.getBoolean("generate")) {
+                report.unsupported(key + ".resource.generate = true with model_path "
+                        + "(model_path was imported; verify which model ItemsAdder used)");
+            }
             return Map.of("custom", OraxenImporter.stripExtension(modelPath));
         }
 
@@ -180,6 +191,10 @@ public final class ItemsAdderImporter {
         if (textures.isEmpty()) {
             return null;
         }
+        if (resource.contains("generate") && !resource.getBoolean("generate")) {
+            throw new IllegalArgumentException(
+                    "resource.generate is false but resource.model_path is missing");
+        }
         if (textures.size() > 1) {
             report.unsupported(key + ".resource.textures (" + textures.size()
                     + " layers; only the first is used)");
@@ -192,7 +207,7 @@ public final class ItemsAdderImporter {
                                           @NotNull ConfigurationSection item,
                                           @NotNull ImportReport report) {
         for (String child : item.getKeys(false)) {
-            if (KNOWN_ITEM_KEYS.contains(child)) {
+            if (CONVERTED_ITEM_KEYS.contains(child)) {
                 continue;
             }
             if (child.equals("behaviours") || child.equals("behaviors")) {
@@ -200,6 +215,23 @@ public final class ItemsAdderImporter {
                 continue;
             }
             report.unsupported(key + "." + child);
+        }
+    }
+
+    private static void reportResourceKeys(@NotNull String key,
+                                           @Nullable ConfigurationSection resource,
+                                           @NotNull ImportReport report) {
+        if (resource == null) {
+            return;
+        }
+        for (String child : resource.getKeys(false)) {
+            if (!CONVERTED_RESOURCE_KEYS.contains(child)) {
+                report.unsupported(key + ".resource." + child);
+            }
+        }
+        if (resource.contains("model_path")
+                && (resource.contains("textures") || resource.contains("texture"))) {
+            report.unsupported(key + ".resource.textures (not used because model_path is set)");
         }
     }
 
@@ -220,7 +252,7 @@ public final class ItemsAdderImporter {
                 continue;
             }
             try {
-                convertBlock(key, block, output, report);
+                convertBlock(key, block, output, report, false);
                 report.imported((namespace != null ? namespace : "imported") + ":" + key);
                 converted++;
             } catch (Exception e) {
@@ -233,7 +265,8 @@ public final class ItemsAdderImporter {
     private static void convertBlock(@NotNull String key,
                                      @NotNull ConfigurationSection block,
                                      @NotNull YamlConfiguration output,
-                                     @NotNull ImportReport report) {
+                                     @NotNull ImportReport report,
+                                     boolean furniture) {
         Map<String, Object> converted = new LinkedHashMap<>();
         converted.put("type", "block");
         converted.put("java", Map.of("mode", "virtual"));
@@ -255,6 +288,10 @@ public final class ItemsAdderImporter {
             if (textures.isEmpty()) {
                 throw new IllegalArgumentException("block has no model_path or texture in its resource section");
             }
+            if (textures.size() > 1) {
+                report.unsupported(key + ".resource.textures (" + textures.size()
+                        + " layers; only the first is used)");
+            }
             converted.put("model", Map.of("cube_all", OraxenImporter.stripExtension(textures.get(0))));
         }
 
@@ -269,6 +306,32 @@ public final class ItemsAdderImporter {
             // uses one model for both.
             report.unsupported(key + ".specific_properties.block.placed_model "
                     + "(Kalo uses one model for the item and the placed block)");
+        }
+
+        reportResourceKeys(key, resource, report);
+        for (String child : block.getKeys(false)) {
+            if (Set.of("display_name", "displayname", "resource", "specific_properties").contains(child)) {
+                continue;
+            }
+            if (furniture && Set.of("entity", "hitbox", "sit", "seats", "rotation", "rotatable")
+                    .contains(child)) {
+                continue; // convertFurniture reports these with the precise limitation.
+            }
+            report.unsupported(key + "." + child);
+        }
+        if (properties != null) {
+            for (String child : properties.getKeys(false)) {
+                if (!child.equals("block")) {
+                    report.unsupported(key + ".specific_properties." + child);
+                }
+            }
+        }
+        if (blockProperties != null) {
+            for (String child : blockProperties.getKeys(false)) {
+                if (!Set.of("hardness", "placed_model").contains(child)) {
+                    report.unsupported(key + ".specific_properties.block." + child);
+                }
+            }
         }
 
         output.createSection(key, converted);
@@ -291,7 +354,7 @@ public final class ItemsAdderImporter {
                 continue;
             }
             try {
-                convertBlock(key, piece, output, report);
+                convertBlock(key, piece, output, report, true);
                 ConfigurationSection out = output.getConfigurationSection(key);
                 if (out != null) {
                     out.set("type", "furniture");

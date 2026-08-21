@@ -8,7 +8,6 @@ import io.kalo.pack.ResourcePack;
 import io.kalo.platform.java.JavaGlyphCompiler;
 import io.kalo.registry.Registries;
 import io.kalo.utils.Constants;
-import io.kalo.utils.Plugins;
 import net.kyori.adventure.key.Key;
 import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +38,8 @@ public final class GlyphType implements ContentType<Item> {
     public static final Key KEY = Key.key(Constants.PLUGIN_ID, "glyph");
 
     private static final Key DEFAULT_FONT = Key.key("minecraft", "default");
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger(GlyphType.class.getName());
 
     private final Map<Key, GlyphDefinition> glyphs = new ConcurrentHashMap<>();
 
@@ -62,10 +63,14 @@ public final class GlyphType implements ContentType<Item> {
                         @NotNull ConfigurationSection config) {
         Key key = pack.key(config.getName());
         try {
-            glyphs.put(key, parse(key, config));
+            GlyphDefinition definition = parse(key, config);
+            if (glyphs.putIfAbsent(key, definition) != null) {
+                LOGGER.warning("Duplicate glyph '" + key.asString() + "'; keeping the first definition");
+                return false;
+            }
             return true;
         } catch (Exception e) {
-            Plugins.logger().log(Level.WARNING,
+            LOGGER.log(Level.WARNING,
                     "Failed to load glyph '" + key.asString() + "': " + e.getMessage(), e);
             return false;
         }
@@ -93,7 +98,12 @@ public final class GlyphType implements ContentType<Item> {
             throw new IllegalArgumentException("glyph has no character");
         }
         if (value instanceof Number number) {
-            return number.intValue();
+            double numeric = number.doubleValue();
+            if (!Double.isFinite(numeric) || numeric != Math.rint(numeric)
+                    || numeric < Integer.MIN_VALUE || numeric > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("glyph character must be an integer codepoint");
+            }
+            return (int) numeric;
         }
 
         String text = value.toString();
@@ -104,6 +114,10 @@ public final class GlyphType implements ContentType<Item> {
             return Integer.parseInt(text.substring(2), 16);
         }
         // A literal character, which may be a surrogate pair.
+        if (text.codePointCount(0, text.length()) != 1) {
+            throw new IllegalArgumentException(
+                    "glyph character must contain exactly one Unicode codepoint");
+        }
         return text.codePointAt(0);
     }
 

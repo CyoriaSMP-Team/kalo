@@ -7,7 +7,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -68,8 +67,9 @@ public final class NekoImporter implements Importer {
                 continue;
             }
             try {
-                convertContent(key, content, output, report);
-                report.imported(namespace + ":" + key);
+                if (convertContent(key, content, output, report)) {
+                    report.imported(namespace + ":" + key);
+                }
             } catch (Exception e) {
                 report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
             }
@@ -78,15 +78,15 @@ public final class NekoImporter implements Importer {
         return output.saveToString();
     }
 
-    private static void convertContent(@NotNull String key,
-                                       @NotNull ConfigurationSection content,
-                                       @NotNull YamlConfiguration output,
-                                       @NotNull ImportReport report) {
+    private static boolean convertContent(@NotNull String key,
+                                          @NotNull ConfigurationSection content,
+                                          @NotNull YamlConfiguration output,
+                                          @NotNull ImportReport report) {
         String type = content.getString("type", "item");
         if (!type.equals("item")) {
             // Neko only ever shipped an item type; anything else is from a fork.
             report.unsupported(key + ".type = " + type + " (only Neko's item type is known)");
-            return;
+            return false;
         }
 
         Map<String, Object> converted = new LinkedHashMap<>();
@@ -113,10 +113,7 @@ public final class NekoImporter implements Importer {
 
         String material = properties.getString("type");
         if (material != null) {
-            Material parsed = Material.matchMaterial(material.toUpperCase(Locale.ROOT));
-            if (parsed == null) {
-                throw new IllegalArgumentException("unknown material '" + material + "'");
-            }
+            Material parsed = MigrationMaterials.item(material);
             converted.put("java", Map.of("base_material", parsed.name()));
         }
 
@@ -131,6 +128,7 @@ public final class NekoImporter implements Importer {
         }
 
         output.createSection(key, converted);
+        return true;
     }
 
     /**

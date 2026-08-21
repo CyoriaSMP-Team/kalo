@@ -3,12 +3,11 @@ package io.kalo.platform.java;
 import com.google.gson.JsonObject;
 import io.kalo.content.block.Block;
 import io.kalo.content.block.definition.BlockDefinition;
-import io.kalo.content.block.definition.BlockCarrier;
 import io.kalo.content.block.definition.BlockModelDefinition;
-import io.kalo.content.block.definition.JavaBlockMode;
 import io.kalo.pack.Json;
 import io.kalo.pack.ResourcePack;
 import net.kyori.adventure.key.Key;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -20,16 +19,42 @@ import java.util.logging.Logger;
 /**
  * Turns block definitions into Java resource pack assets.
  *
- * <p>Native blocks borrow spare vanilla states and therefore get an exhaustive generated
- * blockstates file. Virtual blocks do not consume a state at all: their item definition
- * still points at the block model, while the runtime renders it through an
- * {@code ItemDisplay}.</p>
+ * <p>Java cannot add a block without a client mod, so a custom block is a note block in
+ * a state the pack tells the client to render differently. That means one shared file,
+ * {@code assets/minecraft/blockstates/note_block.json}, has to enumerate <em>every</em>
+ * state — the borrowed ones pointing at custom models and the rest at the vanilla model.
+ * Omitting a state makes the client render it as missing texture, so this file is
+ * generated exhaustively rather than only for the states in use.</p>
  */
 public final class JavaBlockCompiler {
     private static final Logger LOGGER = Logger.getLogger(JavaBlockCompiler.class.getName());
-    /** Compatibility alias for the original note-block-only compiler API. */
-    public static final String NOTE_BLOCK_STATES_PATH = BlockCarrier.NOTE_BLOCK.blockStatesPath();
 
+    /**
+     * The note block instruments whose state can be relied upon, under vanilla's own
+     * names as they appear in the block state.
+     *
+     * <p>Order is load-bearing: {@link BlockStateAllocator} indexes into this list, so
+     * reordering or inserting would reassign every already-placed custom block. Append
+     * only, and only if vanilla adds an instrument that behaves like these.</p>
+     *
+     * <p>The mob-head instruments (zombie, skeleton, creeper, …) and the trumpet variants
+     * are excluded: vanilla derives them from surrounding blocks rather than from the
+     * block state alone, so they cannot be held.</p>
+     *
+     * <p>Deliberately strings rather than {@code org.bukkit.Instrument}: that enum is
+     * registry-backed on modern Paper and throws {@code No RegistryAccess implementation
+     * found} outside a running server, which would make this compiler impossible to test.
+     * The Bukkit mapping lives in {@link JavaBlockListener}, which genuinely needs a
+     * server anyway.</p>
+     */
+    static final List<String> INSTRUMENT_IDS = List.of(
+            "harp", "basedrum", "snare", "hat", "bass", "flute", "bell", "guitar",
+            "chime", "xylophone", "iron_xylophone", "cow_bell", "didgeridoo", "bit",
+            "banjo", "pling"
+    );
+
+    static final String NOTE_BLOCK_STATES_PATH = "assets/minecraft/blockstates/note_block.json";
+    private static final String VANILLA_NOTE_BLOCK_MODEL = "minecraft:block/note_block";
     private static final Key CUBE_ALL_PARENT = Key.key("minecraft", "block/cube_all");
     private static final Key CUBE_PARENT = Key.key("minecraft", "block/cube");
 
@@ -40,36 +65,28 @@ public final class JavaBlockCompiler {
     public static Map<String, String> compileBlocks(@NotNull ResourcePack pack,
                                                     @NotNull Iterable<Block> blocks,
                                                     @NotNull BlockStateAllocator allocator) {
-        // carrier -> state index -> model key of the custom block occupying it
-        Map<io.kalo.content.block.definition.BlockCarrier, Map<Integer, Key>> occupied =
-                new java.util.EnumMap<>(io.kalo.content.block.definition.BlockCarrier.class);
-        Map<String, String> translations = new TreeMap<>();
+        // index -> model key of the custom block occupying it
+        Map<Integer, Key> occupied = new TreeMap<>();
+        Map<String, Map<String, String>> translations = new TreeMap<>();
         Map<String, String> failed = new TreeMap<>();
 
         for (Block block : blocks) {
             try {
                 BlockDefinition definition = block.definition();
+                int index = allocator.allocate(definition.key());
+
                 Key modelKey = compileModel(pack, definition);
-                BlockStateAllocator.Assignment assignment = null;
-                if (definition.java().mode() == JavaBlockMode.NATIVE) {
-                    assignment = allocator.allocate(definition.key(), definition.java().carrier());
-                } else {
-                    // A server may switch an existing content key from native to virtual.
-                    // Keep its old state in the pack as a read-only compatibility path so
-                    // blocks already in the world do not turn into plain vanilla blocks.
-                    assignment = allocator.assignmentOf(definition.key());
-                }
-                if (assignment != null) {
-                    occupied.computeIfAbsent(assignment.carrier(), ignored -> new TreeMap<>())
-                            .put(assignment.state(), modelKey);
-                }
+                occupied.put(index, modelKey);
 
                 // The item players hold and place should look like the block, so it gets
-                // its own item definition pointing at the same model. Virtual placement
-                // uses this same item as the ItemDisplay payload.
+                // its own item definition pointing at the same model.
                 pack.file(itemDefinitionPath(definition.key()), Json.writable(itemDefinition(modelKey)));
 
-                translations.put(definition.translationKey(), humanize(definition.key().value()));
+                String translation = definition.display().name() != null
+                        ? PlainTextComponentSerializer.plainText().serialize(definition.display().name())
+                        : humanize(definition.key().value());
+                translations.computeIfAbsent(definition.key().namespace(), ignored -> new TreeMap<>())
+                        .put(definition.translationKey(), translation);
             } catch (Exception e) {
                 // Named, with the reason. 104 identical "failed to compile a block" lines
                 // tell a server owner nothing about which block or why.
@@ -79,7 +96,7 @@ public final class JavaBlockCompiler {
             }
         }
 
-        occupied.forEach((carrier, states) -> writeBlockStates(pack, carrier, states));
+        writeNoteBlockStates(pack, occupied);
 
         if (!translations.isEmpty()) {
             writeTranslations(pack, translations);
@@ -112,9 +129,7 @@ public final class JavaBlockCompiler {
                 pack.file(modelPath(modelKey), Json.writable(model(CUBE_ALL_PARENT, textures)));
             }
             case BlockModelDefinition.Cube cube -> {
-                JsonObject textures = new JsonObject();
-                new TreeMap<>(cube.faces()).forEach((face, texture) ->
-                        textures.addProperty(face, texture.asString()));
+                JsonObject textures = cubeTextures(cube.faces());
                 pack.file(modelPath(modelKey), Json.writable(model(CUBE_PARENT, textures)));
             }
             case BlockModelDefinition.Custom custom -> {
@@ -127,22 +142,17 @@ public final class JavaBlockCompiler {
     }
 
     /**
-     * Writes one carrier's blockstates file, preserving what earlier passes put there.
+     * Writes the shared note block state file, preserving what earlier passes put there.
      *
-     * <p>Every state the carrier provides is enumerated, not only the ones in use: a state
-     * the client is not told about renders as missing texture, and these are blocks
-     * players can already place themselves.</p>
-     *
-     * <p>Merged rather than replaced because blocks and furniture are separate content
-     * types compiling in separate passes over the same file. Replacing it meant whichever
-     * ran second erased the other's blocks.</p>
+     * <p>Blocks and furniture are separate content types that share one carrier, so they
+     * compile in separate passes but write this same file. Replacing it outright meant
+     * whichever type compiled second erased the other's states, and every one of those
+     * blocks rendered as a plain note block.</p>
      */
-    private static void writeBlockStates(@NotNull ResourcePack pack,
-                                         @NotNull BlockCarrier carrier,
-                                         @NotNull Map<Integer, Key> occupied) {
-        JsonObject generated = blockStates(carrier, occupied);
+    private static void writeNoteBlockStates(@NotNull ResourcePack pack, @NotNull Map<Integer, Key> occupied) {
+        JsonObject generated = noteBlockStates(occupied);
 
-        io.kalo.pack.Writable existing = pack.file(carrier.blockStatesPath());
+        io.kalo.pack.Writable existing = pack.file(NOTE_BLOCK_STATES_PATH);
         if (existing != null) {
             try {
                 JsonObject previous = com.google.gson.JsonParser
@@ -151,31 +161,44 @@ public final class JavaBlockCompiler {
                 JsonObject previousVariants = previous.getAsJsonObject("variants");
                 JsonObject generatedVariants = generated.getAsJsonObject("variants");
 
+                // Keep any variant an earlier pass already pointed at a custom model;
+                // this pass only knows about its own blocks and defaults the rest.
                 previousVariants.entrySet().forEach(entry -> {
                     String model = entry.getValue().getAsJsonObject().get("model").getAsString();
-                    if (!carrier.vanillaModel().equals(model)) {
+                    if (!VANILLA_NOTE_BLOCK_MODEL.equals(model)) {
                         generatedVariants.add(entry.getKey(), entry.getValue());
                     }
                 });
             } catch (Exception e) {
-                LOGGER.log(Level.WARNING,
-                        "Could not merge into the existing " + carrier.blockStatesPath(), e);
+                LOGGER.log(Level.WARNING, "Could not merge into the existing note block state file", e);
             }
         }
 
-        pack.file(carrier.blockStatesPath(), Json.writable(generated));
+        pack.file(NOTE_BLOCK_STATES_PATH, Json.writable(generated));
     }
 
-    /** Every state of a carrier, the borrowed ones pointing at custom models. */
-    static @NotNull JsonObject blockStates(@NotNull BlockCarrier carrier,
-                                           @NotNull Map<Integer, Key> occupied) {
+    /**
+     * Builds the exhaustive note block state map: every state the carrier provides, with
+     * the borrowed ones pointing at custom models.
+     */
+    static @NotNull JsonObject noteBlockStates(@NotNull Map<Integer, Key> occupied) {
         JsonObject variants = new JsonObject();
 
-        for (int index = 0; index < carrier.stateCount(); index++) {
-            Key custom = occupied.get(index);
-            JsonObject variant = new JsonObject();
-            variant.addProperty("model", custom != null ? custom.asString() : carrier.vanillaModel());
-            variants.add(carrier.variantKey(index), variant);
+        for (int instrument = 0; instrument < INSTRUMENT_IDS.size(); instrument++) {
+            for (int note = 0; note < 25; note++) {
+                for (int powered = 0; powered < 2; powered++) {
+                    int index = BlockStateAllocator.encode(
+                            new BlockStateAllocator.NoteBlockState(instrument, note, powered == 1));
+
+                    Key custom = occupied.get(index);
+                    JsonObject variant = new JsonObject();
+                    variant.addProperty("model", custom != null ? custom.asString() : VANILLA_NOTE_BLOCK_MODEL);
+
+                    variants.add("instrument=" + INSTRUMENT_IDS.get(instrument)
+                            + ",note=" + note
+                            + ",powered=" + (powered == 1), variant);
+                }
+            }
         }
 
         JsonObject root = new JsonObject();
@@ -188,6 +211,40 @@ public final class JavaBlockCompiler {
         root.addProperty("parent", parent.asString());
         root.add("textures", textures);
         return root;
+    }
+
+    /** Expands the author-friendly {@code all/top/bottom} aliases to cube's texture slots. */
+    private static @NotNull JsonObject cubeTextures(@NotNull Map<String, Key> faces) {
+        Map<String, Key> sorted = new TreeMap<>(faces);
+        Key all = sorted.get("all");
+
+        JsonObject textures = new JsonObject();
+        for (String face : List.of("down", "up", "north", "south", "west", "east")) {
+            Key texture = switch (face) {
+                case "down" -> sorted.getOrDefault("down", sorted.get("bottom"));
+                case "up" -> sorted.getOrDefault("up", sorted.get("top"));
+                default -> sorted.get(face);
+            };
+            if (texture == null) {
+                texture = all;
+            }
+            // BlockModelDefinition.Cube verifies that every slot has either an explicit
+            // texture or an `all` fallback, so null here would mean a broken caller.
+            textures.addProperty(face, texture.asString());
+        }
+        Key particle = sorted.getOrDefault("particle", all != null ? all : texturesKey(sorted));
+        textures.addProperty("particle", particle.asString());
+        return textures;
+    }
+
+    private static @NotNull Key texturesKey(@NotNull Map<String, Key> faces) {
+        for (String face : List.of("north", "south", "west", "east", "up", "top", "down", "bottom")) {
+            Key texture = faces.get(face);
+            if (texture != null) {
+                return texture;
+            }
+        }
+        throw new IllegalArgumentException("cube declares no usable texture");
     }
 
     private static @NotNull String modelPath(@NotNull Key key) {
@@ -208,17 +265,11 @@ public final class JavaBlockCompiler {
         return root;
     }
 
-    private static void writeTranslations(@NotNull ResourcePack pack, @NotNull Map<String, String> translations) {
-        Map<String, JsonObject> byNamespace = new TreeMap<>();
-        for (Map.Entry<String, String> entry : translations.entrySet()) {
-            // translation keys are "block.<namespace>.<name>"
-            String[] parts = entry.getKey().split("\\.", 3);
-            String namespace = parts.length >= 2 ? parts[1] : "minecraft";
-            byNamespace.computeIfAbsent(namespace, ignored -> new JsonObject())
-                    .addProperty(entry.getKey(), entry.getValue());
-        }
-
-        byNamespace.forEach((namespace, json) -> {
+    private static void writeTranslations(@NotNull ResourcePack pack,
+                                          @NotNull Map<String, Map<String, String>> translations) {
+        translations.forEach((namespace, entries) -> {
+            JsonObject json = new JsonObject();
+            entries.forEach(json::addProperty);
             String path = "assets/" + namespace + "/lang/en_us.json";
             // Items may already have written this pack's lang file; merge rather than
             // clobber, since the last content type to run would otherwise win.

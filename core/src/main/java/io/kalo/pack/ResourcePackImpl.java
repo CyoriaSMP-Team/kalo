@@ -62,6 +62,13 @@ public final class ResourcePackImpl implements ResourcePack {
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException("Pack file path cannot be empty");
         }
+        for (String segment : normalized.split("/", -1)) {
+            if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
+                // Resource packs are archives. Keeping traversal-like names inside one
+                // would hand unsafe entries to whichever client or tool extracts it.
+                throw new IllegalArgumentException("Invalid pack file path: " + path);
+            }
+        }
         return normalized;
     }
 }

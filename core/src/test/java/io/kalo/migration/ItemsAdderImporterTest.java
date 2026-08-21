@@ -233,4 +233,89 @@ class ItemsAdderImporterTest {
         assertEquals(1, report.failed().size());
         assertEquals("item", out.getString("good.type"));
     }
+
+    @Test
+    void aBlockOnlyMaterialCannotBecomeAnItemBaseMaterial() {
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("""
+                info:
+                  namespace: mypack
+                items:
+                  water_item:
+                    resource:
+                      material: WATER
+                """, report);
+
+        assertEquals(1, report.failed().size());
+        assertTrue(report.failed().getFirst().contains("not an obtainable item"),
+                report.failed().toString());
+        assertNull(out.get("water_item"));
+    }
+
+    @Test
+    void generateFalseRequiresTheHandAuthoredModelItPromises() {
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = convert("""
+                info:
+                  namespace: mypack
+                items:
+                  broken:
+                    resource:
+                      material: PAPER
+                      generate: false
+                      textures: [item/broken.png]
+                """, report);
+
+        assertEquals(1, report.failed().size());
+        assertTrue(report.failed().getFirst().contains("model_path"), report.failed().toString());
+        assertNull(out.get("broken"));
+    }
+
+    @Test
+    void knownButUnconvertedItemAndResourceOptionsAreReported() {
+        ImportReport report = new ImportReport();
+        convert("""
+                info:
+                  namespace: mypack
+                items:
+                  ruby:
+                    permission: mypack.ruby
+                    enable_light: true
+                    specific_properties:
+                      trim: true
+                    resource:
+                      material: PAPER
+                      generate: true
+                      textures: [item/ruby.png]
+                      model_id: 42
+                """, report);
+
+        String unsupported = report.unsupported().toString();
+        assertTrue(unsupported.contains("ruby.permission"), unsupported);
+        assertTrue(unsupported.contains("ruby.enable_light"), unsupported);
+        assertTrue(unsupported.contains("ruby.specific_properties"), unsupported);
+        assertTrue(unsupported.contains("ruby.resource.model_id"), unsupported);
+    }
+
+    @Test
+    void unsupportedBlockPropertiesAreReportedInsteadOfDisappearing() {
+        ImportReport report = new ImportReport();
+        convert("""
+                info:
+                  namespace: mypack
+                blocks:
+                  ruby_block:
+                    resource:
+                      textures: [block/ruby.png]
+                    specific_properties:
+                      block:
+                        hardness: 3
+                        light_level: 12
+                        break_tools_whitelist: [PICKAXE]
+                """, report);
+
+        String unsupported = report.unsupported().toString();
+        assertTrue(unsupported.contains("block.light_level"), unsupported);
+        assertTrue(unsupported.contains("block.break_tools_whitelist"), unsupported);
+    }
 }

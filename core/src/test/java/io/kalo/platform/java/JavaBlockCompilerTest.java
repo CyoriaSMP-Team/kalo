@@ -30,7 +30,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JavaBlockCompilerTest {
@@ -121,45 +121,31 @@ class JavaBlockCompilerTest {
     }
 
     @Test
-    void virtualBlocksDoNotConsumeAStateButStillGetAnItemDefinition() throws IOException {
+    void cubeAllFallbackIsExpandedForEveryVanillaCubeFace() throws IOException {
         ResourcePack pack = pack();
-        BlockStateAllocator allocator = new BlockStateAllocator();
-        BlockDefinition definition = BlockDefinition.builder(Key.key("testpack", "unlimited"))
-                .model(new BlockModelDefinition.CubeAll(Key.key("testpack", "block/unlimited")))
-                .java(JavaBlockOptions.virtual())
+        BlockStateAllocator allocator = new BlockStateAllocator(BlockCarrier.NOTE_BLOCK);
+        BlockDefinition definition = BlockDefinition.builder(Key.key("testpack", "machine"))
+                .model(new BlockModelDefinition.Cube(Map.of(
+                        "all", Key.key("testpack", "block/machine_side"),
+                        "top", Key.key("testpack", "block/machine_top"))))
                 .build();
 
         JavaBlockCompiler.compileBlocks(pack, List.of(new StubBlock(definition)), allocator);
 
-        assertNull(allocator.assignmentOf(definition.key()),
-                "virtual content must not consume a finite native state");
-        assertNotNull(pack.file("assets/testpack/items/unlimited.json"));
-        assertNotNull(pack.file("assets/testpack/models/block/unlimited.json"));
-        assertNull(pack.file(JavaBlockCompiler.NOTE_BLOCK_STATES_PATH),
-                "a virtual-only pass should not generate a carrier blockstates file");
+        JsonObject textures = json(pack, "assets/testpack/models/block/machine.json")
+                .getAsJsonObject("textures");
+        assertEquals("testpack:block/machine_top", textures.get("up").getAsString());
+        assertEquals("testpack:block/machine_side", textures.get("down").getAsString());
+        assertEquals("testpack:block/machine_side", textures.get("north").getAsString());
+        assertEquals("testpack:block/machine_side", textures.get("particle").getAsString());
     }
 
     @Test
-    void switchingAnExistingNativeKeyToVirtualKeepsItsLegacyStateRenderable() throws IOException {
-        ResourcePack pack = pack();
-        BlockStateAllocator allocator = new BlockStateAllocator();
-        Key key = Key.key("testpack", "legacy");
-        allocator.allocate(key, BlockCarrier.NOTE_BLOCK);
-        BlockDefinition definition = BlockDefinition.builder(key)
-                .model(new BlockModelDefinition.CubeAll(Key.key("testpack", "block/legacy")))
-                .java(JavaBlockOptions.virtual())
-                .build();
-
-        JavaBlockCompiler.compileBlocks(pack, List.of(new StubBlock(definition)), allocator);
-
-        JsonObject variants = json(pack, JavaBlockCompiler.NOTE_BLOCK_STATES_PATH)
-                .getAsJsonObject("variants");
-        String customModel = variants.entrySet().stream()
-                .map(entry -> entry.getValue().getAsJsonObject().get("model").getAsString())
-                .filter(model -> model.equals("testpack:block/legacy"))
-                .findFirst()
-                .orElse(null);
-        assertEquals("testpack:block/legacy", customModel);
+    void incompleteCubeWithoutFallbackIsRejected() {
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new BlockModelDefinition.Cube(Map.of(
+                        "north", Key.key("testpack", "block/front"))));
+        assertTrue(error.getMessage().contains("every face"), error.getMessage());
     }
 
     @Test

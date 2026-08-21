@@ -10,10 +10,16 @@ public final class ItemConfigSchema implements ConfigSchema {
         Result result = new Result();
 
         ConfigurationSection model = config.getConfigurationSection("model");
-        if (model != null) {
-            boolean hasSource = model.contains("sprite") || model.contains("vanilla") || model.contains("custom");
-            if (!hasSource) {
+        if (config.contains("model") && model == null) {
+            result.failed("model must be a section");
+        } else if (model != null) {
+            int sources = (model.contains("sprite") ? 1 : 0)
+                    + (model.contains("vanilla") ? 1 : 0)
+                    + (model.contains("custom") ? 1 : 0);
+            if (sources == 0) {
                 result.failed("model section must declare one of 'sprite', 'vanilla' or 'custom'");
+            } else if (sources > 1) {
+                result.failed("model section must declare exactly one of 'sprite', 'vanilla' or 'custom'");
             }
             if (model.contains("textures") && !model.contains("custom")) {
                 result.failed("'textures' only applies to a 'custom' model");

@@ -49,6 +49,9 @@ public final class JavaBlockItemCompiler {
             if (!definition.display().lore().isEmpty()) {
                 meta.lore(definition.display().lore());
             }
+            if (definition.display().enchantmentGlint()) {
+                meta.setEnchantmentGlintOverride(true);
+            }
 
             Key key = definition.key();
             meta.setItemModel(new NamespacedKey(key.namespace(), key.value()));

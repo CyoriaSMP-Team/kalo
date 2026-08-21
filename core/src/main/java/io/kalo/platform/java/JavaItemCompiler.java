@@ -30,6 +30,13 @@ public final class JavaItemCompiler {
     }
 
     public static @NotNull ItemStack compile(@NotNull Item item) {
+        ItemStack itemStack = compileBase(item);
+        fireGenerationEvent(item, itemStack);
+        return itemStack;
+    }
+
+    /** Builds the base stack without firing, so subtypes can attach their components first. */
+    static @NotNull ItemStack compileBase(@NotNull Item item) {
         ItemDefinition definition = item.definition();
         ItemStack itemStack = new ItemStack(definition.java().baseMaterial());
 
@@ -68,9 +75,11 @@ public final class JavaItemCompiler {
             meta.getPersistentDataContainer().set(ITEM_ID_KEY, PersistentDataType.STRING, item.key().asString());
         });
 
-        item.featureEventBus().call(new ItemStackGenerationEvent(itemStack));
-
         return itemStack;
+    }
+
+    static void fireGenerationEvent(@NotNull Item item, @NotNull ItemStack itemStack) {
+        item.featureEventBus().call(new ItemStackGenerationEvent(itemStack));
     }
 
     /**

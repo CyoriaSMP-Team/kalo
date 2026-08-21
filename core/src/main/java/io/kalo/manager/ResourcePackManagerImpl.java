@@ -15,7 +15,6 @@ import io.kalo.pack.ZipPackWriter;
 import io.kalo.registry.Registries;
 import io.kalo.platform.bedrock.BedrockPackCompiler;
 import io.kalo.platform.bedrock.BedrockPackWriter;
-import io.kalo.pack.PackMeta;
 import io.kalo.utils.Constants;
 import io.kalo.utils.Files;
 import it.unimi.dsi.fastutil.Pair;
@@ -24,8 +23,14 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,6 +41,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
     private io.kalo.pack.host.PackHost packHost;
     private io.kalo.pack.host.PackDeliveryListener delivery;
+    private final GenerationQueue generations = new GenerationQueue(ForkJoinPool.commonPool());
 
     @Override
     public void preload(@NotNull Context context) {
@@ -43,12 +49,26 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
     @Override
     public void start(@NotNull Context context) {
+        generations.start();
+        // Finish the first build before opening the host. Starting the host first exposed
+        // a previous generated.zip (or nothing) to players who joined during generation,
+        // and they were never offered the completed replacement.
+        try {
+            generateResourcePack().join();
+        } catch (CompletionException e) {
+            throw new IllegalStateException("Initial resource pack generation failed", unwrap(e));
+        }
         startPackHost(context);
-        generateResourcePack();
+        sendPackToOnlinePlayers(context);
     }
 
     @Override
     public void end(@NotNull Context context) {
+        // A reload clears and repopulates the registries. Let the in-flight generation
+        // finish first so it cannot read half old / half new state or overwrite the new
+        // pack after the replacement generation completes.
+        generations.stopAndWait();
+
         if (packHost != null) {
             packHost.stop();
             packHost = null;
@@ -85,9 +105,25 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         }
     }
 
+    /** Reloads also replace the pack for players who are already connected. */
+    private void sendPackToOnlinePlayers(@NotNull Context context) {
+        io.kalo.pack.host.PackDeliveryListener current = delivery;
+        if (current == null) {
+            return;
+        }
+        for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+            player.getScheduler().execute(context.plugin(), () -> {
+                // Do not send through a listener that a concurrent disable already retired.
+                if (delivery == current) {
+                    current.send(player);
+                }
+            }, null, 1L);
+        }
+    }
+
     @Override
     public @NotNull CompletableFuture<Void> generateResourcePack() {
-        return CompletableFuture.runAsync(() -> {
+        CompletableFuture<Void> generation = generations.submit(() -> {
             LOGGER.info("Generating resource pack...");
 
             ResourcePack resourcePack = new ResourcePackImpl(
@@ -98,14 +134,16 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
             compileRegistrylessTypes(resourcePack);
             mergeBasePack(resourcePack);
 
+            dispatchFeatureEvents(resourcePack, RegistryManager.GlobalRegistries.registries());
+
+            Bukkit.getPluginManager().callEvent(new AsyncResourcePackGenerationEvent(resourcePack));
+
+            // Bedrock uses this Java pack as its texture source. Run it after both
+            // extension points so assets supplied by features/add-ons are visible to the
+            // Bedrock compiler too.
             if (bedrockWanted()) {
                 generateBedrockPack(resourcePack);
             }
-
-            RegistryManager.GlobalRegistries.registries().item().forEach(content ->
-                    content.featureEventBus().call(new ResourcePackGenerationEvent(resourcePack)));
-
-            Bukkit.getPluginManager().callEvent(new AsyncResourcePackGenerationEvent(resourcePack));
 
             // After the event: a listener may have supplied the very asset that would
             // otherwise look missing.
@@ -114,8 +152,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
             try {
                 ZipPackWriter.write(generatedPackFile(), resourcePack);
             } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Failed to write the generated resource pack", e);
-                return;
+                throw new CompletionException("Failed to write the generated resource pack", e);
             }
 
             LOGGER.info("Successfully generated resource pack (" + resourcePack.files().size() + " files)");
@@ -126,12 +163,22 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                 packHost.refresh();
                 LOGGER.info("Pack available at " + packHost.url());
             }
-        }).exceptionally(throwable -> {
-            // CompletableFuture swallows exceptions unless something joins the future,
-            // and nothing does — without this a generation failure would be invisible.
-            LOGGER.log(Level.SEVERE, "Resource pack generation failed", throwable);
-            return null;
         });
+
+        // Keep the returned future exceptional for API callers while still ensuring a
+        // fire-and-forget startup generation can never fail silently.
+        generation.whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                LOGGER.log(Level.SEVERE, "Resource pack generation failed", unwrap(failure));
+            }
+        });
+        return generation;
+    }
+
+    private static @NotNull Throwable unwrap(@NotNull Throwable failure) {
+        return failure instanceof CompletionException && failure.getCause() != null
+                ? failure.getCause()
+                : failure;
     }
 
     /**
@@ -195,7 +242,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         java.util.Map<net.kyori.adventure.key.Key, Integer> blockStates = new java.util.HashMap<>();
         if (Kalo.plugin().registryManager() instanceof RegistryManagerImpl impl) {
             impl.blockStateAllocator().assignments().forEach((key, assignment) ->
-                    blockStates.put(net.kyori.adventure.key.Key.key(key), assignment.state()));
+                    blockStates.put(net.kyori.adventure.key.Key.key(key), assignment));
         }
 
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, PACK_DESCRIPTION));
@@ -304,6 +351,78 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
             if (!contents.isEmpty()) {
                 type.compilePack(resourcePack, contents);
+            }
+        }
+    }
+
+    /** Sends the per-content extension event to every content type, not only items. */
+    static void dispatchFeatureEvents(@NotNull ResourcePack resourcePack,
+                                      @NotNull RegistryManager.GlobalRegistries registries) {
+        Set<Content> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        ResourcePackGenerationEvent event = new ResourcePackGenerationEvent(resourcePack);
+
+        for (Pair<net.kyori.adventure.key.Key, ContentType<?>> entry : registries.types().entries()) {
+            try {
+                for (Object candidate : entry.value().contents(registries)) {
+                    if (!(candidate instanceof Content content) || !seen.add(content)) {
+                        continue;
+                    }
+                    try {
+                        content.featureEventBus().call(event);
+                    } catch (RuntimeException e) {
+                        LOGGER.log(Level.WARNING, "A resource-pack feature failed for content '"
+                                + content.key().asString() + "'", e);
+                    }
+                }
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.WARNING, "Could not enumerate content type '"
+                        + entry.key().asString() + "' for resource-pack feature events", e);
+            }
+        }
+    }
+
+    /**
+     * Serializes generations and provides a lifecycle barrier for reload/shutdown.
+     *
+     * <p>The old implementation launched every request independently on the common pool.
+     * Two quick reloads could therefore write the same zip concurrently, while the older
+     * task could refresh the newer host with a hash for whichever write happened to win.</p>
+     */
+    static final class GenerationQueue {
+        private final Executor executor;
+        private CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
+        private boolean accepting;
+
+        GenerationQueue(@NotNull Executor executor) {
+            this.executor = executor;
+        }
+
+        synchronized void start() {
+            accepting = true;
+        }
+
+        synchronized @NotNull CompletableFuture<Void> submit(@NotNull Runnable generation) {
+            if (!accepting) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("Resource pack manager is not running"));
+            }
+
+            // A failed generation must not poison the queue forever; the next explicit
+            // request still deserves a chance to rebuild after the underlying issue is fixed.
+            tail = tail.handle((ignored, failure) -> null).thenRunAsync(generation, executor);
+            return tail;
+        }
+
+        void stopAndWait() {
+            CompletableFuture<Void> pending;
+            synchronized (this) {
+                accepting = false;
+                pending = tail;
+            }
+            try {
+                pending.join();
+            } catch (CompletionException ignored) {
+                // generateResourcePack's completion handler already logged the cause.
             }
         }
     }

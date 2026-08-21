@@ -63,9 +63,9 @@ class BedrockGeometryTest {
     }
 
     @Test
-    void eastAndWestSwapWithTheMirroredAxis() {
-        assertEquals("west", BedrockGeometry.mirrorFace("east"));
-        assertEquals("east", BedrockGeometry.mirrorFace("west"));
+    void faceNamesStayPutBecauseTheCubeCoordinatesAlreadyMirrorX() {
+        assertEquals("east", BedrockGeometry.mirrorFace("east"));
+        assertEquals("west", BedrockGeometry.mirrorFace("west"));
         assertEquals("north", BedrockGeometry.mirrorFace("north"));
         assertEquals("up", BedrockGeometry.mirrorFace("up"));
     }
@@ -83,27 +83,29 @@ class BedrockGeometryTest {
     }
 
     @Test
-    void flippedUvsKeepAPositiveSize() {
-        // Java allows the corners in either order to flip a texture.
+    void flippedUvsKeepTheirNegativeSize() {
+        // Java allows the corners in either order to flip a texture. Bedrock supports
+        // negative uv_size too; abs() would erase the authored flip.
         JsonObject geometry = BedrockGeometry.convert("geometry.kalo.x", model("""
                 {"elements":[{"from":[0,0,0],"to":[16,16,16],
-                  "faces":{"up":{"uv":[10,11,2,3]}}}]}
+                  "faces":{"north":{"uv":[10,11,2,3]}}}]}
                 """));
 
-        JsonObject up = firstCube(geometry).getAsJsonObject("uv").getAsJsonObject("up");
-        assertArrayEquals(new double[]{2, 3}, doubles(up.getAsJsonArray("uv")));
-        assertArrayEquals(new double[]{8, 8}, doubles(up.getAsJsonArray("uv_size")));
+        JsonObject north = firstCube(geometry).getAsJsonObject("uv").getAsJsonObject("north");
+        assertArrayEquals(new double[]{10, 11}, doubles(north.getAsJsonArray("uv")));
+        assertArrayEquals(new double[]{-8, -8}, doubles(north.getAsJsonArray("uv_size")));
     }
 
     @Test
-    void aFaceWithNoUvIsLeftOutRatherThanGuessed() {
-        // Java infers these from the element's position; Bedrock has no equivalent, and a
-        // wrong UV is harder to notice than a missing face.
+    void aFaceWithNoUvUsesJavasExactInferredCoordinates() {
         JsonObject geometry = BedrockGeometry.convert("geometry.kalo.x", model("""
                 {"elements":[{"from":[0,0,0],"to":[16,16,16],"faces":{"north":{"texture":"#0"}}}]}
                 """));
 
-        assertFalse(firstCube(geometry).has("uv"));
+        JsonObject north = firstCube(geometry).getAsJsonObject("uv").getAsJsonObject("north");
+        assertArrayEquals(new double[]{0, 0}, doubles(north.getAsJsonArray("uv")));
+        assertArrayEquals(new double[]{16, 16}, doubles(north.getAsJsonArray("uv_size")));
+        assertEquals("0", north.get("material_instance").getAsString());
     }
 
     @Test
@@ -115,7 +117,31 @@ class BedrockGeometryTest {
 
         JsonObject cube = firstCube(geometry);
         assertArrayEquals(new double[]{0, 8, 0}, doubles(cube.getAsJsonArray("pivot")));
-        assertArrayEquals(new double[]{0, -22.5, 0}, doubles(cube.getAsJsonArray("rotation")));
+        assertArrayEquals(new double[]{0, 22.5, 0}, doubles(cube.getAsJsonArray("rotation")));
+    }
+
+    @Test
+    void horizontalFacesReverseTheirUvDirectionForBedrock() {
+        JsonObject geometry = BedrockGeometry.convert("geometry.kalo.x", model("""
+                {"elements":[{"from":[0,0,0],"to":[16,16,16],
+                  "faces":{"up":{"uv":[2,3,10,11]}}}]}
+                """));
+
+        JsonObject up = firstCube(geometry).getAsJsonObject("uv").getAsJsonObject("up");
+        assertArrayEquals(new double[]{10, 11}, doubles(up.getAsJsonArray("uv")));
+        assertArrayEquals(new double[]{-8, -8}, doubles(up.getAsJsonArray("uv_size")));
+    }
+
+    @Test
+    void faceUvRotationAndTextureSlotSurviveConversion() {
+        JsonObject geometry = BedrockGeometry.convert("geometry.kalo.x", model("""
+                {"elements":[{"from":[0,0,0],"to":[16,16,16],
+                  "faces":{"south":{"uv":[0,0,16,16],"rotation":90,"texture":"#side"}}}]}
+                """));
+
+        JsonObject south = firstCube(geometry).getAsJsonObject("uv").getAsJsonObject("south");
+        assertEquals(90, south.get("uv_rotation").getAsInt());
+        assertEquals("side", south.get("material_instance").getAsString());
     }
 
     @Test

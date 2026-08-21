@@ -19,7 +19,7 @@ import java.util.Locale;
  *   <li>Java positions a cuboid by two corners in {@code 0..16}; Bedrock positions it by
  *       an {@code origin} plus a {@code size}.</li>
  *   <li><b>Bedrock's X axis is mirrored.</b> A cuboid's origin is therefore
- *       {@code 8 - to.x}, not {@code from.x - 8}, and the east and west faces swap.
+ *       {@code 8 - to.x}, not {@code from.x - 8}.
  *       Getting this backwards produces a model that looks right until it is asymmetric.</li>
  *   <li>Java's Y is measured from the block floor and Bedrock's origin Y matches it, but
  *       X and Z are centred on the block, so both shift by 8.</li>
@@ -126,7 +126,7 @@ public final class BedrockGeometry {
 
         JsonObject faces = element.getAsJsonObject("faces");
         if (faces != null) {
-            JsonObject uv = convertFaces(faces, textureSize);
+            JsonObject uv = convertFaces(faces, fromX, fromY, fromZ, toX, toY, toZ);
             if (uv.size() > 0) {
                 cube.add("uv", uv);
             }
@@ -137,8 +137,9 @@ public final class BedrockGeometry {
 
     /**
      * Java rotates an element around a pivot on one axis; Bedrock takes the same idea but
-     * expects the angle on all three axes and mirrors X, which flips the sign on the Y
-     * and Z rotations.
+     * expects the angle on all three axes. Mirroring the model's X coordinates reverses
+     * an X-axis rotation; Y and Z keep their authored sign. This matches the converter
+     * Geyser itself ships in Rainbow.
      */
     private static void applyRotation(@NotNull JsonObject cube, @NotNull JsonObject rotation) {
         JsonArray origin = rotation.getAsJsonArray("origin");
@@ -157,15 +158,17 @@ public final class BedrockGeometry {
                 origin.get(2).getAsDouble() - 8));
 
         cube.add("rotation", switch (axis) {
-            // The mirrored X axis reverses the direction of the other two rotations.
+            // Mirroring the model coordinates reverses rotation around X only.
             case "x" -> array(-angle, 0, 0);
-            case "y" -> array(0, -angle, 0);
+            case "y" -> array(0, angle, 0);
             case "z" -> array(0, 0, angle);
             default -> array(0, 0, 0);
         });
     }
 
-    private static @NotNull JsonObject convertFaces(@NotNull JsonObject faces, int[] textureSize) {
+    private static @NotNull JsonObject convertFaces(@NotNull JsonObject faces,
+                                                     double fromX, double fromY, double fromZ,
+                                                     double toX, double toY, double toZ) {
         JsonObject converted = new JsonObject();
 
         for (String face : FACES) {
@@ -174,9 +177,11 @@ public final class BedrockGeometry {
                 continue;
             }
             JsonArray uv = javaFace.getAsJsonArray("uv");
-            if (uv == null || uv.size() != 4) {
-                // Java infers missing UVs from the element's position. Bedrock has no
-                // equivalent, so the face is left out rather than given a wrong one.
+            if (uv == null) {
+                uv = defaultUv(face, fromX, fromY, fromZ, toX, toY, toZ);
+            } else if (uv.size() != 4) {
+                // Malformed rather than omitted. Java would reject this model too, so do
+                // not invent coordinates for it.
                 continue;
             }
 
@@ -186,22 +191,59 @@ public final class BedrockGeometry {
             double y2 = uv.get(3).getAsDouble();
 
             JsonObject bedrockFace = new JsonObject();
-            bedrockFace.add("uv", array(Math.min(x1, x2), Math.min(y1, y2)));
-            bedrockFace.add("uv_size", array(Math.abs(x2 - x1), Math.abs(y2 - y1)));
+            if ("up".equals(face) || "down".equals(face)) {
+                // Java and Bedrock orient horizontal faces oppositely. Negative sizes
+                // are intentional and supported by Bedrock; taking abs() silently
+                // unflips asymmetric textures.
+                bedrockFace.add("uv", array(x2, y2));
+                bedrockFace.add("uv_size", array(x1 - x2, y1 - y2));
+            } else {
+                bedrockFace.add("uv", array(x1, y1));
+                bedrockFace.add("uv_size", array(x2 - x1, y2 - y1));
+            }
 
-            converted.add(mirrorFace(face), bedrockFace);
+            JsonElement uvRotation = javaFace.get("rotation");
+            if (uvRotation != null) {
+                bedrockFace.addProperty("uv_rotation", uvRotation.getAsInt());
+            }
+
+            JsonElement texture = javaFace.get("texture");
+            if (texture != null && texture.isJsonPrimitive()) {
+                bedrockFace.addProperty("material_instance", materialName(texture.getAsString()));
+            }
+
+            // The cube coordinates themselves are mirrored. Face names stay attached to
+            // their world directions; swapping east/west here mirrors the model twice.
+            converted.add(face, bedrockFace);
         }
 
         return converted;
     }
 
-    /** East and west swap because Bedrock's X axis runs the other way. */
+    /** Kept package-visible for the coordinate-regression tests. */
     static @NotNull String mirrorFace(@NotNull String javaFace) {
-        return switch (javaFace) {
-            case "east" -> "west";
-            case "west" -> "east";
-            default -> javaFace;
+        return javaFace;
+    }
+
+    /** Java's exact inferred face UVs when a model omits the optional {@code uv} field. */
+    private static @NotNull JsonArray defaultUv(@NotNull String face,
+                                                 double fromX, double fromY, double fromZ,
+                                                 double toX, double toY, double toZ) {
+        return switch (face) {
+            case "down" -> array(fromX, 16 - toZ, toX, 16 - fromZ);
+            case "up" -> array(fromX, fromZ, toX, toZ);
+            case "north" -> array(16 - toX, 16 - toY, 16 - fromX, 16 - fromY);
+            case "south" -> array(fromX, 16 - toY, toX, 16 - fromY);
+            case "west" -> array(fromZ, 16 - toY, toZ, 16 - fromY);
+            case "east" -> array(16 - toZ, 16 - toY, 16 - fromZ, 16 - fromY);
+            default -> throw new IllegalArgumentException("unknown cube face '" + face + "'");
         };
+    }
+
+    /** Bedrock material-instance names cannot use Java's leading reference marker. */
+    public static @NotNull String materialName(@NotNull String texture) {
+        String value = texture.startsWith("#") ? texture.substring(1) : texture;
+        return value.replace(':', '_').replace('/', '_');
     }
 
     /** Blockbench writes {@code texture_size: [w, h]} when the sheet is not 16x16. */

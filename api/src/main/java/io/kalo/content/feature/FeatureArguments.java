@@ -11,6 +11,13 @@ import java.util.Map;
 import java.util.Objects;
 
 public record FeatureArguments(@NotNull Map<String, String> map) {
+    public FeatureArguments {
+        // A feature may keep its arguments for the lifetime of the registered content.
+        // Retaining a caller's mutable builder map lets a later mutation silently change
+        // the feature after construction, so make the record a real immutable value.
+        map = Map.copyOf(map);
+    }
+
     public FeatureArguments(@Nullable ConfigurationSection config) {
         this(config != null
                 ? config.getKeys(false).stream().collect(HashMap::new, (map, key) -> map.put(key, Objects.requireNonNull(config.get(key)).toString()), HashMap::putAll)

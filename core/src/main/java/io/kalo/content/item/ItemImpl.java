@@ -12,6 +12,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 public class ItemImpl extends AbstractContent implements Item {
     @Getter @Accessors(fluent = true)
@@ -20,9 +21,16 @@ public class ItemImpl extends AbstractContent implements Item {
     private final ImmutableItemStack itemStack;
 
     public ItemImpl(@NotNull ItemDefinition definition, @NotNull List<FeatureBuilder> features) {
+        this(definition, features, JavaItemCompiler::compile);
+    }
+
+    /** Lets item subtypes compile their complete stack once instead of rebuilding a discarded base stack. */
+    protected ItemImpl(@NotNull ItemDefinition definition,
+                       @NotNull List<FeatureBuilder> features,
+                       @NotNull Function<Item, ItemStack> compiler) {
         super(definition.key(), features);
         this.definition = definition;
-        this.itemStack = ImmutableItemStack.of(JavaItemCompiler.compile(this));
+        this.itemStack = ImmutableItemStack.of(compiler.apply(this));
     }
 
     @Override

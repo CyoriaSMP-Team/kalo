@@ -111,6 +111,25 @@ class PackHostTest {
     }
 
     @Test
+    void replacingTheFileCannotMixNewBytesWithTheOldHash(@TempDir Path dir) throws IOException {
+        Path pack = dir.resolve("generated.zip");
+        Files.write(pack, "first".getBytes());
+        PackHost host = hostFor(pack);
+
+        String firstUrl = host.url();
+        String firstHash = host.sha1();
+        Files.write(pack, "second".getBytes());
+
+        // ZipPackWriter replaces the file before ResourcePackManager calls refresh().
+        // During that window the old URL/hash must still serve the matching old bytes.
+        assertArrayEquals("first".getBytes(), get(firstUrl));
+        assertEquals(firstHash, host.sha1());
+
+        host.refresh();
+        assertArrayEquals("second".getBytes(), get(host.url()));
+    }
+
+    @Test
     void anyOtherPathIs404(@TempDir Path dir) throws IOException {
         // The token is cache busting, not security — but the host still must not serve
         // whatever else happens to be reachable.
@@ -141,5 +160,26 @@ class PackHostTest {
         Files.write(pack, "content".getBytes());
 
         assertTrue(hostFor(pack).available());
+    }
+
+    @Test
+    void invalidPortFailsClosedInsteadOfCrashingPluginStartup(@TempDir Path dir) throws IOException {
+        Path pack = dir.resolve("generated.zip");
+        Files.write(pack, "content".getBytes());
+        host = new PackHost(pack.toFile(), 70_000, "127.0.0.1");
+
+        assertFalse(host.start());
+        assertFalse(host.available());
+
+        host = new PackHost(pack.toFile(), 0, "127.0.0.1");
+        assertFalse(host.start(), "ephemeral port zero cannot be advertised to clients");
+        assertFalse(host.available());
+    }
+
+    @Test
+    void ipv6PublicAddressIsRenderedAsAValidUrl(@TempDir Path dir) {
+        host = new PackHost(dir.resolve("generated.zip").toFile(), 8163, "::1");
+
+        assertTrue(host.url().startsWith("http://[::1]:8163/"));
     }
 }

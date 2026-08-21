@@ -6,7 +6,6 @@ import io.kalo.content.recipe.definition.RecipeDefinition;
 import io.kalo.platform.java.JavaRecipeCompiler;
 import io.kalo.registry.Registries;
 import io.kalo.utils.Constants;
-import io.kalo.utils.Plugins;
 import net.kyori.adventure.key.Key;
 import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
@@ -28,6 +27,8 @@ import java.util.logging.Level;
  */
 public final class RecipeType implements ContentType<io.kalo.content.item.Item> {
     public static final Key KEY = Key.key(Constants.PLUGIN_ID, "recipe");
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger(RecipeType.class.getName());
 
     /** Keyed so a reload replaces rather than accumulates. */
     private final Map<Key, RecipeDefinition> recipes = new ConcurrentHashMap<>();
@@ -55,10 +56,13 @@ public final class RecipeType implements ContentType<io.kalo.content.item.Item> 
         try {
             RecipeDefinition definition = RecipeParser.parse(key, config);
             JavaRecipeCompiler.validate(definition);
-            recipes.put(key, definition);
+            if (recipes.putIfAbsent(key, definition) != null) {
+                LOGGER.warning("Duplicate recipe '" + key.asString() + "'; keeping the first definition");
+                return false;
+            }
             return true;
         } catch (Exception e) {
-            Plugins.logger().log(Level.WARNING,
+            LOGGER.log(Level.WARNING,
                     "Failed to load recipe '" + key.asString() + "': " + e.getMessage(), e);
             return false;
         }

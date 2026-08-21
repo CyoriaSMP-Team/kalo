@@ -32,7 +32,7 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
     private static final Logger LOGGER = Logger.getLogger(RegistryManagerImpl.class.getName());
 
     private final io.kalo.platform.java.BlockStateAllocator blockStateAllocator =
-            new io.kalo.platform.java.BlockStateAllocator();
+            new io.kalo.platform.java.BlockStateAllocator(io.kalo.content.block.definition.BlockCarrier.NOTE_BLOCK);
     private final RecipeType recipeType = new RecipeType();
     private final SoundType soundType = new SoundType();
     private final GlyphType glyphType = new GlyphType();
@@ -42,24 +42,20 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
     public void preload(@NotNull Context context) {
         LOGGER.info("Initializing registries...");
 
+        // Validate the irreplaceable carrier-state mapping before clearing the currently
+        // usable registries. On reload, a corrupt file should fail loudly without first
+        // discarding every old content entry.
+        java.nio.file.Path stateFile =
+                new File(context.plugin().getDataFolder(), "block-states.json").toPath();
+        loadBlockStateAssignments(blockStateAllocator, stateFile);
+
         globalRegistries.unlockAll();
         globalRegistries.clearAll();
         // clearAll() empties the type registry as well, so the built-ins go back in
         // before anything tries to read them.
         ((GlobalRegistriesImpl) globalRegistries).registerBuiltinTypes();
-        recipeType.clear();
         soundType.clear();
         glyphType.clear();
-        try {
-            java.nio.file.Path stateFile =
-                    new File(context.plugin().getDataFolder(), "block-states.json").toPath();
-            blockStateAllocator.load(stateFile);
-            // Write through on each new assignment rather than only on shutdown: a crash
-            // between pack generation and shutdown would otherwise lose them.
-            blockStateAllocator.attach(stateFile);
-        } catch (IOException e) {
-            LOGGER.log(java.util.logging.Level.SEVERE, "Could not load block state assignments", e);
-        }
     }
 
     @Override
@@ -80,6 +76,10 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
     @Override
     public void end(@NotNull Context context) {
+        // Recipes are server-global Bukkit state, not merely data in this manager. They
+        // must disappear on a plugin disable as well as on reload. Clearing here also
+        // means preload no longer has to double-clear them on the next lifecycle.
+        recipeType.clear();
         try {
             blockStateAllocator.save(new File(context.plugin().getDataFolder(), "block-states.json").toPath());
         } catch (IOException e) {
@@ -97,6 +97,23 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
     public @NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator() {
         return blockStateAllocator;
+    }
+
+    static void loadBlockStateAssignments(
+            @NotNull io.kalo.platform.java.BlockStateAllocator allocator,
+            @NotNull java.nio.file.Path stateFile
+    ) {
+        try {
+            allocator.load(stateFile);
+            // Write through on each new assignment rather than only on shutdown: a crash
+            // between pack generation and shutdown would otherwise lose them.
+            allocator.attach(stateFile);
+        } catch (IOException e) {
+            // Continuing with an empty/unattached allocator would reassign carrier states
+            // and silently turn already-placed blocks into different content.
+            throw new IllegalStateException(
+                    "Could not load persistent block state assignments from " + stateFile, e);
+        }
     }
 
     @Override

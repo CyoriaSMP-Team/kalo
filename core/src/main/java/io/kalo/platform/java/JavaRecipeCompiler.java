@@ -7,8 +7,10 @@ import io.kalo.content.recipe.definition.RecipeResult;
 import io.kalo.manager.RegistryManager;
 import net.kyori.adventure.key.Key;
 import org.bukkit.Bukkit;
+import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
@@ -17,23 +19,26 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Registers Kalo recipes with the server.
  *
- * <p>Matching a Kalo ingredient is the interesting part. Bukkit's exact-choice matching
- * compares whole item stacks, and a Kalo item carries a display name and lore that a
- * player could plausibly have changed on an anvil — so an exact match would reject a
- * legitimately-obtained item. Kalo items already carry their id in persistent data, so
- * the recipe matches on a freshly built copy, which is stable regardless of what the
- * player has renamed.</p>
+ * <p>Matching a Kalo ingredient is the interesting part. Bukkit offers material or exact
+ * stack choices, but exact choices reject legitimately obtained items after an anvil
+ * rename. Recipes therefore use the content's carrier material for Bukkit's initial
+ * match, while {@link JavaRecipeListener} validates Kalo's persistent id before the
+ * result can be taken. A plain carrier item never satisfies a custom ingredient.</p>
  */
 public final class JavaRecipeCompiler {
     private static final Logger LOGGER = Logger.getLogger(JavaRecipeCompiler.class.getName());
+    private static final Map<NamespacedKey, RecipeDefinition> ACTIVE_RECIPES = new ConcurrentHashMap<>();
 
     private JavaRecipeCompiler() {
     }
@@ -44,9 +49,17 @@ public final class JavaRecipeCompiler {
      */
     public static int register(@NotNull Iterable<RecipeDefinition> recipes) {
         int registered = 0;
+        List<RecipeDefinition> ordered = new ArrayList<>();
+        recipes.forEach(ordered::add);
+        ordered.sort(Comparator.comparing(definition -> definition.key().asString()));
 
-        for (RecipeDefinition definition : recipes) {
+        for (RecipeDefinition definition : ordered) {
             NamespacedKey key = toNamespacedKey(definition.key());
+            ACTIVE_RECIPES.remove(key);
+            // Remove before any validation. If a formerly valid definition becomes
+            // invalid on reload, leaving its old Bukkit recipe behind would keep the
+            // stale result craftable (especially for all-vanilla ingredient recipes).
+            Bukkit.removeRecipe(key);
             try {
                 ItemStack result = resultStack(definition.result());
                 if (result == null) {
@@ -54,9 +67,6 @@ public final class JavaRecipeCompiler {
                             + definition.result().content().asString());
                     continue;
                 }
-
-                // Removing first makes reload idempotent; Bukkit throws on a duplicate key.
-                Bukkit.removeRecipe(key);
 
                 // Same situation as an unknown result, and it should read the same way:
                 // one item failing to load should not spray stack traces for every recipe
@@ -68,12 +78,17 @@ public final class JavaRecipeCompiler {
                     continue;
                 }
 
-                switch (definition) {
+                boolean added = switch (definition) {
                     case RecipeDefinition.Shaped shaped -> Bukkit.addRecipe(shaped(key, result, shaped));
                     case RecipeDefinition.Shapeless shapeless ->
                             Bukkit.addRecipe(shapeless(key, result, shapeless));
+                };
+                if (added) {
+                    ACTIVE_RECIPES.put(key, definition);
+                    registered++;
+                } else {
+                    LOGGER.warning("Server rejected recipe " + definition.key().asString());
                 }
-                registered++;
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Failed to register recipe " + definition.key().asString(), e);
             }
@@ -85,7 +100,9 @@ public final class JavaRecipeCompiler {
     /** Removes every recipe under Kalo's namespace, so a reload starts from a clean slate. */
     public static void unregisterAll(@NotNull Iterable<RecipeDefinition> recipes) {
         for (RecipeDefinition definition : recipes) {
-            Bukkit.removeRecipe(toNamespacedKey(definition.key()));
+            NamespacedKey key = toNamespacedKey(definition.key());
+            ACTIVE_RECIPES.remove(key);
+            Bukkit.removeRecipe(key);
         }
     }
 
@@ -141,18 +158,32 @@ public final class JavaRecipeCompiler {
         return switch (ingredient) {
             case RecipeIngredient.Vanilla vanilla -> {
                 Material material = Material.matchMaterial(vanilla.item().value().toUpperCase(Locale.ROOT));
-                yield material != null ? new RecipeChoice.MaterialChoice(material) : null;
+                yield material != null && material.isItem()
+                        ? new RecipeChoice.MaterialChoice(material) : null;
             }
             case RecipeIngredient.Content content -> {
                 ItemStack stack = contentStack(content.key());
-                // ExactChoice compares the whole stack. That is the point for Kalo items:
-                // a plain PAPER must not satisfy a slot that wants mypack:ruby.
-                yield stack != null ? new RecipeChoice.ExactChoice(stack) : null;
+                // The listener performs the identity check. Using ExactChoice here would
+                // make an anvil rename change what the item is allowed to craft.
+                yield stack != null ? new RecipeChoice.MaterialChoice(stack.getType()) : null;
             }
         };
     }
 
-    private static @Nullable ItemStack resultStack(@NotNull RecipeResult result) {
+    static @Nullable RecipeDefinition definitionOf(@Nullable Recipe recipe) {
+        if (!(recipe instanceof Keyed keyed)) {
+            return null;
+        }
+        return ACTIVE_RECIPES.get(keyed.getKey());
+    }
+
+    static @NotNull List<RecipeDefinition> activeRecipes() {
+        return ACTIVE_RECIPES.values().stream()
+                .sorted(Comparator.comparing(definition -> definition.key().asString()))
+                .toList();
+    }
+
+    static @Nullable ItemStack resultStack(@NotNull RecipeResult result) {
         ItemStack stack = contentStack(result.content());
         if (stack == null) {
             return null;
@@ -173,7 +204,9 @@ public final class JavaRecipeCompiler {
                 .map(block -> block.itemStack().get())
                 .orElseGet(() -> registries.furniture().get(key)
                         .map(furniture -> furniture.itemStack().get())
-                        .orElse(null));
+                        .orElseGet(() -> registries.armor().get(key)
+                                .map(armor -> armor.itemStack().get())
+                                .orElse(null)));
     }
 
     private static @NotNull NamespacedKey toNamespacedKey(@NotNull Key key) {

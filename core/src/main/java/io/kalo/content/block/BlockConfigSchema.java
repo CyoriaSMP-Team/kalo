@@ -18,9 +18,13 @@ public final class BlockConfigSchema implements ConfigSchema {
             // without a model would render as missing texture in the world.
             result.failed("Missing model section — declare 'cube_all', 'cube' or 'custom'");
         } else {
-            boolean hasSource = model.contains("cube_all") || model.contains("cube") || model.contains("custom");
-            if (!hasSource) {
+            int sources = (model.contains("cube_all") ? 1 : 0)
+                    + (model.contains("cube") ? 1 : 0)
+                    + (model.contains("custom") ? 1 : 0);
+            if (sources == 0) {
                 result.failed("model section must declare one of 'cube_all', 'cube' or 'custom'");
+            } else if (sources > 1) {
+                result.failed("model section must declare exactly one of 'cube_all', 'cube' or 'custom'");
             }
         }
 

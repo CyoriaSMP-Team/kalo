@@ -199,4 +199,56 @@ class BlockStateAllocatorTest {
         assertNotNull(grouped.get(BlockCarrier.TRIPWIRE));
         assertTrue(grouped.get(BlockCarrier.TRIPWIRE).containsValue("testpack:flat"));
     }
+
+    @Test
+    void aMissingLoadFileReallyStartsFromEmpty(@TempDir Path dir) throws Exception {
+        var allocator = new BlockStateAllocator(BlockCarrier.NOTE_BLOCK);
+        allocator.allocate(Key.key("testpack", "old"));
+
+        allocator.load(dir.resolve("does-not-exist.json"));
+
+        assertTrue(allocator.assignments().isEmpty());
+        assertEquals(1, allocator.allocate(Key.key("testpack", "new")));
+    }
+
+    @Test
+    void anUnpersistedAssignmentIsRolledBack(@TempDir Path dir) {
+        var allocator = new BlockStateAllocator(BlockCarrier.NOTE_BLOCK);
+        Key ruby = Key.key("testpack", "ruby");
+        // A directory cannot be replaced with the state file. This deterministically
+        // exercises the failed write without depending on platform file permissions.
+        allocator.attach(dir);
+
+        assertThrows(IllegalStateException.class, () -> allocator.allocate(ruby));
+        assertNull(allocator.indexOf(ruby));
+        assertTrue(allocator.assignments().isEmpty());
+
+        allocator.attach(dir.resolve("states.json"));
+        assertEquals(1, allocator.allocate(ruby), "the failed index should be available again");
+    }
+
+    @Test
+    void invalidStatesCannotAliasARealCarrierState() {
+        assertThrows(IllegalArgumentException.class, () -> BlockStateAllocator.decode(-1));
+        assertThrows(IllegalArgumentException.class,
+                () -> BlockStateAllocator.decode(BlockCarrier.NOTE_BLOCK.stateCount()));
+        assertThrows(IllegalArgumentException.class,
+                () -> new BlockStateAllocator.NoteBlockState(16, 0, false));
+        assertThrows(IllegalArgumentException.class,
+                () -> new BlockStateAllocator.NoteBlockState(0, 25, false));
+    }
+
+    @Test
+    void persistedAssignmentsRequireValidKeysAndIntegerIndices(@TempDir Path dir) throws Exception {
+        var allocator = new BlockStateAllocator(BlockCarrier.NOTE_BLOCK);
+
+        Path invalidKey = dir.resolve("invalid-key.json");
+        Files.writeString(invalidKey, "{\"NOT A KEY\": 1}");
+        assertThrows(Exception.class, () -> allocator.load(invalidKey));
+
+        Path fractionalIndex = dir.resolve("fractional-index.json");
+        Files.writeString(fractionalIndex, "{\"testpack:ruby\": 1.5}");
+        assertThrows(Exception.class, () -> allocator.load(fractionalIndex));
+        assertTrue(allocator.assignments().isEmpty());
+    }
 }

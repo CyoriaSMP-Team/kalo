@@ -61,8 +61,15 @@ public final class PackMerger {
                 if (entry.isDirectory()) {
                     continue;
                 }
-                if (mergeEntry(pack, zip, entry)) {
-                    merged++;
+                try {
+                    if (mergeEntry(pack, zip, entry)) {
+                        merged++;
+                    }
+                } catch (IllegalArgumentException e) {
+                    // Never copy traversal-like or malformed entry names into the pack
+                    // that is sent on to clients.
+                    LOGGER.warning("Ignoring unsafe entry '" + entry.getName()
+                            + "' in base pack " + base.getName());
                 }
             }
         } catch (IOException e) {

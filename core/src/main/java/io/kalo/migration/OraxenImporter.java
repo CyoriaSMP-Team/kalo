@@ -8,7 +8,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -46,10 +45,14 @@ public final class OraxenImporter {
      * Top-level keys the importer understands. Anything else in an item is reported, which
      * is what makes an unrecognised or newer format visible instead of silently lossy.
      */
-    private static final Set<String> KNOWN_KEYS = Set.of(
+    private static final Set<String> CONVERTED_ITEM_KEYS = Set.of(
             "displayname", "display_name", "material", "Pack", "pack",
-            "durability", "itemname", "lore", "unbreakable", "color",
-            "customModelData", "custom_model_data"
+            "durability", "itemname", "lore"
+    );
+
+    private static final Set<String> CONVERTED_BLOCK_KEYS = Set.of(
+            "displayname", "display_name", "itemname", "material", "Pack", "pack",
+            "Mechanics", "mechanics"
     );
 
     private OraxenImporter() {
@@ -260,24 +263,28 @@ public final class OraxenImporter {
             mechanics = item.getConfigurationSection("mechanics");
         }
         ConfigurationSection noteblock = mechanics != null ? mechanics.getConfigurationSection("noteblock") : null;
+        String blockMechanicName = "noteblock";
+        if (noteblock == null && mechanics != null) {
+            noteblock = mechanics.getConfigurationSection("block");
+            blockMechanicName = "block";
+        }
         if (noteblock != null && noteblock.contains("custom_variation")) {
             // Deliberately not carried over: Kalo owns its own state allocation, and
             // adopting Oraxen's numbering would collide with blocks Kalo already placed.
-            report.unsupported(key + ".Mechanics.noteblock.custom_variation "
+            report.unsupported(key + ".Mechanics." + blockMechanicName + ".custom_variation "
                     + "(Kalo allocates its own states; see the world-migration warning)");
         }
 
         Map<String, Object> behaviour = new LinkedHashMap<>();
-        if (mechanics != null) {
-            ConfigurationSection hardness = mechanics.getConfigurationSection("hardness");
-            if (hardness != null || mechanics.contains("hardness")) {
-                behaviour.put("hardness", mechanics.getDouble("hardness", 1.5));
-            }
+        if (noteblock != null && noteblock.contains("hardness")) {
+            behaviour.put("hardness", noteblock.getDouble("hardness"));
         }
         if (!behaviour.isEmpty()) {
             converted.put("behaviour", behaviour);
         }
 
+        reportPackKeys(key, pack, report);
+        reportBlockKeys(key, item, mechanics, noteblock, blockMechanicName, report);
         output.createSection(key, converted);
     }
 
@@ -327,14 +334,19 @@ public final class OraxenImporter {
 
         String material = item.getString("material");
         if (material != null) {
-            Material parsed = Material.matchMaterial(material.toUpperCase(Locale.ROOT));
-            if (parsed == null) {
-                throw new IllegalArgumentException("unknown material '" + material + "'");
-            }
+            Material parsed = MigrationMaterials.item(material);
             converted.put("java", Map.of("base_material", parsed.name()));
         }
 
-        reportUnknownKeys(key, item, report);
+        reportPackKeys(key, pack, report);
+        if (durability != null) {
+            for (String child : durability.getKeys(false)) {
+                if (!child.equals("value")) {
+                    report.unsupported(key + ".durability." + child);
+                }
+            }
+        }
+        reportUnknownItemKeys(key, item, report);
 
         output.createSection(key, converted);
     }
@@ -375,11 +387,11 @@ public final class OraxenImporter {
         return Map.of("sprite", stripExtension(textures.get(0)));
     }
 
-    private static void reportUnknownKeys(@NotNull String key,
-                                          @NotNull ConfigurationSection item,
-                                          @NotNull ImportReport report) {
+    private static void reportUnknownItemKeys(@NotNull String key,
+                                              @NotNull ConfigurationSection item,
+                                              @NotNull ImportReport report) {
         for (String child : item.getKeys(false)) {
-            if (KNOWN_KEYS.contains(child)) {
+            if (CONVERTED_ITEM_KEYS.contains(child)) {
                 continue;
             }
             if (child.equals("Mechanics") || child.equals("mechanics")) {
@@ -389,6 +401,49 @@ public final class OraxenImporter {
                 continue;
             }
             report.unsupported(key + "." + child);
+        }
+    }
+
+    private static void reportPackKeys(@NotNull String key,
+                                       @Nullable ConfigurationSection pack,
+                                       @NotNull ImportReport report) {
+        if (pack == null) {
+            return;
+        }
+        for (String child : pack.getKeys(false)) {
+            if (!Set.of("model", "textures", "texture", "generate_model").contains(child)) {
+                report.unsupported(key + ".Pack." + child);
+            }
+        }
+        if (pack.contains("model") && (pack.contains("textures") || pack.contains("texture"))) {
+            report.unsupported(key + ".Pack.textures (not used because Pack.model is set)");
+        }
+    }
+
+    private static void reportBlockKeys(@NotNull String key,
+                                        @NotNull ConfigurationSection item,
+                                        @Nullable ConfigurationSection mechanics,
+                                        @Nullable ConfigurationSection blockMechanic,
+                                        @NotNull String blockMechanicName,
+                                        @NotNull ImportReport report) {
+        for (String child : item.getKeys(false)) {
+            if (!CONVERTED_BLOCK_KEYS.contains(child)) {
+                report.unsupported(key + "." + child);
+            }
+        }
+        if (blockMechanic != null) {
+            for (String child : blockMechanic.getKeys(false)) {
+                if (!Set.of("custom_variation", "model", "hardness").contains(child)) {
+                    report.unsupported(key + ".Mechanics." + blockMechanicName + "." + child);
+                }
+            }
+        }
+        if (mechanics != null) {
+            for (String child : mechanics.getKeys(false)) {
+                if (!Set.of("noteblock", "block", "furniture").contains(child)) {
+                    report.unsupported(key + ".Mechanics." + child);
+                }
+            }
         }
     }
 

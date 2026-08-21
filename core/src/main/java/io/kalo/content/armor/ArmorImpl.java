@@ -13,11 +13,13 @@ public final class ArmorImpl extends ItemImpl implements Armor {
     private final ImmutableItemStack armorItemStack;
 
     public ArmorImpl(@NotNull ArmorDefinition definition, @NotNull List<FeatureBuilder> features) {
-        super(definition.item(), features);
+        // Compile the completed armor stack in one pass. The old path built and emitted
+        // an event for a plain item, threw that stack away, then built and emitted a
+        // second event for the armor before its equippable component was attached.
+        super(definition.item(), features,
+                item -> JavaArmorItemCompiler.compile(item, definition));
         this.armorDefinition = definition;
-        // ItemImpl already built a plain item stack; rebuild it with the equippable
-        // component so the piece can actually be worn.
-        this.armorItemStack = ImmutableItemStack.of(JavaArmorItemCompiler.compile(this));
+        this.armorItemStack = super.itemStack();
     }
 
     @Override

@@ -44,8 +44,11 @@ public record GlyphDefinition(
             throw new IllegalArgumentException(
                     "ascent (" + ascent + ") must not exceed height (" + height + ")");
         }
-        if (character <= 0) {
-            throw new IllegalArgumentException("character must be a positive codepoint");
+        if (!Character.isValidCodePoint(character) || character == 0
+                || (character >= Character.MIN_SURROGATE && character <= Character.MAX_SURROGATE)) {
+            throw new IllegalArgumentException(
+                    "character must be a valid Unicode scalar value, got U+"
+                            + Integer.toHexString(character).toUpperCase(java.util.Locale.ROOT));
         }
     }
 

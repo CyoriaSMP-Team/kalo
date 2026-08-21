@@ -11,6 +11,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.jetbrains.annotations.NotNull;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.Level;
@@ -44,7 +45,7 @@ public final class JavaPackCompiler {
     public static void compileItems(@NotNull ResourcePack pack, @NotNull Iterable<Item> items) {
         // Sorted so the emitted lang file is stable between runs, which keeps the pack
         // hash stable and stops clients re-downloading an unchanged pack.
-        Map<String, String> translations = new TreeMap<>();
+        Map<String, Map<String, String>> translations = new TreeMap<>();
 
         for (Item item : items) {
             // Everything including definition() is inside the try: one broken item must
@@ -114,7 +115,7 @@ public final class JavaPackCompiler {
         return root;
     }
 
-    private static void collectTranslation(@NotNull Map<String, String> translations,
+    private static void collectTranslation(@NotNull Map<String, Map<String, String>> translations,
                                            @NotNull ItemDefinition definition) {
         Component name = definition.display().name();
         // An item with an explicit name carries it on the stack itself and needs no
@@ -122,23 +123,34 @@ public final class JavaPackCompiler {
         String value = name != null
                 ? PlainTextComponentSerializer.plainText().serialize(name)
                 : humanize(definition.key().value());
-        translations.put(definition.translationKey(), value);
+        translations.computeIfAbsent(definition.key().namespace(), ignored -> new TreeMap<>())
+                .put(definition.translationKey(), value);
     }
 
-    private static void writeTranslations(@NotNull ResourcePack pack, @NotNull Map<String, String> translations) {
-        // Grouped by namespace so each pack's translations land in its own lang file
-        // rather than all packs fighting over one.
-        Map<String, JsonObject> byNamespace = new TreeMap<>();
-        for (Map.Entry<String, String> entry : translations.entrySet()) {
-            // translation keys are "item.<namespace>.<name>"
-            String[] parts = entry.getKey().split("\\.", 3);
-            String namespace = parts.length >= 2 ? parts[1] : "minecraft";
-            byNamespace.computeIfAbsent(namespace, ignored -> new JsonObject())
-                    .addProperty(entry.getKey(), entry.getValue());
-        }
+    private static void writeTranslations(@NotNull ResourcePack pack,
+                                          @NotNull Map<String, Map<String, String>> translations) {
+        translations.forEach((namespace, entries) -> {
+            JsonObject json = new JsonObject();
+            entries.forEach(json::addProperty);
 
-        byNamespace.forEach((namespace, json) ->
-                pack.file("assets/" + namespace + "/lang/" + DEFAULT_LANGUAGE + ".json", Json.writable(json)));
+            String path = "assets/" + namespace + "/lang/" + DEFAULT_LANGUAGE + ".json";
+            io.kalo.pack.Writable existing = pack.file(path);
+            if (existing != null) {
+                // Items and armor compile in separate passes, and blocks may have written
+                // this namespace first. Language files are additive: replacing one here
+                // makes whichever content type ran last erase every earlier name.
+                try {
+                    JsonObject merged = com.google.gson.JsonParser.parseString(
+                            new String(existing.toByteArray(), StandardCharsets.UTF_8)).getAsJsonObject();
+                    json.entrySet().forEach(entry -> merged.add(entry.getKey(), entry.getValue()));
+                    pack.file(path, Json.writable(merged));
+                    return;
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Could not merge into existing lang file " + path, e);
+                }
+            }
+            pack.file(path, Json.writable(json));
+        });
     }
 
     /** {@code ruby_sword} to {@code Ruby Sword}, so an unnamed item still reads sensibly. */

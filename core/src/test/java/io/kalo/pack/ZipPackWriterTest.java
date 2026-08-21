@@ -18,6 +18,7 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ZipPackWriterTest {
@@ -95,6 +96,18 @@ class ZipPackWriterTest {
 
         assertTrue(pack.files().containsKey("assets/testpack/a.json"));
         assertTrue(pack.files().containsKey("assets/testpack/b.json"));
+    }
+
+    @Test
+    void rejectsTraversalAndEmptyPathSegments() {
+        ResourcePack pack = pack();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> pack.file("../outside.txt", Writable.string("unsafe")));
+        assertThrows(IllegalArgumentException.class,
+                () -> pack.file("assets/test//item.json", Writable.string("unsafe")));
+        assertThrows(IllegalArgumentException.class,
+                () -> pack.file("assets\\test\\..\\outside.txt", Writable.string("unsafe")));
     }
 
     @Test

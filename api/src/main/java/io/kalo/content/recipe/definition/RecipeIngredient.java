@@ -14,6 +14,12 @@ public sealed interface RecipeIngredient {
 
     /** A vanilla item, named the way the game names it, e.g. {@code minecraft:diamond}. */
     record Vanilla(@NotNull Key item) implements RecipeIngredient {
+        public Vanilla {
+            if (!item.namespace().equals("minecraft")) {
+                throw new IllegalArgumentException(
+                        "a vanilla ingredient must use the minecraft namespace, got " + item.asString());
+            }
+        }
     }
 
     /** Another piece of Kalo content, e.g. {@code mypack:ruby}. */

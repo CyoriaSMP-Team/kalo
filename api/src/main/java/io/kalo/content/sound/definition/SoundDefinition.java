@@ -40,10 +40,10 @@ public record SoundDefinition(
      */
     public record SoundFile(@NotNull Key file, float volume, float pitch, int weight) {
         public SoundFile {
-            if (volume < 0 || volume > 1) {
+            if (!Float.isFinite(volume) || volume < 0 || volume > 1) {
                 throw new IllegalArgumentException("volume must be within 0..1, got " + volume);
             }
-            if (pitch <= 0) {
+            if (!Float.isFinite(pitch) || pitch <= 0) {
                 throw new IllegalArgumentException("pitch must be positive, got " + pitch);
             }
             if (weight < 1) {

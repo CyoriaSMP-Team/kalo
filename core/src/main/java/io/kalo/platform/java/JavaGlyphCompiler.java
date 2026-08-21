@@ -46,10 +46,11 @@ public final class JavaGlyphCompiler {
 
     public static void compileGlyphs(@NotNull ResourcePack pack, @NotNull Iterable<GlyphDefinition> glyphs) {
         Map<Key, List<GlyphDefinition>> byFont = new TreeMap<>(java.util.Comparator.comparing(Key::asString));
-        Map<Integer, String> claimed = new LinkedHashMap<>();
+        Map<Key, Map<Integer, String>> claimed = new LinkedHashMap<>();
 
         for (GlyphDefinition glyph : glyphs) {
-            String previous = claimed.putIfAbsent(glyph.character(), glyph.key().asString());
+            String previous = claimed.computeIfAbsent(glyph.font(), ignored -> new LinkedHashMap<>())
+                    .putIfAbsent(glyph.character(), glyph.key().asString());
             if (previous != null) {
                 // Two glyphs on one character means one is invisible, and which one wins
                 // is down to file order — worth naming both rather than leaving a mystery.

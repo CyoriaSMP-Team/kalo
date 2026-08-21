@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -51,7 +52,7 @@ public final class ImportReport {
     }
 
     public @NotNull @Unmodifiable Set<String> unsupported() {
-        return Set.copyOf(unsupported);
+        return Collections.unmodifiableSet(new LinkedHashSet<>(unsupported));
     }
 
     public @NotNull @Unmodifiable List<String> warnings() {
@@ -65,7 +66,7 @@ public final class ImportReport {
     /** A human summary, one line per fact, for printing to a console or a command sender. */
     public @NotNull List<String> lines() {
         List<String> lines = new ArrayList<>();
-        lines.add("Imported " + imported.size() + " item(s)");
+        lines.add("Imported " + imported.size() + " content definition(s)");
 
         if (!failed.isEmpty()) {
             lines.add("Failed (" + failed.size() + "):");

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -143,6 +144,48 @@ class ImportersTest {
 
         assertEquals("ruby", normalised.getString("r.ingredients.R.oraxen_item"));
         assertEquals("ruby_sword", normalised.getString("r.result.oraxen_item"));
+    }
+
+    @Test
+    void nexoNormalisationOnlyRenamesKeysNotUserText() {
+        YamlConfiguration original = yaml("""
+                r:
+                  description: "keep nexo_item: literally"
+                  ingredient:
+                    nexo_type: PAPER
+                """);
+
+        YamlConfiguration normalised = NexoImporter.normalise(original);
+
+        assertEquals("keep nexo_item: literally", normalised.getString("r.description"));
+        assertEquals("PAPER", normalised.getString("r.ingredient.minecraft_type"));
+        assertEquals("keep nexo_item: literally", original.getString("r.description"),
+                "normalising must not mutate the caller's configuration");
+    }
+
+    @Test
+    void nexoNormalisationRejectsAliasCollisionsInsteadOfOverwritingOne() {
+        assertThrows(IllegalArgumentException.class, () -> NexoImporter.normalise(yaml("""
+                r:
+                  nexo_item: ruby
+                  oraxen_item: sapphire
+                """)));
+    }
+
+    @Test
+    void unsupportedNekoTypesAreNotReportedAsImported() {
+        ImportReport report = new ImportReport();
+        YamlConfiguration out = yaml(new NekoImporter().convert(yaml("""
+                custom_block:
+                  type: block
+                  properties:
+                    type: STONE
+                """), "mypack", report));
+
+        assertTrue(report.imported().isEmpty(), report.imported().toString());
+        assertTrue(report.unsupported().stream().anyMatch(path -> path.contains("custom_block.type")),
+                report.unsupported().toString());
+        assertNull(out.get("custom_block"));
     }
 
     @Test

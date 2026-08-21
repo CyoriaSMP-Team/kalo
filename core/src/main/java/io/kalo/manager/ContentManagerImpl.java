@@ -18,7 +18,10 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Optional;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class ContentManagerImpl implements ContentManager, Managerial, Reloadable, Listener {
@@ -50,18 +53,69 @@ public final class ContentManagerImpl implements ContentManager, Managerial, Rel
             return;
         }
 
+        // Stable discovery makes duplicate-id diagnostics and first-load behaviour
+        // reproducible across filesystems.
+        Arrays.sort(packFolders, Comparator.comparing(File::getName));
+
         int loadedPacksCnt = 0;
         for (File packFolder : packFolders) {
-            ContentsPack pack = PackLoader.loadPack(packFolder);
+            ContentsPack pack = PackLoader.loadPack(packFolder, id -> {
+                Key key = ContentsPackImpl.createKey(id);
+                if (registries.contentsPacks().get(key).isEmpty()) {
+                    return true;
+                }
+                LOGGER.warning("Skipping pack at " + packFolder + ": duplicate pack id '" + id + "'");
+                return false;
+            });
             if (pack == null) {
                 continue;
             }
 
-            registries.contentsPacks().register(ContentsPackImpl.createKey(pack.id()), pack);
-            registries.mergeAll(pack.registries());
-            loadedPacksCnt++;
+            net.kyori.adventure.key.Key packKey = ContentsPackImpl.createKey(pack.id());
+            if (registries.contentsPacks().get(packKey).isPresent()) {
+                LOGGER.warning("Skipping pack at " + pack.packFolder() + ": duplicate pack id '"
+                        + pack.id() + "'");
+                continue;
+            }
+
+            String conflict = firstConflict(registries, pack.registries());
+            if (conflict != null) {
+                LOGGER.warning("Skipping pack '" + pack.id() + "' at " + pack.packFolder()
+                        + ": registry key '" + conflict + "' is already registered");
+                continue;
+            }
+
+            try {
+                // Preflight above keeps mergeAll atomic across its four registry merges;
+                // without it a late conflict could leave half a rejected pack registered.
+                registries.mergeAll(pack.registries());
+                registries.contentsPacks().register(packKey, pack);
+                loadedPacksCnt++;
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.WARNING, "Could not register pack '" + pack.id()
+                        + "' from " + pack.packFolder(), e);
+            }
         }
         LOGGER.info("Loaded " + loadedPacksCnt + " packs!");
+    }
+
+    private static String firstConflict(@NotNull RegistryManager.GlobalRegistries target,
+                                        @NotNull io.kalo.registry.Registries source) {
+        String conflict = firstConflict(target.item(), source.item());
+        if (conflict == null) conflict = firstConflict(target.block(), source.block());
+        if (conflict == null) conflict = firstConflict(target.furniture(), source.furniture());
+        if (conflict == null) conflict = firstConflict(target.armor(), source.armor());
+        return conflict;
+    }
+
+    private static <T> String firstConflict(@NotNull io.kalo.registry.Registry<T> target,
+                                            @NotNull io.kalo.registry.Registry<T> source) {
+        for (it.unimi.dsi.fastutil.Pair<Key, T> entry : source.entries()) {
+            if (target.get(entry.key()).isPresent()) {
+                return entry.key().asString();
+            }
+        }
+        return null;
     }
 
     @Override
@@ -82,6 +136,21 @@ public final class ContentManagerImpl implements ContentManager, Managerial, Rel
         if (id == null) {
             return Optional.empty();
         }
-        return RegistryManager.GlobalRegistries.registries().item().get(Key.key(id));
+        final Key key;
+        try {
+            key = Key.key(id);
+        } catch (RuntimeException ignored) {
+            // Item PDC can be edited by commands/tools; malformed data is not content.
+            return Optional.empty();
+        }
+
+        RegistryManager.GlobalRegistries registries = RegistryManager.GlobalRegistries.registries();
+        Item item = registries.item().get(key).orElse(null);
+        if (item != null) {
+            return Optional.of(item);
+        }
+        // Armor has an item form and carries the same item id marker, but lives in its
+        // own registry so a lookup limited to item() made it invisible to this API.
+        return registries.armor().get(key).map(Item.class::cast);
     }
 }

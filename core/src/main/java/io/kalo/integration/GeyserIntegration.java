@@ -5,7 +5,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
 import java.util.logging.Level;
 
 /**
@@ -17,8 +16,14 @@ import java.util.logging.Level;
  */
 public final class GeyserIntegration {
 
-    /** Geyser's plugin name differs by platform; a server runs at most one of these. */
-    private static final List<String> GEYSER_PLUGINS = List.of("Geyser-Spigot", "Geyser-Paper", "Geyser");
+    /**
+     * The official Bukkit/Paper bootstrap name. This must stay aligned with the optional
+     * join-classpath dependency in paper-plugin.yml: detecting an unrelated/fork name
+     * without that classloader edge only leads to a guaranteed LinkageError.
+     */
+    private static final String GEYSER_PLUGIN = "Geyser-Spigot";
+    // Object keeps this guard class free of Geyser types in its fields and signatures.
+    private static Object registration;
 
     private GeyserIntegration() {
     }
@@ -29,12 +34,15 @@ public final class GeyserIntegration {
      * @return whether the native path is active; when false the standalone extension is
      *         the way Bedrock content gets registered
      */
-    public static boolean registerIfPresent(@NotNull Plugin plugin) {
+    public static synchronized boolean registerIfPresent(@NotNull Plugin plugin) {
+        if (registration != null) {
+            return true;
+        }
         if (!geyserPresent()) {
             return false;
         }
         try {
-            GeyserBridge.register(plugin);
+            registration = GeyserBridge.register(plugin);
             return true;
         } catch (Throwable t) {
             // Throwable: a Geyser version whose API has moved surfaces as LinkageError,
@@ -42,6 +50,20 @@ public final class GeyserIntegration {
             Plugins.logger().log(Level.WARNING,
                     "Geyser is installed but could not be hooked; use the standalone extension instead", t);
             return false;
+        }
+    }
+
+    /** Releases Geyser's owned subscriptions when Kalo is disabled. */
+    public static synchronized void unregister() {
+        Object registered = registration;
+        registration = null;
+        if (registered == null) {
+            return;
+        }
+        try {
+            GeyserBridge.unregister(registered);
+        } catch (Throwable t) {
+            Plugins.logger().log(Level.WARNING, "Could not unregister Kalo from Geyser", t);
         }
     }
 
@@ -56,12 +78,7 @@ public final class GeyserIntegration {
     }
 
     private static boolean geyserPresent() {
-        for (String name : GEYSER_PLUGINS) {
-            Plugin plugin = Bukkit.getPluginManager().getPlugin(name);
-            if (plugin != null && plugin.isEnabled()) {
-                return true;
-            }
-        }
-        return false;
+        Plugin plugin = Bukkit.getPluginManager().getPlugin(GEYSER_PLUGIN);
+        return plugin != null && plugin.isEnabled();
     }
 }

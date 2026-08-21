@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * How a custom block looks.
@@ -22,8 +23,36 @@ public sealed interface BlockModelDefinition {
 
     /** A cube with a per-face texture. Missing faces fall back to {@code all}. */
     record Cube(@NotNull @Unmodifiable Map<String, Key> faces) implements BlockModelDefinition {
+        private static final Set<String> ALLOWED_FACES = Set.of(
+                "all", "particle", "down", "bottom", "up", "top",
+                "north", "south", "west", "east");
+
         public Cube {
             faces = Map.copyOf(faces);
+            if (faces.isEmpty()) {
+                throw new IllegalArgumentException("a cube needs at least one texture");
+            }
+            for (String face : faces.keySet()) {
+                if (!ALLOWED_FACES.contains(face)) {
+                    throw new IllegalArgumentException("unknown cube face '" + face + "'");
+                }
+            }
+            if (faces.containsKey("up") && faces.containsKey("top")) {
+                throw new IllegalArgumentException("cube cannot declare both 'up' and its alias 'top'");
+            }
+            if (faces.containsKey("down") && faces.containsKey("bottom")) {
+                throw new IllegalArgumentException("cube cannot declare both 'down' and its alias 'bottom'");
+            }
+            if (!faces.containsKey("all")) {
+                boolean complete = (faces.containsKey("up") || faces.containsKey("top"))
+                        && (faces.containsKey("down") || faces.containsKey("bottom"))
+                        && faces.containsKey("north") && faces.containsKey("south")
+                        && faces.containsKey("west") && faces.containsKey("east");
+                if (!complete) {
+                    throw new IllegalArgumentException(
+                            "cube needs an 'all' fallback or a texture for every face");
+                }
+            }
         }
     }
 

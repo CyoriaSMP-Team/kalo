@@ -1,12 +1,9 @@
 package io.kalo.integration;
 
-import io.kalo.content.item.ItemImpl;
 import io.kalo.manager.RegistryManager;
 import io.kalo.utils.Constants;
 import io.kalo.utils.Plugins;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
-import net.kyori.adventure.key.Key;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -38,8 +35,16 @@ public final class PlaceholderApiHook extends PlaceholderExpansion {
      * loaded. Named {@code install} rather than {@code register} to avoid colliding with
      * {@link PlaceholderExpansion#register()}, which this calls.
      */
-    static void install() {
-        new PlaceholderApiHook().register();
+    static @Nullable Object install() {
+        PlaceholderApiHook hook = new PlaceholderApiHook();
+        return hook.register() ? hook : null;
+    }
+
+    /** Object-typed so the guarding integration never exposes a PlaceholderAPI type. */
+    static void uninstall(@NotNull Object installed) {
+        if (installed instanceof PlaceholderApiHook hook) {
+            hook.unregister();
+        }
     }
 
     @Override
@@ -85,18 +90,19 @@ public final class PlaceholderApiHook extends PlaceholderExpansion {
         }
 
         if (params.equals("held_id")) {
-            String id = heldId(player);
-            return id != null ? id : "";
+            HeldContentResolver.ResolvedContent held = heldContent(player, registries);
+            return held != null ? held.id() : "";
         }
         if (params.equals("held_name")) {
-            return heldName(player);
+            return heldName(player, registries);
         }
         if (params.startsWith("is_held_")) {
-            String id = heldId(player);
-            return String.valueOf(params.substring("is_held_".length()).equals(id));
+            HeldContentResolver.ResolvedContent held = heldContent(player, registries);
+            return String.valueOf(held != null
+                    && params.substring("is_held_".length()).equals(held.id()));
         }
         if (params.startsWith("count_")) {
-            return String.valueOf(count(player, params.substring("count_".length())));
+            return String.valueOf(count(player, params.substring("count_".length()), registries));
         }
 
         // null rather than "" so PlaceholderAPI leaves an unknown placeholder visible
@@ -104,33 +110,39 @@ public final class PlaceholderApiHook extends PlaceholderExpansion {
         return null;
     }
 
-    private static @Nullable String heldId(@NotNull Player player) {
+    private static @Nullable HeldContentResolver.ResolvedContent heldContent(
+            @NotNull Player player,
+            @NotNull RegistryManager.GlobalRegistries registries
+    ) {
         ItemStack held = player.getInventory().getItemInMainHand();
-        return held.isEmpty() ? null : ItemImpl.idOf(held);
+        return held.isEmpty() ? null : HeldContentResolver.resolve(held, registries);
     }
 
-    private static @NotNull String heldName(@NotNull Player player) {
-        String id = heldId(player);
-        if (id == null) {
+    private static @NotNull String heldName(
+            @NotNull Player player,
+            @NotNull RegistryManager.GlobalRegistries registries
+    ) {
+        HeldContentResolver.ResolvedContent held = heldContent(player, registries);
+        if (held == null) {
             return "";
         }
-        return RegistryManager.GlobalRegistries.registries().item().get(Key.key(id))
-                .map(item -> {
-                    var name = item.definition().display().name();
-                    return name != null
-                            ? PlainTextComponentSerializer.plainText().serialize(name)
-                            : item.key().value();
-                })
-                .orElse("");
+        return HeldContentResolver.displayName(held.content());
     }
 
-    private static int count(@NotNull Player player, @NotNull String id) {
+    private static int count(
+            @NotNull Player player,
+            @NotNull String id,
+            @NotNull RegistryManager.GlobalRegistries registries
+    ) {
         int total = 0;
         for (ItemStack stack : player.getInventory().getContents()) {
-            if (stack != null && !stack.isEmpty() && id.equals(ItemImpl.idOf(stack))) {
+            HeldContentResolver.ResolvedContent content = stack == null || stack.isEmpty()
+                    ? null : HeldContentResolver.resolve(stack, registries);
+            if (content != null && id.equals(content.id())) {
                 total += stack.getAmount();
             }
         }
         return total;
     }
+
 }

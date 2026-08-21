@@ -3,12 +3,16 @@ package io.kalo.content.recipe;
 import io.kalo.content.recipe.definition.RecipeDefinition;
 import io.kalo.content.recipe.definition.RecipeIngredient;
 import io.kalo.content.recipe.definition.RecipeResult;
+import io.kalo.content.PackContext;
+import io.kalo.registry.RegistriesImpl;
 import net.kyori.adventure.key.Key;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.io.File;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -118,6 +122,38 @@ class RecipeParserTest {
     }
 
     @Test
+    void shapedRecipesMustBeRectangularAndContainAnIngredient() {
+        RecipeIngredient stick = new RecipeIngredient.Vanilla(Key.key("minecraft", "stick"));
+
+        assertThrows(IllegalArgumentException.class, () -> new RecipeDefinition.Shaped(
+                Key.key("mypack", "ragged"), RecipeResult.of(Key.key("mypack", "result")),
+                List.of("RR", "R"), Map.of('R', stick)));
+        assertThrows(IllegalArgumentException.class, () -> new RecipeDefinition.Shaped(
+                Key.key("mypack", "empty"), RecipeResult.of(Key.key("mypack", "result")),
+                List.of("   "), Map.of()));
+    }
+
+    @Test
+    void unusedIngredientKeysAreRejectedAtParseTime() {
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> parse("""
+                recipe:
+                  result: ruby_sword
+                  pattern:
+                    - " R "
+                  ingredients:
+                    R: mypack:ruby
+                    S: minecraft:stick
+                """));
+        assertEquals(true, error.getMessage().contains("never used"), error.getMessage());
+    }
+
+    @Test
+    void vanillaIngredientsCannotSmuggleInAnotherNamespace() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new RecipeIngredient.Vanilla(Key.key("mypack", "stick")));
+    }
+
+    @Test
     void aShapelessRecipeCannotExceedTheGrid() {
         List<RecipeIngredient> ten = java.util.Collections.nCopies(10,
                 new RecipeIngredient.Vanilla(Key.key("minecraft", "stick")));
@@ -153,5 +189,28 @@ class RecipeParserTest {
                 () -> new RecipeResult(Key.key("mypack", "x"), 0));
         assertThrows(IllegalArgumentException.class,
                 () -> new RecipeResult(Key.key("mypack", "x"), 100));
+    }
+
+    @Test
+    void duplicateRecipeKeysKeepTheFirstDefinition() {
+        RecipeType type = new RecipeType();
+        PackContext pack = new PackContext("mypack", new File("."));
+        RegistriesImpl registries = new RegistriesImpl();
+        ConfigurationSection first = java.util.Objects.requireNonNull(yaml("""
+                same:
+                  result: ruby
+                  ingredients:
+                    a: minecraft:stick
+                """).getConfigurationSection("same"));
+        ConfigurationSection second = java.util.Objects.requireNonNull(yaml("""
+                same:
+                  result: sapphire
+                  ingredients:
+                    a: minecraft:diamond
+                """).getConfigurationSection("same"));
+
+        assertEquals(true, type.load(pack, registries, first));
+        assertEquals(false, type.load(pack, registries, second));
+        assertEquals(1, type.size());
     }
 }

@@ -33,6 +33,8 @@ public final class MappedRegistry<T> implements Registry<T> {
 
     @Override
     public @NotNull Iterator<T> iterator() {
-        return map.values().iterator();
+        // Registry only exposes reads. HashMap's values iterator supports remove(),
+        // which previously let callers mutate this supposedly read-only snapshot.
+        return List.copyOf(map.values()).iterator();
     }
 }

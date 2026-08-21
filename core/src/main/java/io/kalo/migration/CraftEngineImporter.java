@@ -7,7 +7,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -145,10 +144,7 @@ public final class CraftEngineImporter implements Importer {
 
         String material = content.getString("material");
         if (material != null && kaloType.equals("item")) {
-            Material parsed = Material.matchMaterial(material.toUpperCase(Locale.ROOT));
-            if (parsed == null) {
-                throw new IllegalArgumentException("unknown material '" + material + "'");
-            }
+            Material parsed = MigrationMaterials.item(material);
             converted.put("java", Map.of("base_material", parsed.name()));
         }
 

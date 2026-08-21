@@ -65,26 +65,34 @@ public final class NexoImporter implements Importer {
         return oraxen.convert(normalised, namespace, report);
     }
 
-    /**
-     * Rewrites Nexo's renamed keys to their Oraxen equivalents.
-     *
-     * <p>Done on a copy, by re-serialising: mutating the caller's configuration would
-     * surprise anything that reads it afterwards, and a copy costs nothing at import
-     * scale.</p>
-     */
+    /** Rewrites Nexo's renamed keys to their Oraxen equivalents on a structural copy. */
     static @NotNull YamlConfiguration normalise(@NotNull YamlConfiguration source) {
-        String yaml = source.saveToString()
-                .replace("nexo_item:", "oraxen_item:")
-                .replace("nexo_type:", "minecraft_type:");
-
         YamlConfiguration normalised = new YamlConfiguration();
-        try {
-            normalised.loadFromString(yaml);
-        } catch (Exception e) {
-            // Cannot happen for text this class just serialised, but failing loudly beats
-            // silently importing nothing.
-            throw new IllegalStateException("Could not re-read the normalised Nexo config", e);
-        }
+        copySection(source, normalised);
         return normalised;
+    }
+
+    private static void copySection(@NotNull ConfigurationSection source,
+                                    @NotNull ConfigurationSection target) {
+        for (String sourceKey : source.getKeys(false)) {
+            String targetKey = switch (sourceKey) {
+                case "nexo_item" -> "oraxen_item";
+                case "nexo_type" -> "minecraft_type";
+                default -> sourceKey;
+            };
+            if (target.getKeys(false).contains(targetKey)) {
+                throw new IllegalArgumentException("Nexo config contains both '" + sourceKey
+                        + "' and its normalised key '" + targetKey + "'");
+            }
+
+            ConfigurationSection child = source.getConfigurationSection(sourceKey);
+            if (child != null) {
+                copySection(child, target.createSection(targetKey));
+            } else {
+                // Scalar values are copied verbatim. In particular, text containing the
+                // words "nexo_item:" is content, not a YAML key to rewrite.
+                target.set(targetKey, source.get(sourceKey));
+            }
+        }
     }
 }
