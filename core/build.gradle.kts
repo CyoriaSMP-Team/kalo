@@ -23,6 +23,9 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.12.3")
     // Soft dependency: touched only when Geyser shares this JVM.
     compileOnly("org.geysermc.geyser:api:2.11.1-SNAPSHOT")
+    // compileOnly does not reach the test classpath, which left GeyserBridge — the primary
+    // Bedrock path — impossible to test rather than merely untested.
+    testImplementation("org.geysermc.geyser:api:2.11.1-SNAPSHOT")
 }
 
 tasks.named<Test>("test") {

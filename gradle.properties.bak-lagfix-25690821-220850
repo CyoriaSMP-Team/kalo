@@ -5,6 +5,3 @@ plugin_version=0.0.1
 minecraft_version=26.2
 paper_api_version=1.21.4-R0.1-SNAPSHOT
 paper_plugin_api_version=1.21.4
-
-# Keep interactive desktop responsive during AI-driven builds
-org.gradle.workers.max=6
