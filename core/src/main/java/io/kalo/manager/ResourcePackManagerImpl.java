@@ -332,8 +332,17 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
         try {
             BedrockPackWriter.write(new File(Constants.dataFolder(), "generated.mcpack"), result.pack().files());
-            java.nio.file.Files.write(new File(Constants.dataFolder(), "bedrock-mappings.json").toPath(),
-                    result.mappings().toByteArray());
+
+            // Geyser's own custom_mappings format, so a separate Geyser process needs no
+            // Kalo artifact inside it — copy these two files and its packs/ folder and it
+            // registers everything itself. Items and blocks version separately
+            // (format_version 2 and 1), which is why they cannot share one file.
+            File geyser = new File(Constants.dataFolder(), "geyser");
+            java.nio.file.Files.createDirectories(geyser.toPath());
+            java.nio.file.Files.write(new File(geyser, "kalo-items.json").toPath(),
+                    result.itemMappings().toByteArray());
+            java.nio.file.Files.write(new File(geyser, "kalo-blocks.json").toPath(),
+                    result.blockMappings().toByteArray());
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to write Bedrock output", e);
             // Say so, or Geyser blocks its palette event for the full timeout waiting for

@@ -485,28 +485,73 @@ public final class BedrockPackCompiler {
             pack.file("textures/terrain_texture.json", Json.writable(terrain));
         }
 
-        JsonObject mappings = new JsonObject();
-        mappings.addProperty("format_version", 2);
-        mappings.add("items", mappedItems);
-        // Blocks are registered by a Geyser extension at runtime rather than through the
-        // item mapping file, so they are recorded separately for it to read.
-        mappings.add("kalo:blocks", mappedBlocks);
-        if (!geometries.isEmpty()) {
-            mappings.add("kalo:geometries", geometries);
-        }
+        JsonObject itemMappings = new JsonObject();
+        itemMappings.addProperty("format_version", 2);
+        itemMappings.add("items", mappedItems);
 
         int itemDefinitions = mappedItems.entrySet().stream()
                 .mapToInt(entry -> entry.getValue().getAsJsonArray().size())
                 .sum();
-        return new Result(pack, Json.writable(mappings), mappedItems.size(), itemDefinitions,
-                mappedBlocks.size(), attachables, skipped, generation,
+        return new Result(pack, Json.writable(itemMappings), Json.writable(blockMappings()),
+                mappedItems.size(), itemDefinitions,
+                blockRegistrations.size(), attachables, skipped, generation,
                 List.copyOf(blockRegistrations));
     }
 
     /**
+     * Geyser's own custom-block mapping file, keyed by the Java state each block overrides.
+     *
+     * <p>Its own format, not Kalo's: Geyser reads {@code custom_mappings} natively, so a
+     * server that runs Geyser in a separate process needs no Kalo artifact inside it at
+     * all. Blocks use {@code format_version} 1 while items use 2, which is why these are
+     * two files rather than one.</p>
+     *
+     * <p>Virtual blocks are absent by definition — they have no carrier state to override,
+     * because on Java they are an entity wearing a block's appearance.</p>
+     */
+    private @NotNull JsonObject blockMappings() {
+        JsonObject blocks = new JsonObject();
+        for (BedrockBlockRegistration registration : blockRegistrations) {
+            if (registration.javaIdentifier() == null) {
+                continue;
+            }
+
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", registration.bedrockName());
+            if (registration.displayName() != null) {
+                entry.addProperty("display_name", registration.displayName());
+            }
+            entry.addProperty("geometry", registration.geometry());
+            entry.addProperty("destructible_by_mining", registration.hardness());
+            // Obtained through Kalo's own items, so a second copy in the Bedrock creative
+            // menu would only be confusing.
+            entry.addProperty("included_in_creative_inventory", false);
+
+            JsonObject materials = new JsonObject();
+            registration.materialInstances().forEach((slot, texture) -> {
+                JsonObject instance = new JsonObject();
+                instance.addProperty("texture", texture);
+                instance.addProperty("render_method", "opaque");
+                instance.addProperty("face_dimming", true);
+                instance.addProperty("ambient_occlusion", true);
+                materials.add(slot, instance);
+            });
+            entry.add("material_instances", materials);
+
+            blocks.add(registration.javaIdentifier(), entry);
+        }
+
+        JsonObject mappings = new JsonObject();
+        mappings.addProperty("format_version", 1);
+        mappings.add("blocks", blocks);
+        return mappings;
+    }
+
+    /**
      * @param pack        the Bedrock pack, ready to be written as {@code .mcpack}
-     * @param mappings    the Geyser mapping file, which lives beside the pack rather
-     *                    than inside it
+     * @param itemMappings  Geyser's custom_mappings file for items (format_version 2)
+     * @param blockMappings Geyser's custom_mappings file for blocks (format_version 1);
+     *                      a separate file because the two formats version separately
      * @param mappedCount  how many vanilla items carry at least one custom definition
      * @param itemCount    how many custom items exist across them — the number a reader
      *                     expects, since a thousand custom items may all sit on PAPER
@@ -515,7 +560,8 @@ public final class BedrockPackCompiler {
      * @param skippedCount content Bedrock did not get, whether because it needs geometry
      *                     Kalo cannot produce or because Java could not place it either
      */
-    public record Result(@NotNull ResourcePack pack, @NotNull Writable mappings,
+    public record Result(@NotNull ResourcePack pack,
+                         @NotNull Writable itemMappings, @NotNull Writable blockMappings,
                          int mappedCount, int itemCount, int blockCount, int armorCount,
                          int skippedCount,
                          @NotNull BedrockRegistrationSnapshot.Generation generation,

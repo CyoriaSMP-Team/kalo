@@ -36,9 +36,23 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BedrockPackCompilerTest {
+
+    /** One block's entry in Geyser's custom_mappings file, keyed by the state it overrides. */
+    private static JsonObject blockEntry(BedrockPackCompiler.Result result, String javaIdentifier)
+            throws IOException {
+        return json(result.blockMappings()).getAsJsonObject("blocks").getAsJsonObject(javaIdentifier);
+    }
+
+    /** The texture named by one material instance slot. */
+    private static String materialTexture(JsonObject entry, String slot) {
+        return entry.getAsJsonObject("material_instances").getAsJsonObject(slot).get("texture").getAsString();
+    }
+
+    private static final String NOTE_7 = "minecraft:note_block[instrument=harp,note=3,powered=true]";
 
     /** Most cases only care about the state index, so name the default carrier once. */
     private static BlockStateAllocator.Assignment note(int state) {
@@ -101,7 +115,7 @@ class BedrockPackCompilerTest {
         compiler.add(List.of(new StubItem(sprite("ruby_sword"))));
         compiler.add(List.of(new StubItem(sprite("ruby_helmet"))));
 
-        JsonObject mappings = json(compiler.finish().mappings());
+        JsonObject mappings = json(compiler.finish().itemMappings());
         JsonObject items = mappings.getAsJsonObject("items");
 
         // Both map onto PAPER by default, so they share one vanilla item entry.
@@ -127,7 +141,7 @@ class BedrockPackCompilerTest {
         // Geyser shows this verbatim; the key would appear literally in the inventory.
         ResourcePack java = javaPackWith("assets/testpack/textures/item/ruby_sword.png");
 
-        JsonObject mappings = json(compile(java, List.of(new StubItem(sprite("ruby_sword")))).mappings());
+        JsonObject mappings = json(compile(java, List.of(new StubItem(sprite("ruby_sword")))).itemMappings());
         JsonObject entry = mappings.getAsJsonObject("items")
                 .getAsJsonArray("minecraft:paper").get(0).getAsJsonObject();
 
@@ -139,7 +153,7 @@ class BedrockPackCompilerTest {
     void iconUsesGeysersV2BedrockOptionsSection() throws IOException {
         ResourcePack java = javaPackWith("assets/testpack/textures/item/ruby_sword.png");
 
-        JsonObject entry = json(compile(java, List.of(new StubItem(sprite("ruby_sword")))).mappings())
+        JsonObject entry = json(compile(java, List.of(new StubItem(sprite("ruby_sword")))).itemMappings())
                 .getAsJsonObject("items")
                 .getAsJsonArray("minecraft:paper").get(0).getAsJsonObject();
 
@@ -158,7 +172,7 @@ class BedrockPackCompilerTest {
                 .behaviour(new ItemBehaviour(1, 250, false))
                 .build();
 
-        JsonObject components = json(compile(java, List.of(new StubItem(durable))).mappings())
+        JsonObject components = json(compile(java, List.of(new StubItem(durable))).itemMappings())
                 .getAsJsonObject("items")
                 .getAsJsonArray("minecraft:paper").get(0).getAsJsonObject()
                 .getAsJsonObject("components");
@@ -176,7 +190,7 @@ class BedrockPackCompilerTest {
                 .model(new ModelDefinition.Sprite(Key.key("testpack", "item/glinting")))
                 .build();
 
-        JsonObject components = json(compile(java, List.of(new StubItem(glinting))).mappings())
+        JsonObject components = json(compile(java, List.of(new StubItem(glinting))).itemMappings())
                 .getAsJsonObject("items")
                 .getAsJsonArray("minecraft:paper").get(0).getAsJsonObject()
                 .getAsJsonObject("components");
@@ -263,11 +277,7 @@ class BedrockPackCompilerTest {
                         .getAsJsonObject("testpack_ruby_block").get("textures").getAsString());
         assertNotNull(result.pack().file("textures/blocks/testpack_ruby_block.png"));
 
-        JsonObject materials = json(result.mappings()).getAsJsonArray("kalo:blocks")
-                .get(0).getAsJsonObject().getAsJsonObject("material_instances");
-        assertEquals(Map.of("*", "testpack_ruby_block"),
-                materials.asMap().entrySet().stream().collect(Collectors.toMap(
-                        Map.Entry::getKey, entry -> entry.getValue().getAsString())));
+        assertEquals("testpack_ruby_block", materialTexture(blockEntry(result, NOTE_7), "*"));
     }
 
     @Test
@@ -305,11 +315,10 @@ class BedrockPackCompilerTest {
         assertFalse(atlas.has("testpack_faced_cube_particle"),
                 "Java's particle texture is an inventory-particle fallback, not a Bedrock cube face");
 
-        JsonObject materials = json(result.mappings()).getAsJsonArray("kalo:blocks")
-                .get(0).getAsJsonObject().getAsJsonObject("material_instances");
+        JsonObject entry = blockEntry(result, "minecraft:note_block[instrument=harp,note=4,powered=true]");
         assertEquals(Set.of("down", "up", "north", "south", "west", "east"),
-                materials.keySet());
-        assertEquals("testpack_faced_cube_up", materials.get("up").getAsString());
+                entry.getAsJsonObject("material_instances").keySet());
+        assertEquals("testpack_faced_cube_up", materialTexture(entry, "up"));
     }
 
     @Test
@@ -323,17 +332,25 @@ class BedrockPackCompilerTest {
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
         compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> note(7), Set.of());
 
-        JsonObject mappings = json(compiler.finish().mappings());
-        JsonObject record = mappings.getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
+        BedrockPackCompiler.Result result = compiler.finish();
 
-        assertEquals("testpack:ruby_block", record.get("java_key").getAsString());
-        assertEquals("geyser_custom:testpack_ruby_block", record.get("bedrock_identifier").getAsString());
-        assertEquals("native", record.get("java_mode").getAsString());
-        assertEquals(7, record.get("java_carrier_state").getAsInt());
-        assertEquals("minecraft:note_block[instrument=harp,note=3,powered=true]",
-                record.get("java_identifier").getAsString());
-        assertEquals("minecraft:geometry.full_block", record.get("geometry").getAsString());
-        assertEquals(1.5f, record.get("hardness").getAsFloat());
+        // In-process: the bridge reads this straight off the compiler.
+        io.kalo.platform.bedrock.BedrockBlockRegistration registration = result.registrations().getFirst();
+        assertEquals("testpack:ruby_block", registration.javaKey());
+        assertEquals("geyser_custom:testpack_ruby_block", registration.bedrockIdentifier());
+        assertEquals(NOTE_7, registration.javaIdentifier());
+        assertEquals("minecraft:geometry.full_block", registration.geometry());
+        assertEquals(1.5f, registration.hardness());
+
+        // Out of process: the same decision, in the file Geyser reads by itself. The
+        // overridden Java state is the key, which is how Geyser knows what to replace.
+        JsonObject entry = blockEntry(result, NOTE_7);
+        assertEquals("testpack_ruby_block", entry.get("name").getAsString());
+        assertEquals("minecraft:geometry.full_block", entry.get("geometry").getAsString());
+        assertEquals(1.5f, entry.get("destructible_by_mining").getAsFloat());
+        assertFalse(entry.get("included_in_creative_inventory").getAsBoolean());
+        assertEquals(1, json(result.blockMappings()).get("format_version").getAsInt(),
+                "Geyser versions its block mappings separately from its item mappings");
     }
 
     /**
@@ -377,10 +394,12 @@ class BedrockPackCompilerTest {
         BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
         compiler.addBlocks(List.of(new StubBlock(definition)), key -> note(99), Set.of());
 
-        JsonObject record = json(compiler.finish().mappings())
-                .getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
-        assertEquals("virtual", record.get("java_mode").getAsString());
-        assertFalse(record.has("java_carrier_state"));
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        assertNull(result.registrations().getFirst().javaIdentifier());
+        // A virtual block is an entity wearing a block's appearance, so there is no Java
+        // block state for Geyser to override and nothing to put in the mappings file.
+        assertTrue(json(result.blockMappings()).getAsJsonObject("blocks").isEmpty());
     }
 
     @Test
@@ -402,13 +421,10 @@ class BedrockPackCompilerTest {
         assertEquals(1, result.blockCount(), "a custom model should no longer be skipped");
         assertNotNull(result.pack().file("models/blocks/testpack_chair.geo.json"));
 
-        // The extension needs to know which geometry to apply to which block.
-        JsonObject mappings = json(result.mappings());
-        assertEquals("geometry.kalo.testpack_chair",
-                mappings.getAsJsonObject("kalo:geometries").get("testpack:chair").getAsString());
-        JsonObject record = mappings.getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
-        assertEquals("testpack_chair_all",
-                record.getAsJsonObject("material_instances").get("all").getAsString());
+        // Each block names its own geometry, so nothing needs a separate lookup table.
+        JsonObject entry = blockEntry(result, "minecraft:note_block[instrument=harp,note=2,powered=false]");
+        assertEquals("geometry.kalo.testpack_chair", entry.get("geometry").getAsString());
+        assertEquals("testpack_chair_all", materialTexture(entry, "all"));
         assertEquals("testpack_chair_all", json(result.pack().file("blocks.json"))
                 .getAsJsonObject("geyser_custom:testpack_chair").get("textures").getAsString());
         assertNotNull(result.pack().file("textures/blocks/testpack_chair_all.png"));

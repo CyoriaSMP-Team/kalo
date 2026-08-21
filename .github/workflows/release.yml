@@ -56,5 +56,4 @@ jobs:
             --title "$TAG" \
             --generate-notes \
             --target "${{ github.sha }}" \
-            build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar \
-            geyser-extension/build/libs/geyser-extension-${{ steps.version.outputs.plugin_version }}.jar
+            build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar

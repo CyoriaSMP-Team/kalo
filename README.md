@@ -373,9 +373,7 @@ Output: `build/libs/Kalo-<version>.jar`
 ### Modules
 
 - **`api`** — public API: content model, definitions, registries, features, pack model
-- **`core`** — implementation: managers, compilers, pack writer, commands
-- **`geyser-extension`** — runs inside Geyser, not Paper. Only needed when Geyser is a
-  separate process; when it shares the server JVM, `core` registers with Geyser directly
+- **`core`** — implementation: managers, compilers, pack writer, commands, Geyser bridge
 
 ## Migrating from another plugin
 
@@ -466,21 +464,20 @@ between to go stale, so regenerating content cannot leave Bedrock on an old copy
 
 ### Geyser running standalone
 
-A separate process cannot be reached from inside the server, so that setup needs the
-extension and needs the two generated files carried across by hand:
+A separate process cannot be reached from inside the server, so it reads the same
+decisions out of files instead. **There is no Kalo artifact to install inside Geyser** —
+these are Geyser's own `custom_mappings` files, which it reads natively:
 
-1. Put `geyser-extension-<version>.jar` in Geyser's `extensions/` folder.
-2. Copy `plugins/Kalo/bedrock-mappings.json` into `extensions/kalo/`, and again whenever
-   content changes.
-3. Copy `plugins/Kalo/generated.mcpack` into Geyser's `packs/` folder, and again whenever
-   content changes. **Skipping this registers the blocks but leaves them untextured** —
-   the extension does not attach the pack the way the in-process path does.
+1. Copy `plugins/Kalo/geyser/kalo-items.json` and `kalo-blocks.json` into Geyser's
+   `custom_mappings/` folder.
+2. Copy `plugins/Kalo/generated.mcpack` into Geyser's `packs/` folder.
 
-The extension does not fail when the mapping file is missing — Geyser often starts before
-the Paper side has generated one — it simply has nothing to register and says so.
+Repeat both whenever content changes. Items and blocks are two files because Geyser
+versions the two formats separately (`format_version` 2 and 1).
 
-Every copy step here is a chance to serve stale content. If you can run Geyser as a plugin
-on the server, do that instead.
+Every copy step is a chance to serve stale content, and nothing in a separate process can
+tell you when it happened. If you can run Geyser as a plugin on the server, do that
+instead — then there is nothing to copy at all.
 
 ## Roadmap
 
@@ -504,7 +501,7 @@ only been written — the middle column is the one worth reading before you inst
 |---|---|
 | **Bedrock, everything** | No Bedrock client has ever connected. Registration code runs and the pack compiles, but nothing has confirmed a Bedrock player sees an item icon, a placed block, or worn armor. This is the single biggest gap between what Kalo claims and what Kalo has proven. |
 | Bedrock virtual blocks | Placement and `ItemDisplay` rendering unconfirmed — see [docs/VIRTUAL_BLOCKS.md](docs/VIRTUAL_BLOCKS.md) |
-| Standalone-Geyser path | The extension is written and unit-tested, but the full copy-the-files setup has not been run |
+| Standalone-Geyser path | The mapping files are generated and unit-tested against Geyser's documented format, but the copy-the-files setup has not been run against a real standalone Geyser |
 | The 1.21.4 end of the version range | One jar spans 1.21.4 → 26.2 and `pack_format` auto-selects per version, but testing has happened on 26.2 only |
 | Oraxen / ItemsAdder import | Written against documented formats, never run against a real pack. Treat any import as a draft to review. |
 

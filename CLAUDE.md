@@ -84,21 +84,6 @@ Output: `build/libs/Kalo-{version}.jar`
 - `migration` — `OraxenImporter`, `ItemsAdderImporter`, `ImportReport`
 - `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
 
-### `geyser-extension` — runs inside Geyser, not Paper
-
-The fallback for servers that run Geyser as a **separate process**, which `GeyserBridge`
-cannot reach. It reads `bedrock-mappings.json` and registers the same content.
-
-The two halves are different processes, so they can only meet at a file — never at a live
-object. That constraint is not negotiable. What they *may* share is source: code compiled
-into both jars independently crosses no process boundary.
-
-> ⚠️ Today they share neither. `GeyserBridge` and `KaloExtension` each carry their own
-> copy of the Geyser-API calls, and the copies have already drifted — `hardness`,
-> `geometry` and empty-material handling differ, and only `GeyserBridge` registers the
-> resource pack. Folding both onto one shared implementation is planned work; until then,
-> **any change to one must be mirrored in the other**.
-
 ## Architecture
 
 ### The IR is the load-bearing decision
@@ -121,19 +106,33 @@ exist to fail loudly if that rule is broken.
 
 Registering content with Geyser has two paths, and they are not equal partners:
 
-| | `GeyserBridge` (core) | `KaloExtension` (geyser-extension) |
+| | `GeyserBridge` (core) | Geyser's own `custom_mappings` |
 |---|---|---|
 | When | Geyser is a plugin in this JVM — the usual setup | Geyser is a separate process |
-| Source of truth | the live registries | `bedrock-mappings.json` on disk |
-| Installation | nothing to install, nothing to copy | second jar + copy the file on every change |
+| Source of truth | the live registries | two JSON files Kalo writes to `plugins/Kalo/geyser/` |
+| Installation | nothing to install, nothing to copy | copy two files plus the `.mcpack`, on every content change |
 
 **The native path defines what correct means.** Reading from the live registry is the
 point: there is no file in between to go stale, so regenerating content cannot leave
 Bedrock rendering an old copy. The file path exists only because a separate process cannot
-be reached, and it must reproduce the native path's behaviour — never invent its own.
+be reached — and it is **Geyser's format, not Kalo's**, so it needs no Kalo artifact inside
+Geyser. Kalo shipped a `geyser-extension` jar for this before noticing Geyser already read
+mapping files itself.
 
-`bedrock-mappings.json` is written unconditionally whenever Bedrock output is compiled,
-not only for standalone setups, so the fallback is always ready.
+Both paths must produce the same Bedrock identifier, because the generated pack keys its
+`blocks.json` by exactly one of them and a mismatch renders blocks untextured. A
+`custom_mappings` block entry cannot carry a namespace, so Geyser namespaces it
+`geyser_custom` — that constrains the API path too, which is why blocks register as
+`CustomBlockData` rather than `NonVanillaCustomBlockData`. `BedrockBlockRegistration`
+owns the identifier for both.
+
+**`BedrockRegistrationSnapshot` must be resolved.** The compiler opens a generation in its
+constructor and `ResourcePackManagerImpl` publishes success or failure once the output is
+durable. Leaving it unresolved is not a no-op: `GeyserBridge` blocks its palette event for
+the full timeout and then registers nothing.
+
+Both mapping files are written whenever Bedrock output is compiled, not only for
+standalone setups, so the fallback is always ready and always current.
 
 ### Custom blocks borrow vanilla states
 
@@ -217,8 +216,7 @@ bypasses that lands content in `minecraft:` and collides across packs.
 - `@NotNull` / `@Nullable` on API surfaces
 - Never swallow exceptions during pack loading — a content creator's typo must produce a
   message naming the file and the problem
-- Tests live in `core/src/test/java` and `geyser-extension/src/test/java`;
-  `./gradlew build` runs them
+- Tests live in `core/src/test/java` and `api/src/test/java`; `./gradlew build` runs them
 - Compilers must stay runnable without a live server. `org.bukkit.Instrument` is
   registry-backed on Paper 26.2 and throws `No RegistryAccess implementation found`
   outside one — that is why `JavaBlockCompiler` holds instrument *ids* and the Bukkit
