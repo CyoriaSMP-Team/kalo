@@ -5,7 +5,7 @@ Kalo has two Java representations for custom blocks:
 | Mode | World representation | Capacity | Use when |
 |---|---|---:|---|
 | `virtual` | invisible Barrier anchor + persistent `ItemDisplay` | state-unlimited | ordinary decorative blocks and furniture |
-| `native` | spare Note Block/Tripwire state | 862 current states | redstone, piston, fluid or other vanilla block mechanics |
+| `native` | spare Note Block/Tripwire/Scaffolding state | 893 current states | redstone, piston, fluid or other vanilla block mechanics |
 
 ## Configuration
 

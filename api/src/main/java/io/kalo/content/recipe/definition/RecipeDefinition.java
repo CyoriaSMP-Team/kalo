@@ -23,6 +23,25 @@ public sealed interface RecipeDefinition {
     /** What the recipe produces. */
     @NotNull RecipeResult result();
 
+    /** Cooking stations that smelt or smoke an input into a result. */
+    enum CookingStation {
+        FURNACE,
+        BLAST_FURNACE,
+        SMOKER,
+        CAMPFIRE;
+
+        public static @NotNull CookingStation fromString(@NotNull String value) {
+            return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+                case "furnace" -> FURNACE;
+                case "blast_furnace", "blasting" -> BLAST_FURNACE;
+                case "smoker", "smoking" -> SMOKER;
+                case "campfire", "campfire_cooking" -> CAMPFIRE;
+                default -> throw new IllegalArgumentException("unknown cooking station '" + value
+                        + "'; expected furnace, blast_furnace, smoker or campfire");
+            };
+        }
+    }
+
     /**
      * A recipe laid out on the grid.
      *
@@ -98,5 +117,41 @@ public sealed interface RecipeDefinition {
                         "a shapeless recipe needs 1..9 ingredients, got " + ingredients.size());
             }
         }
+    }
+
+    /** A cooking recipe (furnace, blast furnace, smoker, campfire). */
+    record Cooking(
+            @NotNull Key key,
+            @NotNull RecipeResult result,
+            @NotNull RecipeIngredient input,
+            @NotNull CookingStation station,
+            float experience,
+            int cookingTime
+    ) implements RecipeDefinition {
+        public Cooking {
+            if (cookingTime < 1) {
+                throw new IllegalArgumentException("cookingTime must be >= 1, got " + cookingTime);
+            }
+            if (experience < 0) {
+                throw new IllegalArgumentException("experience must be >= 0, got " + experience);
+            }
+        }
+    }
+
+    /** A stonecutter recipe. */
+    record Stonecutting(
+            @NotNull Key key,
+            @NotNull RecipeResult result,
+            @NotNull RecipeIngredient input
+    ) implements RecipeDefinition {
+    }
+
+    /** A smithing transform recipe (base + addition -> result). */
+    record Smithing(
+            @NotNull Key key,
+            @NotNull RecipeResult result,
+            @NotNull RecipeIngredient base,
+            @NotNull RecipeIngredient addition
+    ) implements RecipeDefinition {
     }
 }

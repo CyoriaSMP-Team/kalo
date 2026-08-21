@@ -18,7 +18,6 @@ import java.util.List;
 public final class Importers {
 
     private static final List<Importer> IMPORTERS = new ArrayList<>(List.of(
-            new NexoImporter(),
             new OraxenFormatImporter(),
             new ItemsAdderFormatImporter(),
             new NekoImporter(),

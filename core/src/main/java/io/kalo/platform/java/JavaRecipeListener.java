@@ -76,6 +76,9 @@ public final class JavaRecipeListener implements Listener {
         return switch (definition) {
             case RecipeDefinition.Shaped shaped -> matchesShaped(shaped, matrix, gridWidth);
             case RecipeDefinition.Shapeless shapeless -> matchesShapeless(shapeless, matrix);
+            case RecipeDefinition.Cooking ignored -> false;
+            case RecipeDefinition.Stonecutting ignored -> false;
+            case RecipeDefinition.Smithing ignored -> false;
         };
     }
 

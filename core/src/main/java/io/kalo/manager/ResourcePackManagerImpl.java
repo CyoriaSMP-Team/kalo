@@ -186,7 +186,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         LOGGER.info("Generating resource pack...");
 
         ResourcePack resourcePack = new ResourcePackImpl(
-                PackMeta.of(PackFormats.CURRENT, PACK_DESCRIPTION));
+                PackMeta.of(PackFormats.resolve(), PACK_DESCRIPTION));
 
         copyPackAssets(resourcePack);
         compileContentTypes(resourcePack);

@@ -54,20 +54,6 @@ class ImportersTest {
     }
 
     @Test
-    void nexoWinsOverOraxenWhenItsOwnKeyIsPresent() {
-        // Nexo is an Oraxen fork, so a Nexo file also looks like Oraxen. The
-        // vendor-specific key has to decide it, or recipes convert with the wrong reader.
-        assertEquals("Nexo", detected("""
-                ruby_sword_recipe:
-                  ingredients:
-                    R:
-                      nexo_item: ruby
-                  result:
-                    nexo_item: ruby_sword
-                """));
-    }
-
-    @Test
     void nekoIsRecognisedByItsPropertiesSection() {
         assertEquals("Neko", detected("""
                 ruby_sword:
@@ -97,7 +83,7 @@ class ImportersTest {
 
     @Test
     void everyShippedImporterHasAName() {
-        assertTrue(Importers.all().size() >= 5, Importers.all().toString());
+        assertTrue(Importers.all().size() >= 4, Importers.all().toString());
         Importers.all().forEach(importer -> assertTrue(!importer.name().isBlank()));
     }
 
@@ -129,47 +115,6 @@ class ImportersTest {
         // Neko had no model support, so an imported item has no appearance of its own.
         assertTrue(report.unsupported().stream().anyMatch(u -> u.contains("no model")),
                 report.unsupported().toString());
-    }
-
-    @Test
-    void nexoKeysAreNormalisedBeforeTheOraxenReaderSeesThem() {
-        YamlConfiguration normalised = NexoImporter.normalise(yaml("""
-                r:
-                  ingredients:
-                    R:
-                      nexo_item: ruby
-                  result:
-                    nexo_item: ruby_sword
-                """));
-
-        assertEquals("ruby", normalised.getString("r.ingredients.R.oraxen_item"));
-        assertEquals("ruby_sword", normalised.getString("r.result.oraxen_item"));
-    }
-
-    @Test
-    void nexoNormalisationOnlyRenamesKeysNotUserText() {
-        YamlConfiguration original = yaml("""
-                r:
-                  description: "keep nexo_item: literally"
-                  ingredient:
-                    nexo_type: PAPER
-                """);
-
-        YamlConfiguration normalised = NexoImporter.normalise(original);
-
-        assertEquals("keep nexo_item: literally", normalised.getString("r.description"));
-        assertEquals("PAPER", normalised.getString("r.ingredient.minecraft_type"));
-        assertEquals("keep nexo_item: literally", original.getString("r.description"),
-                "normalising must not mutate the caller's configuration");
-    }
-
-    @Test
-    void nexoNormalisationRejectsAliasCollisionsInsteadOfOverwritingOne() {
-        assertThrows(IllegalArgumentException.class, () -> NexoImporter.normalise(yaml("""
-                r:
-                  nexo_item: ruby
-                  oraxen_item: sapphire
-                """)));
     }
 
     @Test

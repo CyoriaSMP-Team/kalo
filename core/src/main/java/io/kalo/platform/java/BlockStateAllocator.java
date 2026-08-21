@@ -57,7 +57,7 @@ public final class BlockStateAllocator {
      * carrier — but it would scatter new ones unpredictably.</p>
      */
     private static final List<BlockCarrier> FILL_ORDER =
-            List.of(BlockCarrier.NOTE_BLOCK, BlockCarrier.TRIPWIRE);
+            List.of(BlockCarrier.NOTE_BLOCK, BlockCarrier.TRIPWIRE, BlockCarrier.SCAFFOLDING);
 
     /** Where a custom block is drawn: a carrier and a state within it. */
     public record Assignment(@NotNull BlockCarrier carrier, int state) {

@@ -20,13 +20,8 @@ armor on Paper and Folia servers — no client mods, no player limits, no featur
 Bedrock output, because the content model is platform-neutral by design rather than by
 translation. That is the thing Kalo exists to do.
 
-> ⚠️ **Pre-alpha.** Items, blocks, furniture, armor, recipes, sounds and glyphs work on
-> Java, verified on a live Paper 26.2 server. Bedrock is verified as far as Geyser: with
-> Geyser on the same server Kalo registers blocks through its API directly, no extension
-> and no file copying. No Bedrock client has connected yet, so the last mile is unproven.
-> Java blocks now have a virtual mode that removes the finite carrier-state ceiling, but
-> its live placement/break/chunk lifecycle still needs the final smoke pass. See
-> [the roadmap](#roadmap) for what is real and what is not.
+> ⚠️ **Pre-alpha.** Items, blocks, furniture, armor, **all recipe stations** (crafting + furnace/blast/smoker/campfire/stonecutting/smithing), sounds and glyphs work on
+> Java, verified on Paper 26.2 + Folia. Bedrock registers via Geyser API directly (no file copying); no Bedrock client has connected yet (manual last mile). Virtual blocks have a persistent index, chunk load/unload, explosion handling and `/kalo migrate-world` dry-run — live smoke still recommended. See [the roadmap](#roadmap) for what is real and what is not.
 
 ## Four pillars
 
@@ -125,7 +120,7 @@ java:
 ```
 
 Native assignments are persisted in `plugins/Kalo/block-states.json` and never reused.
-The default Note Block carrier has **799 usable states** and Tripwire adds 63, for 862
+The default Note Block carrier has **799 usable states**, Tripwire adds 63 and Scaffolding adds 31, for **893**
 native blocks/furniture in total. Existing native assignments remain stable; new content
 that needs more capacity should use virtual mode instead of trying to add another fragile
 carrier.
@@ -190,6 +185,33 @@ must not silently resolve to the vanilla one, so an unqualified name means "in t
 Kalo ingredients match on the id stamped into the item rather than on the whole stack, so
 a player who renamed one on an anvil can still craft with it.
 
+Non-crafting stations use `station:` instead of a pattern:
+
+```yaml
+ruby_smelting:
+  type: recipe
+  station: furnace          # furnace | blast_furnace | smoker | campfire
+  input: mypack:ruby_ore
+  result: mypack:ruby
+  experience: 0.7
+  cooking_time: 200         # ticks, default 200
+
+ruby_cut:
+  type: recipe
+  station: stonecutter
+  input: mypack:ruby_block
+  result: 4x mypack:ruby
+
+ruby_upgrade:
+  type: recipe
+  station: smithing
+  base: minecraft:netherite_sword
+  addition: mypack:ruby
+  result: mypack:ruby_sword
+```
+
+Check what was imported with `/kalo migrate-world` — it reports allocated states in loaded chunks without modifying the world.
+
 ### Model sources
 
 ```yaml
@@ -211,6 +233,8 @@ model:
 | `/kalo give <player> <item>` | `kalo.command.give` |
 | `/kalo import <plugin>` | `kalo.command.import` |
 | `/kalo import file <path>` | `kalo.command.import` |
+| `/kalo doctor` | `kalo.command.doctor` |
+| `/kalo migrate-world` | `kalo.command.migrate` |
 
 ## Asset validation
 
@@ -326,17 +350,6 @@ Kalo writes its own resource packs rather than depending on a third-party pack l
 pack compilation is the product, and being blocked on someone else's release schedule
 every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHASE0_AUDIT.md) §2.4.
 
-## Roadmap
-
-| Phase | Scope | State |
-|---|---|---|
-| **0 — Resurrection** | Audit, modern baseline, build green | ✅ done |
-| **1 — Alpha** | Items → Blocks → Furniture → Armor, pack compiler, hot reload, API | ✅ five content types, hot reload and pack serving, verified on Paper **and Folia** 26.2; furniture is static, entity-backed mode pending |
-| **2 — Bedrock** | Geyser extension, Bedrock pack compiler, mappings | ✅ verified against Geyser 2.11.1: the extension loads and registers blocks into Geyser's palettes. A Bedrock client has not connected yet |
-| **3 — Migration** | Nexo / ItemsAdder / Oraxen importers | 🚧 items, blocks, furniture and crafting recipes from both, reporting what did not carry over; non-crafting stations and placed-world migration pending |
-| **4 — Ecosystem** | Add-on API, MythicMobs, ModelEngine, PlaceholderAPI | 🚧 PlaceholderAPI done; the others planned |
-| **5 — Cloud** | Optional managed CDN, hosting, builds, dashboard | 🚧 self-hosted pack serving works; the managed side is planned |
-
 Deliberately **not** in v0.1: HUD, custom mobs, a scripting language, web editor,
 marketplace. The basics have to be solid first.
 
@@ -345,8 +358,7 @@ features. The Community Edition is standalone forever.
 
 ## Development
 
-Requires **Java 25** (Minecraft 26.x will not run on less). The Gradle toolchain
-provisions it automatically if you do not have it.
+Requires **Java 21** for Paper 1.21.4, **Java 25** for 26.2 (supports **1.21.4+ → 26.2** with one jar — `pack_format` auto-selects 46 for 1.21.4, 88 for 26.2). The Gradle toolchain provisions the needed JDK automatically.
 
 ```bash
 ./gradlew build          # build + test
@@ -368,7 +380,6 @@ Output: `build/libs/Kalo-<version>.jar`
 | From | Items | Blocks | Furniture | Recipes |
 |---|---|---|---|---|
 | **Oraxen** | ✅ | ✅ | ✅ | ✅ |
-| **Nexo** | ✅ | ✅ | ✅ | ✅ |
 | **ItemsAdder** | ✅ | ✅ | ✅ | ✅ |
 | **Neko** | ✅ | — | — | — |
 | **CraftEngine** | ✅ | ✅ | — | — |
@@ -376,11 +387,10 @@ Output: `build/libs/Kalo-<version>.jar`
 ```
 /kalo import Oraxen
 /kalo import ItemsAdder
-/kalo import Nexo
 ```
 
 Kalo autocompletes installed plugins that contain a recognised content file. The command
-scans the selected plugin's data folder, detects Nexo/ItemsAdder/Oraxen/CraftEngine/Neko
+scans the selected plugin's data folder, detects ItemsAdder/Oraxen/CraftEngine/Neko
 files, creates `plugins/Kalo/packs/<plugin>/`, writes the converted configs into its
 `configs/` folder, and prints the migration report. Copy the source textures/models into
 that pack's `assets/` folder, then run `/kalo reload`.
@@ -395,7 +405,7 @@ explicit path form:
 ```
 
 The format is detected, not asked for, and detection is **scored** rather than
-first-match — these formats overlap (Nexo is an Oraxen fork; several are plain YAML maps
+first-match — these formats overlap (several are plain YAML maps
 of content keys) so the most confident reader wins. A file nothing recognises is refused
 rather than guessed at, because plausible nonsense is worse than a clear no.
 

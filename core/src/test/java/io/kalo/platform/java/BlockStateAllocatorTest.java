@@ -67,7 +67,9 @@ class BlockStateAllocatorTest {
     void exhaustingEveryCarrierIsReportedWithACount() {
         BlockStateAllocator allocator = new BlockStateAllocator();
 
-        int total = BlockCarrier.NOTE_BLOCK.usableStateCount() + BlockCarrier.TRIPWIRE.usableStateCount();
+        int total = BlockCarrier.NOTE_BLOCK.usableStateCount()
+                + BlockCarrier.TRIPWIRE.usableStateCount()
+                + BlockCarrier.SCAFFOLDING.usableStateCount();
         for (int i = 0; i < total; i++) {
             allocator.allocate(key("b" + i), BlockCarrier.NOTE_BLOCK);
         }

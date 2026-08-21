@@ -91,6 +91,8 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         // Geyser may already be enabled and fire immediately.
         io.kalo.integration.GeyserIntegration.registerIfPresent(this);
         io.kalo.integration.PlaceholderApiIntegration.initialize(this);
+        io.kalo.integration.MythicMobsIntegration.initialize(this);
+        io.kalo.integration.ModelEngineIntegration.initialize(this);
     }
 
     @Override
@@ -100,6 +102,8 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         Context context = new Context(this);
         io.kalo.integration.GeyserIntegration.unregister();
         io.kalo.integration.PlaceholderApiIntegration.unregister();
+        io.kalo.integration.MythicMobsIntegration.unregister();
+        io.kalo.integration.ModelEngineIntegration.unregister();
         for (int i = managers.size() - 1; i >= 0; i--) {
             managers.get(i).end(context);
         }

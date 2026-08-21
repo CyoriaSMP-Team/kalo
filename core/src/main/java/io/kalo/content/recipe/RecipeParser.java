@@ -41,6 +41,65 @@ public final class RecipeParser {
         RecipeResult result = parseResult(key.namespace(),
                 Objects.requireNonNull(config.getString("result"), "recipe is missing a result"));
 
+        String stationRaw = config.getString("station");
+        if (stationRaw != null) {
+            String station = stationRaw.trim().toLowerCase(Locale.ROOT);
+            switch (station) {
+                case "furnace", "blast_furnace", "blasting", "smoker", "smoking", "campfire",
+                     "campfire_cooking" -> {
+                    RecipeDefinition.CookingStation cookingStation =
+                            RecipeDefinition.CookingStation.fromString(station);
+                    String inputRaw = config.getString("input");
+                    if (inputRaw == null) {
+                        // Accept ingredients.<single> as alternative for cooking
+                        ConfigurationSection ing = config.getConfigurationSection("ingredients");
+                        if (ing != null && ing.getKeys(false).size() == 1) {
+                            inputRaw = ing.getString(ing.getKeys(false).iterator().next());
+                        }
+                    }
+                    if (inputRaw == null) {
+                        throw new IllegalArgumentException(
+                                "cooking recipe '" + key.asString() + "' needs 'input' (station: " + stationRaw + ")");
+                    }
+                    float experience = (float) config.getDouble("experience", 0.0);
+                    int cookingTime = config.getInt("cooking_time", config.getInt("cookingTime", 200));
+                    return new RecipeDefinition.Cooking(
+                            key, result, parseIngredient(key.namespace(), inputRaw),
+                            cookingStation, experience, cookingTime);
+                }
+                case "stonecutting", "stonecutter" -> {
+                    String inputRaw = config.getString("input");
+                    if (inputRaw == null) {
+                        ConfigurationSection ing = config.getConfigurationSection("ingredients");
+                        if (ing != null && ing.getKeys(false).size() == 1) {
+                            inputRaw = ing.getString(ing.getKeys(false).iterator().next());
+                        }
+                    }
+                    if (inputRaw == null) {
+                        throw new IllegalArgumentException(
+                                "stonecutting recipe '" + key.asString() + "' needs 'input'");
+                    }
+                    return new RecipeDefinition.Stonecutting(
+                            key, result, parseIngredient(key.namespace(), inputRaw));
+                }
+                case "smithing", "smithing_transform" -> {
+                    String baseRaw = config.getString("base");
+                    String additionRaw = config.getString("addition");
+                    if (baseRaw == null || additionRaw == null) {
+                        throw new IllegalArgumentException(
+                                "smithing recipe '" + key.asString() + "' needs 'base' and 'addition'");
+                    }
+                    return new RecipeDefinition.Smithing(
+                            key, result,
+                            parseIngredient(key.namespace(), baseRaw),
+                            parseIngredient(key.namespace(), additionRaw));
+                }
+                default -> throw new IllegalArgumentException(
+                        "unknown station '" + stationRaw + "' for recipe '" + key.asString()
+                                + "'; expected furnace, blast_furnace, smoker, campfire, stonecutting or smithing");
+            }
+        }
+
         List<String> pattern = config.getStringList("pattern");
         ConfigurationSection ingredients = config.getConfigurationSection("ingredients");
         if (ingredients == null) {

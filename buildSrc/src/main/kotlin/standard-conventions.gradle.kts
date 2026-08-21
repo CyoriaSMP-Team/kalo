@@ -33,7 +33,8 @@ tasks {
     }
 }
 
-// Minecraft 26.x requires Java 25 or newer to run, so that is the floor for the plugin too.
+// 1.21.4+ support: Java 21 baseline runs on both Paper 1.21.4 (Java 21) and 26.2 (Java 25).
+// A Java 25-only jar would refuse to start on 1.21.4.
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }

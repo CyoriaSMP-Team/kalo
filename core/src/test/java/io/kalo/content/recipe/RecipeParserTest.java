@@ -213,4 +213,45 @@ class RecipeParserTest {
         assertEquals(false, type.load(pack, registries, second));
         assertEquals(1, type.size());
     }
+
+    @Test
+    void furnaceStationMakesCookingRecipe() {
+        RecipeDefinition definition = parse("""
+                recipe:
+                  result: mypack:ruby
+                  station: furnace
+                  input: mypack:ruby_ore
+                  experience: 0.7
+                  cooking_time: 200
+                """);
+        RecipeDefinition.Cooking cooking = assertInstanceOf(RecipeDefinition.Cooking.class, definition);
+        assertEquals(RecipeDefinition.CookingStation.FURNACE, cooking.station());
+        assertInstanceOf(RecipeIngredient.Content.class, cooking.input());
+    }
+
+    @Test
+    void stonecutterStationMakesStonecuttingRecipe() {
+        RecipeDefinition definition = parse("""
+                recipe:
+                  result: 4x mypack:ruby
+                  station: stonecutter
+                  input: mypack:ruby_block
+                """);
+        RecipeDefinition.Stonecutting cutting = assertInstanceOf(RecipeDefinition.Stonecutting.class, definition);
+        assertEquals(4, cutting.result().amount());
+    }
+
+    @Test
+    void smithingStationMakesSmithingRecipe() {
+        RecipeDefinition definition = parse("""
+                recipe:
+                  result: mypack:ruby_sword
+                  station: smithing
+                  base: minecraft:netherite_sword
+                  addition: mypack:ruby
+                """);
+        RecipeDefinition.Smithing smithing = assertInstanceOf(RecipeDefinition.Smithing.class, definition);
+        assertInstanceOf(RecipeIngredient.Vanilla.class, smithing.base());
+        assertInstanceOf(RecipeIngredient.Content.class, smithing.addition());
+    }
 }

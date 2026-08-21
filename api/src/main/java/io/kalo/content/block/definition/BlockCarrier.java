@@ -56,7 +56,19 @@ public enum BlockCarrier {
             new Property("north", List.of("false", "true")),
             new Property("powered", List.of("false", "true")),
             new Property("south", List.of("false", "true")),
-            new Property("west", List.of("false", "true"))));
+            new Property("west", List.of("false", "true")))),
+
+     /**
+      * Scaffolding: {@code distance} 0-7 plus {@code bottom} and {@code waterlogged}.
+      *
+      * <p>Vertical, gravity-affected and non-solid when not at the base, so it suits
+      * tall decorative or temporary-structure blocks. Added as the third carrier
+      * to lift the native cap from 862 to 893 without requiring virtual mode.</p>
+      */
+     SCAFFOLDING("minecraft:scaffolding", List.of(
+             new Property("bottom", List.of("false", "true")),
+             new Property("distance", List.of("0", "1", "2", "3", "4", "5", "6", "7")),
+             new Property("waterlogged", List.of("false", "true"))));
 
     /** One block state property and the values this carrier may use for it. */
     public record Property(@NotNull String name, @NotNull @Unmodifiable List<String> values) {

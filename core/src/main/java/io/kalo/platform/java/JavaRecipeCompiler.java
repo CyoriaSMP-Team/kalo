@@ -10,11 +10,17 @@ import org.bukkit.Bukkit;
 import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.inventory.BlastingRecipe;
+import org.bukkit.inventory.CampfireRecipe;
+import org.bukkit.inventory.FurnaceRecipe;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.inventory.SmokingRecipe;
+import org.bukkit.inventory.StonecuttingRecipe;
+import org.bukkit.inventory.SmithingTransformRecipe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -82,6 +88,11 @@ public final class JavaRecipeCompiler {
                     case RecipeDefinition.Shaped shaped -> Bukkit.addRecipe(shaped(key, result, shaped));
                     case RecipeDefinition.Shapeless shapeless ->
                             Bukkit.addRecipe(shapeless(key, result, shapeless));
+                    case RecipeDefinition.Cooking cooking -> Bukkit.addRecipe(cooking(key, result, cooking));
+                    case RecipeDefinition.Stonecutting stonecutting ->
+                            Bukkit.addRecipe(stonecutting(key, result, stonecutting));
+                    case RecipeDefinition.Smithing smithing ->
+                            Bukkit.addRecipe(smithing(key, result, smithing));
                 };
                 if (added) {
                     ACTIVE_RECIPES.put(key, definition);
@@ -111,6 +122,9 @@ public final class JavaRecipeCompiler {
         Iterable<RecipeIngredient> ingredients = switch (definition) {
             case RecipeDefinition.Shaped shaped -> shaped.keys().values();
             case RecipeDefinition.Shapeless shapeless -> shapeless.ingredients();
+            case RecipeDefinition.Cooking cooking -> List.of(cooking.input());
+            case RecipeDefinition.Stonecutting stonecutting -> List.of(stonecutting.input());
+            case RecipeDefinition.Smithing smithing -> List.of(smithing.base(), smithing.addition());
         };
 
         for (RecipeIngredient ingredient : ingredients) {
@@ -152,6 +166,49 @@ public final class JavaRecipeCompiler {
             recipe.addIngredient(choice);
         }
         return recipe;
+    }
+
+    private static @NotNull Recipe cooking(@NotNull NamespacedKey key,
+                                            @NotNull ItemStack result,
+                                            @NotNull RecipeDefinition.Cooking definition) {
+        RecipeChoice input = choice(definition.input());
+        if (input == null) {
+            throw new IllegalArgumentException("unknown cooking input " + definition.input());
+        }
+        return switch (definition.station()) {
+            case FURNACE -> new FurnaceRecipe(key, result, input, definition.experience(), definition.cookingTime());
+            case BLAST_FURNACE -> new BlastingRecipe(key, result, input, definition.experience(), definition.cookingTime());
+            case SMOKER -> new SmokingRecipe(key, result, input, definition.experience(), definition.cookingTime());
+            case CAMPFIRE -> new CampfireRecipe(key, result, input, definition.experience(), definition.cookingTime());
+        };
+    }
+
+    private static @NotNull StonecuttingRecipe stonecutting(@NotNull NamespacedKey key,
+                                                             @NotNull ItemStack result,
+                                                             @NotNull RecipeDefinition.Stonecutting definition) {
+        RecipeChoice input = choice(definition.input());
+        if (input == null) {
+            throw new IllegalArgumentException("unknown stonecutting input " + definition.input());
+        }
+        return new StonecuttingRecipe(key, result, input);
+    }
+
+    private static @NotNull SmithingTransformRecipe smithing(@NotNull NamespacedKey key,
+                                                              @NotNull ItemStack result,
+                                                              @NotNull RecipeDefinition.Smithing definition) {
+        RecipeChoice base = choice(definition.base());
+        RecipeChoice addition = choice(definition.addition());
+        if (base == null) {
+            throw new IllegalArgumentException("unknown smithing base " + definition.base());
+        }
+        if (addition == null) {
+            throw new IllegalArgumentException("unknown smithing addition " + definition.addition());
+        }
+        // Template slot is required by the SmithingTransformRecipe API. Kalo has no concept of
+        // a template — the transform is base + addition -> result. An empty template (air)
+        // means the player leaves the template slot empty on the smithing table.
+        RecipeChoice template = new RecipeChoice.MaterialChoice(Material.AIR);
+        return new SmithingTransformRecipe(key, result, template, base, addition);
     }
 
     private static @Nullable RecipeChoice choice(@NotNull RecipeIngredient ingredient) {
