@@ -36,13 +36,13 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 ### Verified
 
-- Deployed to a live Paper server running Geyser 2.11.2 and Floodgate. Geyser confirms the
-  handshake from its own side rather than taking Kalo's word for it: against Kalo's "2
-  block(s), 5 item(s)" it logs `Registered 2 custom block item overrides` and its custom
-  item count rises accordingly, with no rejection. The generated pack is attached through
-  Geyser's API, and both `custom_mappings` files are written.
-- No Bedrock client has connected, so what a player actually sees is still unverified.
-  Everything above is the two servers agreeing about what they handed each other.
+- **A Bedrock player confirmed it.** On a live Paper server running Geyser 2.11.2 and
+  Floodgate: custom item icons render, native blocks place and mine and drop, worn armor
+  shows on the player. Geyser also confirms the handshake from its own side rather than
+  taking Kalo's word for it, and both `custom_mappings` files are written.
+- Getting there took five release candidates. Everything each one fixed was green in CI
+  beforehand — including an assertion that pinned the wrong armor geometry, and a rule that
+  was correct, tested, and called by nothing.
 
 ### Fixed after a Bedrock player tested it
 

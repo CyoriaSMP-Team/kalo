@@ -25,10 +25,10 @@ translation. That is the thing Kalo exists to do.
 > verified on Paper 26.2 + Folia. Virtual blocks have a persistent index, chunk
 > load/unload, explosion handling and a `/kalo migrate-world` dry-run.
 >
-> **Bedrock has not been seen by a Bedrock client yet.** The registration path is written
-> and tested and the mapping files match Geyser's documented format, but nothing has
-> confirmed a Bedrock player sees an item icon or a placed block. Read
-> [the roadmap](#roadmap) before you rely on it.
+> **Bedrock is verified by a Bedrock player**, on a live server running Geyser and
+> Floodgate: custom item icons, native blocks placed and mined, and worn armor all render.
+> One thing does not, and cannot — see [the roadmap](#roadmap) for that and for everything
+> else this is still too young for.
 
 ## Four pillars
 
@@ -506,7 +506,7 @@ only been written — the middle column is the one worth reading before you inst
 
 | | What is missing |
 |---|---|
-| **Bedrock, as a player sees it** | Verified on a live server running Geyser: Kalo registers its items, blocks and generated pack with Geyser natively at startup, and the identifiers linking the mapping files to the pack's `blocks.json` and terrain atlas agree. What has **not** happened is a Bedrock client connecting, so nothing has confirmed a *player* sees an item icon, a placed block, or worn armor. That last step is the gap. |
+| ~~Bedrock, as a player sees it~~ | **Verified.** A Bedrock player on a live Geyser + Floodgate server confirmed custom item icons, native blocks placed and broken, and worn armor rendering. Finding that out took five release candidates: the registration never ran, blocks were named inconsistently, armor pointed at a geometry Bedrock does not define, block items fell back to note blocks, and native blocks could not be mined at all. Every one of those was green in CI. |
 | ~~Bedrock virtual blocks~~ | **Confirmed not to work.** A virtual block is an `ItemDisplay` entity, which Geyser does not put on a Bedrock client, and it overrides no block state so it cannot be mapped either. Native blocks are unaffected — see [docs/VIRTUAL_BLOCKS.md](docs/VIRTUAL_BLOCKS.md) |
 | Standalone-Geyser path | The mapping files generate on a real server and match Geyser's documented format, but the copy-the-files setup has not been run against a real standalone Geyser |
 | The 1.21.4 end of the version range | One jar spans 1.21.4 → 26.2 and `pack_format` auto-selects per version, but testing has happened on 26.2 only |
