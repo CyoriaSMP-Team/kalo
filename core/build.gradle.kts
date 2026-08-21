@@ -67,7 +67,15 @@ paperPluginYaml {
         // Geyser is up before Kalo registers blocks with it.
         server("Geyser-Spigot", PaperPluginYaml.Load.BEFORE, false, true)
 
-        // PlaceholderAPI needs no entry: the expansion is registered through its own API
-        // on ServerLoadEvent, by which point every plugin is loaded.
+        // PlaceholderAPI needs an entry for the same reason. Being loaded is not the same
+        // as being visible: PlaceholderApiHook extends PlaceholderExpansion, so resolving
+        // that class needs a classpath edge, no matter how late the registration happens
+        // or how carefully it is guarded. Waiting for ServerLoadEvent fixes the ordering
+        // and does nothing about the classloader, which is how this shipped broken —
+        // NoClassDefFoundError on every server that actually had PlaceholderAPI.
+        server("PlaceholderAPI", PaperPluginYaml.Load.BEFORE, false, true)
+
+        // MythicMobs and ModelEngine deliberately have no entry: those hooks reach their
+        // plugins through reflection and never name a class, so they need no edge.
     }
 }
