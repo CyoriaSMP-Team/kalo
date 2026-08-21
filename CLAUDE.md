@@ -45,6 +45,11 @@ there. CI builds on a Java 25 JDK, but the bytecode it emits is 21. The foojay r
 ./gradlew test         # tests only
 ```
 
+`runServer` picks its own JVM from `minecraft_version`, not from the compile toolchain.
+Compiling low and running high cuts both ways: the jar is Java 21 so it starts on 1.21.4,
+but Minecraft 26.1 and newer refuse to *run* on anything below Java 25, so inheriting the
+toolchain made the task fail before Kalo was ever loaded.
+
 Output: `build/libs/Kalo-{version}.jar`
 
 ## Module Structure
