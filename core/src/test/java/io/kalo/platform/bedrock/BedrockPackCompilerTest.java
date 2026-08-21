@@ -66,6 +66,16 @@ class BedrockPackCompilerTest {
         return java;
     }
 
+    /** Shared with GeyserMappingFormatTest, which pins the emitted files' shape. */
+    static io.kalo.content.item.Item stubSpriteItem(String name) {
+        return new StubItem(sprite(name));
+    }
+
+    /** Shared with GeyserMappingFormatTest. */
+    static io.kalo.content.block.Block stubCubeAllBlock(String name) {
+        return new StubBlock(cubeAll(name));
+    }
+
     private static ItemDefinition sprite(String name) {
         Key key = Key.key("testpack", name);
         return ItemDefinition.builder(key)
