@@ -36,11 +36,13 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 ### Verified
 
-- Deployed to a live Paper server running Geyser and Floodgate. Kalo registers 5 items,
-  2 native blocks and the generated pack with Geyser at startup; the third block is
-  virtual and reported as rendering through its entity instead. Both `custom_mappings`
-  files are written. No Bedrock client has connected yet, so what a player actually sees
-  remains unverified.
+- Deployed to a live Paper server running Geyser 2.11.2 and Floodgate. Geyser confirms the
+  handshake from its own side rather than taking Kalo's word for it: against Kalo's "2
+  block(s), 5 item(s)" it logs `Registered 2 custom block item overrides` and its custom
+  item count rises accordingly, with no rejection. The generated pack is attached through
+  Geyser's API, and both `custom_mappings` files are written.
+- No Bedrock client has connected, so what a player actually sees is still unverified.
+  Everything above is the two servers agreeing about what they handed each other.
 
 ### Known limitations
 
