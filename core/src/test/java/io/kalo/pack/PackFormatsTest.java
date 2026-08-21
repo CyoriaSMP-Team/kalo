@@ -14,6 +14,7 @@ class PackFormatsTest {
     @Test
     void theVerifiedNumbersAreTheOnesFromVersionJson() {
         assertEquals(46, PackFormats.MC_1_21_4);
+        assertEquals(75, PackFormats.MC_1_21_11);
         assertEquals(88, PackFormats.MC_26_2);
         assertEquals(PackFormats.MC_26_2, PackFormats.CURRENT);
     }

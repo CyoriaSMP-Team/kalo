@@ -516,7 +516,7 @@ only been written — the middle column is the one worth reading before you inst
 
 | | |
 |---|---|
-| Verified `pack_format` for 1.21.5 – 1.21.11 | Only 1.21.4 (46) and 26.2 (88) have been read out of a real client jar. Servers in between get 46 and a warning in the console — the number is a guess, and a wrong one can make the client reject the whole pack. Read `pack_version.resource_major` from that version's client jar and add it to `PackFormats` |
+| Verified `pack_format` for 1.21.5 – 1.21.10 | 1.21.4 (46), 1.21.11 (75) and 26.2 (88) have been read out of real client jars. The versions between still get a guess plus a console warning saying so. Read `pack_version.resource_major` from that version's client jar and add it to `PackFormats` |
 | Bedrock geometry for custom **item** models | Only sprite items reach Bedrock; an item with a hand-authored model is skipped and counted in the generation warning. Blocks and furniture are fine — `BedrockGeometry` converts their custom models already |
 | Real server-side block registration | Would still need a borrowed visual state on vanilla clients — see the `BlockCarrier` javadoc |
 

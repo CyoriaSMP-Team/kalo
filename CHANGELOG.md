@@ -59,7 +59,8 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   `ItemDisplay` entity, which Geyser does not translate to a Bedrock client, and it
   overrides no Java block state so it cannot be mapped either. Native blocks are
   unaffected. On a server with Bedrock players, the 893 native states are the real ceiling.
-- `pack_format` is only verified for 1.21.4 and 26.2. A server on any version in between
+- `pack_format` is verified for 1.21.4, 1.21.11 and 26.2. Any other version gets the
+  nearest number in its family and a console warning saying it is a guess. A server on any version in between
   gets 46 and a console warning saying so. A wrong `pack_format` can make the client reject
   the pack outright, so treat the warning as work to do, not noise.
 

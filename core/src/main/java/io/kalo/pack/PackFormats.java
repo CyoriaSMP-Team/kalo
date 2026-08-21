@@ -20,6 +20,16 @@ public final class PackFormats {
     public static final int MC_1_21_4 = 46;
 
     /**
+     * Minecraft 1.21.11 — read out of {@code version.json} in the 1.21.11 client jar
+     * ({@code "pack_version": {"resource_major": 75, "resource_minor": 0, ...}}).
+     *
+     * <p>Added because the first real deployment landed on exactly this version and took
+     * 46 — the 1.21.4 number — because nothing between the two ends of the supported range
+     * had ever been checked.</p>
+     */
+    public static final int MC_1_21_11 = 75;
+
+    /**
      * Minecraft 26.2 — verified against {@code version.json} in the 26.2 client jar
      * ({@code "pack_version": {"resource_major": 88, ...}}).
      */
@@ -59,6 +69,9 @@ public final class PackFormats {
         version = version.trim();
         if (version.equals("1.21.4") || version.startsWith("1.21.4-")) {
             return MC_1_21_4;
+        }
+        if (version.equals("1.21.11") || version.startsWith("1.21.11-")) {
+            return MC_1_21_11;
         }
         if (version.equals("26.2") || version.startsWith("26.2.") || version.startsWith("26.2-")) {
             return MC_26_2;
