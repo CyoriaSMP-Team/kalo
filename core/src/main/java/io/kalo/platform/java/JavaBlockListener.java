@@ -242,8 +242,21 @@ public final class JavaBlockListener implements Listener {
             if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
                 breakVirtual(clicked, event.getPlayer(), virtual);
             }
-        } else if (resolve(clicked) != null) {
-            event.setCancelled(true);
+        } else if (JavaBlockRules.preventsTuning(clicked.getType(), event.getAction())
+                && resolve(clicked) != null) {
+            // Right-clicking a note block re-tunes it, which moves it to a state the pack
+            // draws as a different custom block — or as none. Only note blocks have that
+            // problem; tripwire and scaffolding have nothing to tune.
+            //
+            // Denying the block's own interaction rather than cancelling the event matters
+            // twice over. Cancelling outright also swallowed LEFT_CLICK_BLOCK, which is
+            // where mining starts, so no native custom block could be broken at all — the
+            // standard trick for an indestructible block, done by accident. And leaving
+            // the item hand alone keeps blocks placeable against this one.
+            //
+            // JavaBlockRules.preventsTuning had encoded exactly this, tests and all, and
+            // nothing in production called it.
+            event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
         }
     }
 

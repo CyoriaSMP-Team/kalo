@@ -28,6 +28,10 @@ class JavaBlockListenerTest {
 
     @Test
     void tuningProtectionOnlyCancelsRightClicksOnNoteBlocks() {
+        // This rule was correct and tested from the start. What it lacked was a caller:
+        // onInteract cancelled the whole PlayerInteractEvent for any carrier and any
+        // action, so left-click never reached the dig, and no native custom block could be
+        // broken. A rule nothing consults protects nothing.
         assertTrue(JavaBlockRules.preventsTuning(Material.NOTE_BLOCK, Action.RIGHT_CLICK_BLOCK));
         assertFalse(JavaBlockRules.preventsTuning(Material.NOTE_BLOCK, Action.LEFT_CLICK_BLOCK));
         assertFalse(JavaBlockRules.preventsTuning(Material.NOTE_BLOCK, Action.PHYSICAL));
