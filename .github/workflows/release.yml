@@ -69,8 +69,10 @@ jobs:
         id: changelog
         run: |
           version="${{ steps.version.outputs.plugin_version }}"
-          body=$(awk -v v="^## $version\\b" '
-            $0 ~ v {found=1; next}
+          # Exact line match, not a regex: a version contains "." and "-", which an
+          # ERE would treat as metacharacters, and awk has no word-boundary escape.
+          body=$(awk -v heading="## $version" '
+            $0 == heading {found=1; next}
             found && /^## / {exit}
             found {print}
           ' CHANGELOG.md)
