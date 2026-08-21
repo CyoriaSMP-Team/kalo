@@ -6,7 +6,7 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
-## 0.1.0-rc.2
+## 0.1.0-rc.3
 
 ### Fixed
 
@@ -44,8 +44,21 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 - No Bedrock client has connected, so what a player actually sees is still unverified.
   Everything above is the two servers agreeing about what they handed each other.
 
+### Fixed after a Bedrock player tested it
+
+- **Custom armor equipped invisibly.** The attachable named
+  `geometry.player_armor.helmet`, which Bedrock does not define, while already hiding the
+  base material's armor underneath — so the piece drew nothing at all. All four slots were
+  wrong the same way, and the test asserted the broken string.
+- **Every custom block showed as a note block in the hotbar.** Blocks had no Bedrock item
+  definition, so they fell back to their Java base material, which is always `NOTE_BLOCK`.
+
 ### Known limitations
 
+- **Virtual blocks do not render on Bedrock and cannot.** A virtual block is an
+  `ItemDisplay` entity, which Geyser does not translate to a Bedrock client, and it
+  overrides no Java block state so it cannot be mapped either. Native blocks are
+  unaffected. On a server with Bedrock players, the 893 native states are the real ceiling.
 - `pack_format` is only verified for 1.21.4 and 26.2. A server on any version in between
   gets 46 and a console warning saying so. A wrong `pack_format` can make the client reject
   the pack outright, so treat the warning as work to do, not noise.
