@@ -6,7 +6,7 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
-## 0.1.0-rc.3
+## 0.1.0-rc.4
 
 ### Fixed
 
@@ -52,6 +52,9 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   wrong the same way, and the test asserted the broken string.
 - **Every custom block showed as a note block in the hotbar.** Blocks had no Bedrock item
   definition, so they fell back to their Java base material, which is always `NOTE_BLOCK`.
+- **The Java resource pack declared the wrong `pack_format` on 1.21.11.** It sent 46, the
+  1.21.4 number, because nothing between the ends of the supported range had been checked.
+  The real value is 75.
 
 ### Known limitations
 
