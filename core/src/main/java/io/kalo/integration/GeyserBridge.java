@@ -11,7 +11,6 @@ import io.kalo.utils.Plugins;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.geysermc.geyser.api.GeyserApi;
 import org.geysermc.geyser.api.block.custom.CustomBlockData;
-import org.geysermc.geyser.api.block.custom.NonVanillaCustomBlockData;
 import org.geysermc.geyser.api.block.custom.component.BoxComponent;
 import org.geysermc.geyser.api.block.custom.component.CustomBlockComponents;
 import org.geysermc.geyser.api.block.custom.component.GeometryComponent;
@@ -199,12 +198,8 @@ public final class GeyserBridge {
     }
 
     private static @NotNull CustomBlockData build(@NotNull BedrockBlockRegistration block) {
-        String[] identifier = block.bedrockIdentifier().split(":", 2);
-        String namespace = identifier.length == 2 ? identifier[0] : "kalo";
-        String name = identifier.length == 2 ? identifier[1] : identifier[0];
-
         CustomBlockComponents.Builder components = CustomBlockComponents.builder()
-                .displayName(block.displayName() != null ? block.displayName() : name)
+                .displayName(block.displayName() != null ? block.displayName() : block.bedrockName())
                 // Java's carrier is a full note block. Keeping these boxes full-sized
                 // preserves server collision and targeting even for decorative geometry.
                 .selectionBox(BoxComponent.fullBox())
@@ -215,16 +210,18 @@ public final class GeyserBridge {
         block.materialInstances().forEach((material, texture) ->
                 addMaterial(components, material, texture));
 
-        CustomBlockComponents builtComponents = components
-                .build();
-
-        return NonVanillaCustomBlockData.builder()
-                .namespace(namespace)
-                .name(name)
+        // CustomBlockData, not NonVanillaCustomBlockData: Geyser namespaces this itself as
+        // geyser_custom, which is the only namespace a custom_mappings file can produce.
+        // Registering under a Kalo-chosen namespace here would make the identifier depend
+        // on which path registered the block, while the pack's blocks.json is keyed by one.
+        // NonVanilla is for blocks with no Java counterpart anyway; Kalo overrides a real
+        // carrier state, so it never needed it.
+        return CustomBlockData.builder()
+                .name(block.bedrockName())
                 // Obtained through Kalo's own items, so a second copy in the Bedrock
                 // creative menu would only be confusing.
                 .includedInCreativeInventory(false)
-                .components(builtComponents)
+                .components(components.build())
                 .build();
     }
 

@@ -235,8 +235,12 @@ public final class BedrockPackCompiler {
             }
 
             Key key = definition.key();
-            String bedrockId = key.namespace() + ":" + key.value();
+            // Geyser namespaces every custom block it registers itself, and a
+            // custom_mappings file cannot override that, so the identifier is built the
+            // one way both registration paths can agree on. The pack's blocks.json is
+            // keyed by it, so a mismatch renders the block untextured.
             String shorthand = key.namespace() + "_" + key.value();
+            String bedrockId = BedrockBlockRegistration.identifierFor(shorthand);
 
             JsonElement textures = blockTextures(definition, shorthand);
             if (textures == null) {

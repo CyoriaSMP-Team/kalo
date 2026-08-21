@@ -21,7 +21,29 @@ public record BedrockBlockRegistration(
         float hardness,
         @NotNull Map<String, String> materialInstances
 ) {
+    /**
+     * Geyser's namespace for content it registers on a server's behalf.
+     *
+     * <p>Not a preference. A block defined through a {@code custom_mappings} file gets this
+     * namespace and no other — the file format only lets you name the block, not namespace
+     * it — so the in-process API path uses it too. Anything else means the identifier
+     * depends on which path registered the block, while the generated pack keys its
+     * {@code blocks.json} by exactly one of them.</p>
+     */
+    public static final String NAMESPACE = "geyser_custom";
+
     public BedrockBlockRegistration {
         materialInstances = Map.copyOf(materialInstances);
+    }
+
+    /** The bare name Geyser appends to {@link #NAMESPACE}. */
+    public @NotNull String bedrockName() {
+        int colon = bedrockIdentifier.indexOf(':');
+        return colon < 0 ? bedrockIdentifier : bedrockIdentifier.substring(colon + 1);
+    }
+
+    /** Builds the identifier the way both registration paths must agree on. */
+    public static @NotNull String identifierFor(@NotNull String name) {
+        return NAMESPACE + ":" + name;
     }
 }

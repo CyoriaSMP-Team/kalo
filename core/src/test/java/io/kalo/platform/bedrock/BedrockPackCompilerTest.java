@@ -254,7 +254,7 @@ class BedrockPackCompilerTest {
         // Bedrock has real custom blocks, declared in blocks.json at the pack root.
         JsonObject blocks = json(result.pack().file("blocks.json"));
         assertEquals("testpack_ruby_block",
-                blocks.getAsJsonObject("testpack:ruby_block").get("textures").getAsString());
+                blocks.getAsJsonObject("geyser_custom:testpack_ruby_block").get("textures").getAsString());
 
         // Block faces resolve through the terrain atlas, separate from the item atlas.
         JsonObject terrain = json(result.pack().file("textures/terrain_texture.json"));
@@ -289,7 +289,7 @@ class BedrockPackCompilerTest {
 
         BedrockPackCompiler.Result result = compiler.finish();
         JsonObject textures = json(result.pack().file("blocks.json"))
-                .getAsJsonObject("testpack:faced_cube").getAsJsonObject("textures");
+                .getAsJsonObject("geyser_custom:testpack_faced_cube").getAsJsonObject("textures");
 
         assertEquals(Set.of("down", "up", "north", "south", "west", "east"),
                 textures.keySet());
@@ -313,9 +313,10 @@ class BedrockPackCompilerTest {
     }
 
     @Test
-    void blockRecordCarriesTheJavaStateForTheGeyserExtension() throws IOException {
-        // Geyser registers custom blocks at runtime, not through the mapping file, so the
-        // Java carrier state has to reach the extension somehow.
+    void blockRecordCarriesTheJavaStateGeyserOverrides() throws IOException {
+        // Whatever registers the block — the in-process bridge or a mappings file — needs
+        // the exact Java state to override, and only the compiler knows which one was
+        // allocated.
         ResourcePack java = javaPackWith("assets/testpack/textures/block/ruby_block.png");
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
 
@@ -326,13 +327,40 @@ class BedrockPackCompilerTest {
         JsonObject record = mappings.getAsJsonArray("kalo:blocks").get(0).getAsJsonObject();
 
         assertEquals("testpack:ruby_block", record.get("java_key").getAsString());
-        assertEquals("testpack:ruby_block", record.get("bedrock_identifier").getAsString());
+        assertEquals("geyser_custom:testpack_ruby_block", record.get("bedrock_identifier").getAsString());
         assertEquals("native", record.get("java_mode").getAsString());
         assertEquals(7, record.get("java_carrier_state").getAsInt());
         assertEquals("minecraft:note_block[instrument=harp,note=3,powered=true]",
                 record.get("java_identifier").getAsString());
         assertEquals("minecraft:geometry.full_block", record.get("geometry").getAsString());
         assertEquals(1.5f, record.get("hardness").getAsFloat());
+    }
+
+    /**
+     * The pack and the registration have to name the block identically.
+     *
+     * <p>Bedrock looks a custom block's appearance up in {@code blocks.json} by identifier,
+     * so a registration under any other name renders it untextured — a failure only a real
+     * Bedrock client can show. Geyser namespaces blocks it registers as
+     * {@code geyser_custom} and a mappings file cannot say otherwise, so that is the name
+     * both sides have to use.</p>
+     */
+    @Test
+    void theBlocksJsonKeyIsTheIdentifierBothRegistrationPathsUse() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/block/ruby_block.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, "bedrock"));
+
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+        compiler.addBlocks(List.of(new StubBlock(cubeAll("ruby_block"))), key -> note(7), Set.of());
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        io.kalo.platform.bedrock.BedrockBlockRegistration registration = result.registrations().getFirst();
+        assertEquals("geyser_custom:testpack_ruby_block", registration.bedrockIdentifier());
+        assertEquals("testpack_ruby_block", registration.bedrockName());
+
+        JsonObject blocks = json(result.pack().files().get("blocks.json"));
+        assertTrue(blocks.has(registration.bedrockIdentifier()),
+                "blocks.json is keyed by " + blocks.keySet() + ", not by the registered identifier");
     }
 
     @Test
@@ -382,7 +410,7 @@ class BedrockPackCompilerTest {
         assertEquals("testpack_chair_all",
                 record.getAsJsonObject("material_instances").get("all").getAsString());
         assertEquals("testpack_chair_all", json(result.pack().file("blocks.json"))
-                .getAsJsonObject("testpack:chair").get("textures").getAsString());
+                .getAsJsonObject("geyser_custom:testpack_chair").get("textures").getAsString());
         assertNotNull(result.pack().file("textures/blocks/testpack_chair_all.png"));
     }
 
