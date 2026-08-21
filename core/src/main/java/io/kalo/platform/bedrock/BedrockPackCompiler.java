@@ -268,7 +268,7 @@ public final class BedrockPackCompiler {
             if (assignment != null) {
                 record.addProperty("java_carrier", assignment.carrier().name());
                 record.addProperty("java_carrier_state", assignment.state());
-                javaIdentifier = GeyserBlockState.javaIdentifier(assignment);
+                javaIdentifier = assignment.javaIdentifier();
                 record.addProperty("java_identifier", javaIdentifier);
             }
             String displayName = plainName(definition.display().name());

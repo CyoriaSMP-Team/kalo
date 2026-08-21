@@ -67,6 +67,19 @@ public final class BlockStateAllocator {
                         "state " + state + " is outside the usable range of " + carrier);
             }
         }
+
+        /**
+         * The complete Java block state this assignment stands for, e.g.
+         * {@code minecraft:note_block[instrument=harp,note=0,powered=true]}.
+         *
+         * <p>The bare index means nothing without its carrier, so everything that needs to
+         * name the state asks the assignment rather than rebuilding the string. Geyser
+         * overrides are keyed by it, and the world scanner matches placed blocks against
+         * it.</p>
+         */
+        public @NotNull String javaIdentifier() {
+            return carrier.vanillaBlock() + "[" + carrier.variantKey(state) + "]";
+        }
     }
 
     private final Map<String, Assignment> assignments = new LinkedHashMap<>();

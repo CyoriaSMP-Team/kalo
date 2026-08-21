@@ -186,26 +186,58 @@ public final class CommandManager implements Managerial {
 
     private static void runMigrateWorldDryRun(@NotNull CommandSender sender) {
         sender.sendMessage(Component.text("Scanning loaded chunks for Kalo-allocated block states...", NamedTextColor.YELLOW));
-        try {
-            if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl plugin)) {
-                sender.sendMessage(Component.text("Not running as KaloPluginImpl — cannot access allocator", NamedTextColor.RED));
-                return;
+        if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl plugin)) {
+            sender.sendMessage(Component.text("Not running as KaloPluginImpl — cannot access allocator", NamedTextColor.RED));
+            return;
+        }
+
+        io.kalo.migration.WorldMigration.dryRun(plugin, plugin.registryManager().blockStateAllocator())
+                .whenComplete((report, error) -> {
+                    if (error != null) {
+                        Plugins.logger().log(Level.WARNING, "World migration dry-run failed", error);
+                        sender.sendMessage(Component.text("Dry-run failed: " + messageOf(error), NamedTextColor.RED));
+                        return;
+                    }
+                    sendMigrationReport(sender, report);
+                });
+    }
+
+    private static void sendMigrationReport(@NotNull CommandSender sender,
+                                            @NotNull io.kalo.migration.WorldMigration.Report report) {
+        sender.sendMessage(Component.text("World migration dry-run: " + report.total()
+                + " allocated blocks in loaded chunks", NamedTextColor.AQUA));
+
+        report.worlds().values().forEach(world -> {
+            String detail = "  " + world.world() + ": " + world.blocks()
+                    + " (" + world.chunksScanned() + " chunks)";
+            if (!world.complete()) {
+                detail += " — " + world.chunksUnreachable() + " chunk(s) could not be read";
             }
-            io.kalo.migration.WorldMigration.Report report =
-                    io.kalo.migration.WorldMigration.dryRun(plugin.registryManager().blockStateAllocator());
-            sender.sendMessage(Component.text("World migration dry-run: " + report.total() + " allocated blocks in loaded chunks", NamedTextColor.AQUA));
-            report.perWorld().forEach((world, count) ->
-                    sender.sendMessage(Component.text("  " + world + ": " + count, NamedTextColor.GRAY)));
-            if (report.total() == 0) {
-                sender.sendMessage(Component.text("No allocated blocks found in loaded chunks — nothing to migrate", NamedTextColor.GREEN));
-            } else {
-                sender.sendMessage(Component.text(
-                        "This is a dry run only. Placed-world migration requires a mapping from your old plugin; see the import report.",
-                        NamedTextColor.YELLOW));
-            }
-        } catch (Exception e) {
-            Plugins.logger().log(Level.WARNING, "World migration dry-run failed", e);
-            sender.sendMessage(Component.text("Dry-run failed: " + messageOf(e), NamedTextColor.RED));
+            sender.sendMessage(Component.text(detail,
+                    world.complete() ? NamedTextColor.GRAY : NamedTextColor.YELLOW));
+        });
+
+        if (report.unreadableAssignments() > 0) {
+            sender.sendMessage(Component.text(report.unreadableAssignments()
+                    + " allocated state(s) could not be parsed by this server and were not"
+                    + " searched for; see the console.", NamedTextColor.YELLOW));
+        }
+
+        // "Nothing to migrate" and "I could not look" lead to opposite decisions, so an
+        // incomplete scan never gets to say the world is clean.
+        if (!report.complete()) {
+            sender.sendMessage(Component.text(
+                    "This scan was incomplete, so the count above is a lower bound — do not"
+                            + " read it as nothing to migrate.", NamedTextColor.RED));
+            return;
+        }
+
+        if (report.total() == 0) {
+            sender.sendMessage(Component.text("No allocated blocks found in loaded chunks — nothing to migrate", NamedTextColor.GREEN));
+        } else {
+            sender.sendMessage(Component.text(
+                    "This is a dry run only. Placed-world migration requires a mapping from your old plugin; see the import report.",
+                    NamedTextColor.YELLOW));
         }
     }
 

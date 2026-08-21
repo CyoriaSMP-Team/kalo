@@ -254,4 +254,33 @@ class BlockStateAllocatorTest {
         assertThrows(Exception.class, () -> allocator.load(fractionalIndex));
         assertTrue(allocator.assignments().isEmpty());
     }
+
+    /**
+     * The state index is meaningless without its carrier. An earlier Bedrock path kept its
+     * own note-block-only copy of this maths, so a block that had spilled onto tripwire or
+     * scaffolding was named as a note block and would have overridden a Java state it never
+     * occupied.
+     */
+    @Test
+    void anAssignmentNamesTheCarrierItsStateBelongsTo() {
+        assertEquals("minecraft:note_block[instrument=harp,note=0,powered=true]",
+                new BlockStateAllocator.Assignment(BlockCarrier.NOTE_BLOCK, 1).javaIdentifier());
+        assertEquals("minecraft:note_block[instrument=pling,note=24,powered=true]",
+                new BlockStateAllocator.Assignment(BlockCarrier.NOTE_BLOCK, 799).javaIdentifier());
+        assertEquals("minecraft:tripwire[attached=false,disarmed=false,east=false,"
+                        + "north=false,powered=false,south=false,west=true]",
+                new BlockStateAllocator.Assignment(BlockCarrier.TRIPWIRE, 1).javaIdentifier());
+        assertEquals("minecraft:scaffolding[bottom=false,distance=0,waterlogged=true]",
+                new BlockStateAllocator.Assignment(BlockCarrier.SCAFFOLDING, 1).javaIdentifier());
+    }
+
+    @Test
+    void anAssignmentRejectsTheReservedVanillaStateAndOutOfRangeIndexes() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new BlockStateAllocator.Assignment(BlockCarrier.NOTE_BLOCK, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> new BlockStateAllocator.Assignment(BlockCarrier.NOTE_BLOCK, 800));
+        assertThrows(IllegalArgumentException.class,
+                () -> new BlockStateAllocator.Assignment(BlockCarrier.SCAFFOLDING, 32));
+    }
 }
