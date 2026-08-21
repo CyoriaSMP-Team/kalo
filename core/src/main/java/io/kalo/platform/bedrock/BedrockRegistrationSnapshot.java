@@ -43,6 +43,21 @@ public final class BedrockRegistrationSnapshot {
     }
 
     /**
+     * Reports that a generation produced nothing durable.
+     *
+     * <p>Without this a failed compile is indistinguishable from a slow one, so Geyser
+     * blocks its palette event for the full timeout before giving up — on the startup path,
+     * that is thirty seconds of a stalled server to reach the same answer.</p>
+     */
+    public static void publishFailure(@NotNull Generation generation) {
+        State state = CURRENT.get();
+        if (!state.generation().equals(generation)) {
+            return;
+        }
+        state.ready().complete(List.of());
+    }
+
+    /**
      * Returns the latest successful compilation, waiting for the first one when Geyser
      * reaches its palette event before Kalo's asynchronous compiler has finished.
      */

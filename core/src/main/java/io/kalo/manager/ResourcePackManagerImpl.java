@@ -15,6 +15,7 @@ import io.kalo.pack.ZipPackWriter;
 import io.kalo.registry.Registries;
 import io.kalo.platform.bedrock.BedrockPackCompiler;
 import io.kalo.platform.bedrock.BedrockPackWriter;
+import io.kalo.platform.bedrock.BedrockRegistrationSnapshot;
 import io.kalo.utils.Constants;
 import io.kalo.utils.Files;
 import it.unimi.dsi.fastutil.Pair;
@@ -335,8 +336,17 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                     result.mappings().toByteArray());
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to write Bedrock output", e);
+            // Say so, or Geyser blocks its palette event for the full timeout waiting for
+            // output that is never coming.
+            BedrockRegistrationSnapshot.publishFailure(result.generation());
             return;
         }
+
+        // The output is durable, so the native Geyser bridge may now register against it.
+        // Nothing published this until now: GeyserBridge waited out its timeout on every
+        // startup and registered no blocks at all, which is why custom blocks never
+        // reached a Bedrock client.
+        BedrockRegistrationSnapshot.publishSuccess(result.generation(), result.registrations());
 
         // mappedCount is distinct vanilla items, which reads like a failure when 1000
         // custom items all map onto PAPER. Report what the reader actually wants.
