@@ -20,8 +20,15 @@ armor on Paper and Folia servers — no client mods, no player limits, no featur
 Bedrock output, because the content model is platform-neutral by design rather than by
 translation. That is the thing Kalo exists to do.
 
-> ⚠️ **Pre-alpha.** Items, blocks, furniture, armor, **all recipe stations** (crafting + furnace/blast/smoker/campfire/stonecutting/smithing), sounds and glyphs work on
-> Java, verified on Paper 26.2 + Folia. Bedrock registers via Geyser API directly (no file copying); no Bedrock client has connected yet (manual last mile). Virtual blocks have a persistent index, chunk load/unload, explosion handling and `/kalo migrate-world` dry-run — live smoke still recommended. See [the roadmap](#roadmap) for what is real and what is not.
+> ⚠️ **Pre-alpha.** Items, blocks, furniture, armor, **all recipe stations** (crafting +
+> furnace/blast/smoker/campfire/stonecutting/smithing), sounds and glyphs work on Java,
+> verified on Paper 26.2 + Folia. Virtual blocks have a persistent index, chunk
+> load/unload, explosion handling and a `/kalo migrate-world` dry-run.
+>
+> **Bedrock has not been seen by a Bedrock client yet.** The registration path is written
+> and tested and the mapping files match Geyser's documented format, but nothing has
+> confirmed a Bedrock player sees an item icon or a placed block. Read
+> [the roadmap](#roadmap) before you rely on it.
 
 ## Four pillars
 
@@ -30,7 +37,7 @@ translation. That is the thing Kalo exists to do.
 | **Open Source** | MIT, no paid tier gating features |
 | **Community First** | No player caps, item caps, or premium converters |
 | **Paper / Folia** | Modern server API, current Minecraft — both verified on 26.2 |
-| **Java + Bedrock** | Cross-platform designed in, not bolted on |
+| **Java + Bedrock** | One definition compiles to both. No converter, no companion plugin, no second jar — where Geyser shares the server, there is nothing to install or copy at all |
 
 ## Content packs
 
