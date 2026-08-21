@@ -28,9 +28,11 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,7 +43,15 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
     private io.kalo.pack.host.PackHost packHost;
     private io.kalo.pack.host.PackDeliveryListener delivery;
-    private final GenerationQueue generations = new GenerationQueue(ForkJoinPool.commonPool());
+    private PackHostSettings packHostSettings;
+
+    /** One builder prevents reload spam from running several CPU-heavy compilers at once. */
+    private final ExecutorService packExecutor = Executors.newSingleThreadExecutor(
+            Thread.ofPlatform().daemon(true).name("kalo-pack-builder", 0).factory());
+    private final Object generationLock = new Object();
+    private long requestedGeneration;
+    private boolean generationWorkerRunning;
+    private CompletableFuture<Void> generationFuture = CompletableFuture.completedFuture(null);
 
     @Override
     public void preload(@NotNull Context context) {
@@ -49,26 +59,45 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
     @Override
     public void start(@NotNull Context context) {
-        generations.start();
-        // Finish the first build before opening the host. Starting the host first exposed
-        // a previous generated.zip (or nothing) to players who joined during generation,
-        // and they were never offered the completed replacement.
-        try {
-            generateResourcePack().join();
-        } catch (CompletionException e) {
-            throw new IllegalStateException("Initial resource pack generation failed", unwrap(e));
-        }
-        startPackHost(context);
-        sendPackToOnlinePlayers(context);
+        reconfigurePackHost(context);
+        generateResourcePack();
     }
 
     @Override
     public void end(@NotNull Context context) {
-        // A reload clears and repopulates the registries. Let the in-flight generation
-        // finish first so it cannot read half old / half new state or overwrite the new
-        // pack after the replacement generation completes.
-        generations.stopAndWait();
+        stopPackHost();
+    }
 
+    /** Hot-reload path: keep an unchanged HTTP host alive so its URL/hash stay stable. */
+    public void reloadManager(@NotNull Context context) {
+        reconfigurePackHost(context);
+        generateResourcePack();
+    }
+
+    /** Waits for a pack build before registries are torn down underneath it. */
+    public void awaitIdle() {
+        CompletableFuture<Void> future;
+        synchronized (generationLock) {
+            future = generationFuture;
+        }
+        future.join();
+    }
+
+    /** Final plugin shutdown, distinct from a Kalo content hot reload. */
+    public void shutdown() {
+        awaitIdle();
+        packExecutor.shutdown();
+        try {
+            if (!packExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                packExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            packExecutor.shutdownNow();
+        }
+    }
+
+    private void stopPackHost() {
         if (packHost != null) {
             packHost.stop();
             packHost = null;
@@ -77,108 +106,128 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
             org.bukkit.event.HandlerList.unregisterAll(delivery);
             delivery = null;
         }
+        packHostSettings = null;
     }
 
-    /**
-     * Starts the built-in pack host unless the config points elsewhere.
-     *
-     * <p>Off by default: a server owner has to opt in, because it opens a port and the
-     * right public address is something only they know.</p>
-     */
-    private void startPackHost(@NotNull Context context) {
+    /** Reconfigures the built-in host only when its settings actually changed. */
+    private void reconfigurePackHost(@NotNull Context context) {
         org.bukkit.configuration.file.FileConfiguration config = context.plugin().getConfig();
-        if (!config.getBoolean("pack-host.enabled", false)) {
+        PackHostSettings desired = new PackHostSettings(
+                config.getBoolean("pack-host.enabled", false),
+                config.getInt("pack-host.port", 8163),
+                config.getString("pack-host.public-address", "127.0.0.1"),
+                config.getBoolean("pack-host.required", false));
+
+        if (desired.equals(packHostSettings)
+                && (!desired.enabled() || packHost != null)) {
+            return;
+        }
+
+        stopPackHost();
+        packHostSettings = desired;
+        if (!desired.enabled()) {
             return;
         }
 
         packHost = new io.kalo.pack.host.PackHost(
-                generatedPackFile(),
-                config.getInt("pack-host.port", 8163),
-                config.getString("pack-host.public-address", "127.0.0.1"));
+                generatedPackFile(), desired.port(), desired.publicAddress());
 
         if (packHost.start()) {
-            delivery = new io.kalo.pack.host.PackDeliveryListener(
-                    packHost, config.getBoolean("pack-host.required", false));
+            delivery = new io.kalo.pack.host.PackDeliveryListener(packHost, desired.required());
             Bukkit.getPluginManager().registerEvents(delivery, context.plugin());
         } else {
             packHost = null;
         }
     }
 
-    /** Reloads also replace the pack for players who are already connected. */
-    private void sendPackToOnlinePlayers(@NotNull Context context) {
-        io.kalo.pack.host.PackDeliveryListener current = delivery;
-        if (current == null) {
-            return;
-        }
-        for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
-            player.getScheduler().execute(context.plugin(), () -> {
-                // Do not send through a listener that a concurrent disable already retired.
-                if (delivery == current) {
-                    current.send(player);
-                }
-            }, null, 1L);
-        }
+    private record PackHostSettings(boolean enabled, int port, @NotNull String publicAddress, boolean required) {
     }
 
     @Override
     public @NotNull CompletableFuture<Void> generateResourcePack() {
-        CompletableFuture<Void> generation = generations.submit(() -> {
-            LOGGER.info("Generating resource pack...");
-
-            ResourcePack resourcePack = new ResourcePackImpl(
-                    PackMeta.of(PackFormats.CURRENT, PACK_DESCRIPTION));
-
-            copyPackAssets(resourcePack);
-            compileContentTypes(resourcePack);
-            compileRegistrylessTypes(resourcePack);
-            mergeBasePack(resourcePack);
-
-            dispatchFeatureEvents(resourcePack, RegistryManager.GlobalRegistries.registries());
-
-            Bukkit.getPluginManager().callEvent(new AsyncResourcePackGenerationEvent(resourcePack));
-
-            // Bedrock uses this Java pack as its texture source. Run it after both
-            // extension points so assets supplied by features/add-ons are visible to the
-            // Bedrock compiler too.
-            if (bedrockWanted()) {
-                generateBedrockPack(resourcePack);
+        synchronized (generationLock) {
+            requestedGeneration++;
+            if (!generationWorkerRunning) {
+                generationWorkerRunning = true;
+                generationFuture = CompletableFuture.runAsync(this::drainGenerationQueue, packExecutor);
             }
-
-            // After the event: a listener may have supplied the very asset that would
-            // otherwise look missing.
-            io.kalo.pack.PackValidator.report(io.kalo.pack.PackValidator.validate(resourcePack));
-
-            try {
-                ZipPackWriter.write(generatedPackFile(), resourcePack);
-            } catch (Exception e) {
-                throw new CompletionException("Failed to write the generated resource pack", e);
-            }
-
-            LOGGER.info("Successfully generated resource pack (" + resourcePack.files().size() + " files)");
-
-            if (packHost != null) {
-                // Rotates the URL token as well as the hash: Minecraft caches a pack by
-                // URL, so reusing it after a content change strands players on the old one.
-                packHost.refresh();
-                LOGGER.info("Pack available at " + packHost.url());
-            }
-        });
-
-        // Keep the returned future exceptional for API callers while still ensuring a
-        // fire-and-forget startup generation can never fail silently.
-        generation.whenComplete((ignored, failure) -> {
-            if (failure != null) {
-                LOGGER.log(Level.SEVERE, "Resource pack generation failed", unwrap(failure));
-            }
-        });
-        return generation;
+            return generationFuture;
+        }
     }
 
-    private static @NotNull Throwable unwrap(@NotNull Throwable failure) {
-        return failure instanceof CompletionException && failure.getCause() != null
-                ? failure.getCause()
-                : failure;
+    /**
+     * Collapses any number of requests received during one build into a single follow-up
+     * build. There is never more than one pack compiler touching CPU/disk at a time.
+     */
+    private void drainGenerationQueue() {
+        while (true) {
+            long targetGeneration;
+            synchronized (generationLock) {
+                targetGeneration = requestedGeneration;
+            }
+
+            try {
+                buildResourcePack();
+            } catch (Throwable throwable) {
+                // A fire-and-forget CompletableFuture otherwise makes failures invisible.
+                LOGGER.log(Level.SEVERE, "Resource pack generation failed", throwable);
+            }
+
+            synchronized (generationLock) {
+                if (requestedGeneration == targetGeneration) {
+                    generationWorkerRunning = false;
+                    return;
+                }
+            }
+        }
+    }
+
+    private void buildResourcePack() {
+        LOGGER.info("Generating resource pack...");
+
+        ResourcePack resourcePack = new ResourcePackImpl(
+                PackMeta.of(PackFormats.CURRENT, PACK_DESCRIPTION));
+
+        copyPackAssets(resourcePack);
+        compileContentTypes(resourcePack);
+        compileRegistrylessTypes(resourcePack);
+        mergeBasePack(resourcePack);
+
+        if (bedrockWanted()) {
+            generateBedrockPack(resourcePack);
+        }
+
+        RegistryManager.GlobalRegistries.registries().item().forEach(content ->
+                content.featureEventBus().call(new ResourcePackGenerationEvent(resourcePack)));
+
+        Bukkit.getPluginManager().callEvent(new AsyncResourcePackGenerationEvent(resourcePack));
+
+        // After the event: a listener may have supplied the very asset that would
+        // otherwise look missing.
+        io.kalo.pack.PackValidator.report(io.kalo.pack.PackValidator.validate(resourcePack));
+
+        final boolean changed;
+        try {
+            changed = ZipPackWriter.writeIfChanged(generatedPackFile(), resourcePack);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Failed to write the generated resource pack", e);
+            return;
+        }
+
+        if (changed) {
+            LOGGER.info("Generated resource pack (" + resourcePack.files().size() + " files; output changed)");
+        } else {
+            LOGGER.info("Resource pack unchanged (" + resourcePack.files().size() + " files; keeping existing bytes/hash)");
+        }
+
+        io.kalo.pack.host.PackHost host = packHost;
+        if (host != null) {
+            if (changed) {
+                // Only changed bytes get a new cache-busting URL and SHA-1.
+                host.refresh();
+            }
+            LOGGER.info("Pack available at " + host.url());
+        }
     }
 
     /**
@@ -242,7 +291,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         java.util.Map<net.kyori.adventure.key.Key, Integer> blockStates = new java.util.HashMap<>();
         if (Kalo.plugin().registryManager() instanceof RegistryManagerImpl impl) {
             impl.blockStateAllocator().assignments().forEach((key, assignment) ->
-                    blockStates.put(net.kyori.adventure.key.Key.key(key), assignment));
+                    blockStates.put(net.kyori.adventure.key.Key.key(key), assignment.state()));
         }
 
         ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(0, PACK_DESCRIPTION));

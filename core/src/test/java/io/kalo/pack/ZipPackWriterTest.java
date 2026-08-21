@@ -17,6 +17,7 @@ import java.util.zip.ZipFile;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -68,6 +69,17 @@ class ZipPackWriterTest {
         ZipPackWriter.write(second, populated());
 
         assertArrayEquals(Files.readAllBytes(first.toPath()), Files.readAllBytes(second.toPath()));
+    }
+
+    @Test
+    void unchangedOutputIsReportedAsANoOp(@TempDir Path dir) throws IOException {
+        File out = dir.resolve("pack.zip").toFile();
+        assertTrue(ZipPackWriter.writeIfChanged(out, populated()));
+        assertFalse(ZipPackWriter.writeIfChanged(out, populated()));
+
+        ResourcePack changed = populated();
+        changed.file("assets/testpack/extra.json", Writable.string("changed"));
+        assertTrue(ZipPackWriter.writeIfChanged(out, changed));
     }
 
     @Test

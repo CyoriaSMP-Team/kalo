@@ -21,6 +21,22 @@ base-pack: ""
 #   never  skip Bedrock entirely.
 bedrock: auto
 
+# Runtime performance controller.
+#
+# Kalo has no artificial item/block/furniture count caps. Instead it watches actual server
+# pressure and backs off optional work when the host is struggling. Disable adaptive mode
+# if you prefer fixed behaviour; content remains unlimited either way.
+performance:
+  adaptive:
+    enabled: true
+    tps-warning: 18.5
+    tps-critical: 16.0
+    heap-warning: 0.80
+    heap-critical: 0.90
+    # Pressure rises immediately, but must stay healthy for this many samples before Kalo
+    # restores full background/cache/render budgets. This prevents rapid oscillation.
+    recovery-samples: 5
+
 # Serving the generated resource pack to players.
 #
 # Off by default on purpose: enabling it opens a port, and the address players need to

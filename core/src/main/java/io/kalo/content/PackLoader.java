@@ -14,8 +14,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -23,6 +26,9 @@ import java.util.logging.Logger;
 public final class PackLoader {
     private static final ConfigSchema CONTENTS_PACK_CONFIG_SCHEMA = new ContentsPackConfigSchema();
     private static final ConfigSchema CONTENT_CONFIG_SCHEMA = new ContentConfigSchema();
+
+    /** Parsed YAML is reused while size+mtime are unchanged; hot reload still replays type loaders. */
+    private static final ConcurrentHashMap<Path, CachedYaml> YAML_CACHE = new ConcurrentHashMap<>();
 
     private PackLoader() {
     }
@@ -146,13 +152,24 @@ public final class PackLoader {
     }
 
     private static @Nullable YamlConfiguration loadYaml(@NotNull File file, @NotNull Logger logger) {
-        YamlConfiguration config = new YamlConfiguration();
+        Path path = file.toPath().toAbsolutePath().normalize();
         try {
+            BasicFileAttributes attributes = java.nio.file.Files.readAttributes(path, BasicFileAttributes.class);
+            CachedYaml cached = YAML_CACHE.get(path);
+            if (cached != null && cached.size() == attributes.size()
+                    && cached.modifiedMillis() == attributes.lastModifiedTime().toMillis()) {
+                return cached.configuration();
+            }
+
+            YamlConfiguration config = new YamlConfiguration();
             config.load(file);
+            YAML_CACHE.put(path, new CachedYaml(attributes.size(), attributes.lastModifiedTime().toMillis(), config));
             return config;
         } catch (IOException | InvalidConfigurationException | RuntimeException e) {
             logger.log(Level.WARNING, "Could not parse YAML file " + file, e);
             return null;
         }
     }
+
+    private record CachedYaml(long size, long modifiedMillis, @NotNull YamlConfiguration configuration) {}
 }

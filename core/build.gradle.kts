@@ -1,4 +1,5 @@
 import xyz.jpenilla.resourcefactory.paper.PaperPluginYaml
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     id("paper-conventions")
@@ -22,6 +23,28 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.12.3")
     // Soft dependency: touched only when Geyser shares this JVM.
     compileOnly("org.geysermc.geyser:api:2.11.1-SNAPSHOT")
+}
+
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("benchmark")
+    }
+}
+
+val performanceBenchmark by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Runs Kalo's scale/performance macro benchmark"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("benchmark")
+    }
+    outputs.upToDateWhen { false }
+    systemProperty(
+        "kalo.benchmark.output",
+        layout.buildDirectory.file("reports/benchmarks/kalo-performance.txt").get().asFile.absolutePath
+    )
+    testLogging.showStandardStreams = true
 }
 
 paperPluginYaml {

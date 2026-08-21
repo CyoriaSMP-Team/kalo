@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import io.kalo.content.block.Block;
 import io.kalo.content.block.definition.BlockDefinition;
 import io.kalo.content.block.definition.BlockModelDefinition;
+import io.kalo.content.block.definition.JavaBlockMode;
 import io.kalo.content.item.Item;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
@@ -256,12 +257,12 @@ public final class BedrockPackCompiler {
             JsonObject materialJson = new JsonObject();
             materials.forEach(materialJson::addProperty);
             record.add("material_instances", materialJson);
-            Integer state = allocator.apply(key);
+            JavaBlockMode javaMode = definition.java().mode();
+            record.addProperty("java_mode", javaMode.name().toLowerCase(Locale.ROOT));
+            Integer state = javaMode == JavaBlockMode.NATIVE ? allocator.apply(key) : null;
             String javaIdentifier = null;
             if (state != null) {
                 record.addProperty("java_carrier_state", state);
-                // The standalone extension cannot interpret Kalo's internal integer on
-                // its own. Geyser's override API needs the complete Java state string.
                 javaIdentifier = GeyserBlockState.javaIdentifier(state);
                 record.addProperty("java_identifier", javaIdentifier);
             }

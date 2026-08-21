@@ -27,6 +27,7 @@ public final class EntryScalableRegistry<T, E extends EntryWritableRegistry.Regi
         T value = registryEntry.toValue();
 
         map.put(key.asString(), value);
+        markDirty();
         return value;
     }
 }

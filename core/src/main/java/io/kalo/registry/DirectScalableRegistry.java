@@ -11,6 +11,7 @@ public final class DirectScalableRegistry<T> extends ScalableRegistry<T> impleme
         if (map.putIfAbsent(key.asString(), value) != null) {
             throw new IllegalStateException("The registry already contains '" + key.asString() + "'");
         }
+        markDirty();
         return value;
     }
 }

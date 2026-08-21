@@ -4,6 +4,8 @@ import io.kalo.manager.ContentManager;
 import io.kalo.manager.RegistryManager;
 import io.kalo.manager.RegistryManagerImpl;
 import io.kalo.manager.ResourcePackManager;
+import io.kalo.performance.PerformanceService;
+import io.kalo.performance.PerformanceSnapshot;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -33,6 +35,16 @@ public final class TestKalo {
             @Override
             public ResourcePackManager resourcePackManager() {
                 return resourcePacks;
+            }
+
+            @Override
+            public PerformanceService performance() {
+                return new PerformanceService() {
+                    @Override public PerformanceSnapshot snapshot() { return PerformanceSnapshot.initial(); }
+                    @Override public boolean adaptiveEnabled() { return false; }
+                    @Override public void addPressureListener(java.util.function.Consumer<PerformanceSnapshot> listener) {}
+                    @Override public void removePressureListener(java.util.function.Consumer<PerformanceSnapshot> listener) {}
+                };
             }
 
             @Override
