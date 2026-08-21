@@ -114,11 +114,15 @@ public final class GeyserBridge {
         }
 
         int registered = 0;
+        int virtual = 0;
         for (BedrockBlockRegistration block : snapshot.get()) {
             try {
                 if (block.javaIdentifier() == null) {
-                    Plugins.logger().warning("Cannot map Kalo block " + block.javaKey()
-                            + ": its Java carrier state is missing");
+                    // A virtual block is an ItemDisplay entity, not a block state, so there
+                    // is no Java state for Geyser to override. Expected, not a failure —
+                    // warning per block turned a virtual-heavy pack's startup into a wall
+                    // of noise about nothing being wrong.
+                    virtual++;
                     continue;
                 }
                 CustomBlockData data = build(block);
@@ -133,7 +137,8 @@ public final class GeyserBridge {
             }
         }
 
-        Plugins.logger().info("Registered and mapped " + registered + " block(s) with Geyser natively");
+        Plugins.logger().info("Registered and mapped " + registered + " block(s) with Geyser natively"
+                + (virtual > 0 ? "; " + virtual + " virtual block(s) render as entities instead" : ""));
     }
 
     /** Registers the same Geyser v2 definitions that the standalone mapping file carries. */
@@ -323,12 +328,9 @@ public final class GeyserBridge {
     private record CachedPack(@NotNull ResourcePack pack, long size, long modified) {
     }
 
+    /** One reader for the {@code bedrock} setting, shared with the pack generator. */
     private static boolean bedrockOutputEnabled() {
-        if (!(io.kalo.Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin)) {
-            return true;
-        }
-        String configured = plugin.getConfig().getString("bedrock", "auto");
-        return configured == null
-                || !(configured.equalsIgnoreCase("never") || configured.equalsIgnoreCase("false"));
+        return io.kalo.manager.ResourcePackManagerImpl.bedrockWanted();
     }
+
 }

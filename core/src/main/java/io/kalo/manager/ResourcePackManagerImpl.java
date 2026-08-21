@@ -270,8 +270,13 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
      * scale that is thousands of files written for nobody. Detected rather than asked for,
      * with an override because Geyser can also run as a separate process this cannot
      * see.</p>
+     *
+     * <p>{@code GeyserBridge} asks this too rather than reading the setting itself. Two
+     * readers of one key drift: the bridge's copy treated anything but {@code never} as
+     * yes, so {@code auto} on a server without Geyser meant one half was off and the other
+     * on.</p>
      */
-    private static boolean bedrockWanted() {
+    public static boolean bedrockWanted() {
         String mode = Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin
                 ? plugin.getConfig().getString("bedrock", "auto")
                 : "auto";
