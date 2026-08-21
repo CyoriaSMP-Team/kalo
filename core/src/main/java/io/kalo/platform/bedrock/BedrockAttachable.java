@@ -30,14 +30,19 @@ public final class BedrockAttachable {
     /**
      * The vanilla armor geometry each slot attaches to.
      *
-     * <p>Bedrock has one per piece rather than the two layers Java uses.</p>
+     * <p>Bedrock has one per piece rather than the two layers Java uses. These names are
+     * vanilla's and must match exactly: an attachable naming a geometry that does not
+     * exist draws nothing, and because {@link #hideVanillaLayer} has already switched off
+     * the base material's own armor, the result is a piece that equips and is invisible.
+     * That is precisely what a Bedrock player saw when these read
+     * {@code geometry.player_armor.*}, which is not a geometry Bedrock defines.</p>
      */
     static @NotNull String geometryFor(@NotNull ArmorSlot slot) {
         return switch (slot) {
-            case HEAD -> "geometry.player_armor.helmet";
-            case CHEST -> "geometry.player_armor.chestplate";
-            case LEGS -> "geometry.player_armor.leggings";
-            case FEET -> "geometry.player_armor.boots";
+            case HEAD -> "geometry.humanoid.armor.helmet";
+            case CHEST -> "geometry.humanoid.armor.chestplate";
+            case LEGS -> "geometry.humanoid.armor.leggings";
+            case FEET -> "geometry.humanoid.armor.boots";
         };
     }
 

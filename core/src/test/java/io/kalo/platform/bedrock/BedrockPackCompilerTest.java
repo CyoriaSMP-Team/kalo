@@ -520,7 +520,11 @@ class BedrockPackCompilerTest {
                 .getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
 
         assertEquals("testpack:ruby_helmet", attachable.get("identifier").getAsString());
-        assertEquals("geometry.player_armor.helmet",
+        // Vanilla's own geometry name, and it has to be exact. A Bedrock player equipping
+        // this saw nothing at all while it read geometry.player_armor.helmet: the piece
+        // drew no model, and parent_setup had already hidden the base material's armor.
+        // This assertion pinned that string, which is how it survived to a real client.
+        assertEquals("geometry.humanoid.armor.helmet",
                 attachable.getAsJsonObject("geometry").get("default").getAsString());
         // Hides the vanilla layer, or Bedrock draws both at once.
         assertTrue(attachable.getAsJsonObject("scripts").get("parent_setup").getAsString()
