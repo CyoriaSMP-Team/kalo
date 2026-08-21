@@ -19,6 +19,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Job level, not step level: a step's own env block is not in scope for its `if`.
+    env:
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+      HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
     steps:
       - uses: actions/checkout@v6
 
@@ -47,7 +51,40 @@ jobs:
       - name: Build and test
         run: ./gradlew build --stacktrace
 
-      - name: Publish release
+      # The jar has to start on the oldest server in the supported range, and only its
+      # class file version can prove that. Catching it here beats a release that a 1.21.4
+      # owner discovers by the plugin refusing to load.
+      - name: Verify the jar targets Java 21
+        run: |
+          jar="build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar"
+          major=$(unzip -p "$jar" io/kalo/KaloPluginImpl.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          if [ "$major" != "65" ]; then
+            echo "::error::Expected major 65 (Java 21); got $major. This jar will not start on Paper 1.21.4."
+            exit 1
+          fi
+
+      # Four channels each want release notes, and none of them should get an empty box.
+      # Failing here costs a re-tag; shipping blank notes to Modrinth cannot be undone.
+      - name: Extract this version's changelog
+        id: changelog
+        run: |
+          version="${{ steps.version.outputs.plugin_version }}"
+          body=$(awk -v v="^## $version\\b" '
+            $0 ~ v {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md)
+          if [ -z "$(echo "$body" | tr -d '[:space:]')" ]; then
+            echo "::error::CHANGELOG.md has no content under '## $version'. Rename the Unreleased section before tagging."
+            exit 1
+          fi
+          {
+            echo 'body<<KALO_EOF'
+            echo "$body"
+            echo KALO_EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -57,3 +94,55 @@ jobs:
             --generate-notes \
             --target "${{ github.sha }}" \
             build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar
+
+      # Modrinth and Hangar are skipped rather than failed when their secret is absent, so
+      # the workflow is useful before either account exists. SpigotMC has no upload API and
+      # stays manual; see docs/RELEASING.md.
+      - name: Publish to Modrinth
+        if: ${{ env.MODRINTH_TOKEN != '' }}
+        env:
+          MODRINTH_PROJECT: ${{ vars.MODRINTH_PROJECT_ID }}
+          GAME_VERSIONS: ${{ vars.SUPPORTED_GAME_VERSIONS }}
+          VERSION: ${{ steps.version.outputs.plugin_version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          CHANGELOG: ${{ steps.changelog.outputs.body }}
+        run: |
+          jar="build/libs/Kalo-$VERSION.jar"
+          data=$(jq -nc \
+            --arg name "$TAG" \
+            --arg number "$VERSION" \
+            --arg changelog "$CHANGELOG" \
+            --arg project "$MODRINTH_PROJECT" \
+            --argjson versions "$GAME_VERSIONS" \
+            '{name: $name, version_number: $number, changelog: $changelog,
+              dependencies: [], game_versions: $versions, version_type: "release",
+              loaders: ["paper", "folia"], featured: true, project_id: $project,
+              file_parts: ["file"], primary_file: "file"}')
+          curl --fail-with-body -sS -X POST https://api.modrinth.com/v2/version \
+            -H "Authorization: $MODRINTH_TOKEN" \
+            -F "data=$data" \
+            -F "file=@$jar"
+
+      - name: Publish to Hangar
+        if: ${{ env.HANGAR_TOKEN != '' }}
+        env:
+          HANGAR_SLUG: ${{ vars.HANGAR_SLUG }}
+          GAME_VERSIONS: ${{ vars.SUPPORTED_GAME_VERSIONS }}
+          VERSION: ${{ steps.version.outputs.plugin_version }}
+          CHANGELOG: ${{ steps.changelog.outputs.body }}
+        run: |
+          jwt=$(curl --fail-with-body -sS -X POST \
+            "https://hangar.papermc.io/api/v1/authenticate?apiKey=$HANGAR_TOKEN" \
+            | jq -r .token)
+          upload=$(jq -nc \
+            --arg version "$VERSION" \
+            --arg changelog "$CHANGELOG" \
+            --argjson versions "$GAME_VERSIONS" \
+            '{version: $version, description: $changelog, channel: "Release",
+              files: [{platforms: ["PAPER"]}],
+              platformDependencies: {PAPER: $versions}, pluginDependencies: {}}')
+          curl --fail-with-body -sS -X POST \
+            "https://hangar.papermc.io/api/v1/projects/$HANGAR_SLUG/upload" \
+            -H "Authorization: $jwt" \
+            -F "versionUpload=$upload;type=application/json" \
+            -F "files=@build/libs/Kalo-$VERSION.jar"

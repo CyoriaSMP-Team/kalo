@@ -13,24 +13,42 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Kalo compiles to Java 21 bytecode so one jar spans 1.21.4 to 26.2. Building on
+        # both JDKs is what keeps that true: a 25-only API creeping into the source would
+        # otherwise only surface on a 1.21.4 server, at a player's expense.
+        java: ['21', '25']
+    name: Build (Java ${{ matrix.java }})
     steps:
       - uses: actions/checkout@v6
 
-      # Minecraft 26.x requires Java 25, so the plugin targets it too.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ matrix.java }}
 
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Build and test
         run: ./gradlew build --stacktrace
 
+      - name: Verify the jar targets Java 21
+        run: |
+          jar=$(ls build/libs/Kalo-*.jar)
+          major=$(unzip -p "$jar" io/kalo/KaloPluginImpl.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          echo "$jar reports class file major version $major"
+          if [ "$major" != "65" ]; then
+            echo "::error::Expected major 65 (Java 21); got $major. This jar will not start on Paper 1.21.4."
+            exit 1
+          fi
+
       - name: Run performance macro benchmark
         run: ./gradlew :core:performanceBenchmark --stacktrace
 
       - name: Upload performance report
+        if: matrix.java == '25'
         uses: actions/upload-artifact@v4
         with:
           name: performance-benchmark
@@ -38,6 +56,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload plugin jar
+        if: matrix.java == '25'
         uses: actions/upload-artifact@v4
         with:
           name: Kalo
@@ -48,5 +67,5 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: test-reports-java-${{ matrix.java }}
           path: '**/build/reports/tests/'
