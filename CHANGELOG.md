@@ -42,6 +42,12 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   files are written. No Bedrock client has connected yet, so what a player actually sees
   remains unverified.
 
+### Known limitations
+
+- `pack_format` is only verified for 1.21.4 and 26.2. A server on any version in between
+  gets 46 and a console warning saying so. A wrong `pack_format` can make the client reject
+  the pack outright, so treat the warning as work to do, not noise.
+
 ### Changed
 
 - **The `geyser-extension` jar is gone.** Geyser reads a `custom_mappings` folder natively,
