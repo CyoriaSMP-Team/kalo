@@ -34,6 +34,14 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   the guarded call failed with `NoClassDefFoundError` every time. It now declares the
   classpath edge, the way the Geyser dependency already did.
 
+### Verified
+
+- Deployed to a live Paper server running Geyser and Floodgate. Kalo registers 5 items,
+  2 native blocks and the generated pack with Geyser at startup; the third block is
+  virtual and reported as rendering through its entity instead. Both `custom_mappings`
+  files are written. No Bedrock client has connected yet, so what a player actually sees
+  remains unverified.
+
 ### Changed
 
 - **The `geyser-extension` jar is gone.** Geyser reads a `custom_mappings` folder natively,

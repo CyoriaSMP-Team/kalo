@@ -506,7 +506,7 @@ only been written — the middle column is the one worth reading before you inst
 
 | | What is missing |
 |---|---|
-| **Bedrock, everything** | No Bedrock client has ever connected. On a real Paper 26.2 server the pack, both Geyser mapping files, and the identifiers linking them to the pack's `blocks.json` and terrain atlas all generate and agree — but nothing has confirmed a Bedrock *player* sees an item icon, a placed block, or worn armor. This is the single biggest gap between what Kalo claims and what Kalo has proven. |
+| **Bedrock, as a player sees it** | Verified on a live server running Geyser: Kalo registers its items, blocks and generated pack with Geyser natively at startup, and the identifiers linking the mapping files to the pack's `blocks.json` and terrain atlas agree. What has **not** happened is a Bedrock client connecting, so nothing has confirmed a *player* sees an item icon, a placed block, or worn armor. That last step is the gap. |
 | Bedrock virtual blocks | Placement and `ItemDisplay` rendering unconfirmed — see [docs/VIRTUAL_BLOCKS.md](docs/VIRTUAL_BLOCKS.md) |
 | Standalone-Geyser path | The mapping files generate on a real server and match Geyser's documented format, but the copy-the-files setup has not been run against a real standalone Geyser |
 | The 1.21.4 end of the version range | One jar spans 1.21.4 → 26.2 and `pack_format` auto-selects per version, but testing has happened on 26.2 only |
