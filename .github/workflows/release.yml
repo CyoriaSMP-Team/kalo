@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.0.1). Created from the current ref if missing.'
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Minecraft 26.x requires Java 25, so the plugin targets it too.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      # The tag is the release name, but gradle.properties is what the jars are
+      # named after, so a mismatch would ship a jar that contradicts its release.
+      - name: Resolve and verify version
+        id: version
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          plugin_version="$(sed -n 's/^plugin_version=//p' gradle.properties)"
+          if [ "$tag" != "v$plugin_version" ]; then
+            echo "::error::Tag $tag does not match plugin_version=$plugin_version (expected v$plugin_version)"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "plugin_version=$plugin_version" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
+        run: ./gradlew build --stacktrace
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            --target "${{ github.sha }}" \
+            build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar \
+            geyser-extension/build/libs/geyser-extension-${{ steps.version.outputs.plugin_version }}.jar
