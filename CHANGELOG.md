@@ -6,7 +6,7 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
-## Unreleased
+## 0.1.0-rc.1
 
 ### Fixed
 
