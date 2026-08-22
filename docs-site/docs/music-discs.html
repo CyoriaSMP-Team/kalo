@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Migration - Kalo</title>
+    <title>Music Discs - Kalo</title>
     <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <nav style="background: #1a1a2e; padding: 15px; margin-bottom: 20px;">
+        <a href="../" style="color: #f39c12; text-decoration: none; font-weight: bold;">← Back to Home</a>
+    </nav>
     <aside class="sidebar">
         <div class="sidebar-header">
             <a href="index.html" class="sidebar-logo">
@@ -44,7 +47,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                     Paintings
                 </a>
-                <a href="music-discs.html" class="nav-link">
+                <a href="music-discs.html" class="nav-link active">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
                     Music Discs
                 </a>
@@ -62,7 +65,7 @@
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">Developer</div>
-                <a href="migration.html" class="nav-link active">
+                <a href="migration.html" class="nav-link">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
                     Migration
                 </a>
@@ -73,13 +76,6 @@
                 <a href="config.html" class="nav-link">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     Config
-                </a>
-            </div>
-            <div class="nav-section">
-                <div class="nav-section-title">Tools</div>
-                <a href="gui-visualizer.html" class="nav-link">
-                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-                    GUI Visualizer
                 </a>
             </div>
         </nav>
@@ -93,37 +89,25 @@
 
     <main class="main">
         <div class="content">
-            <h1>Migration</h1>
-            <h2>Supported Plugins</h2>
-            <p>Migration reads each plugin's config files and converts them to Kalo definitions. The importer reports anything it cannot carry (behaviours, unrecognised keys) rather than guessing — a quietly dropped mechanic is a bug a server owner finds out about from their players.</p>
+            <h1>Music Discs</h1>
+            <h2>Basic Disc</h2>
+            <pre><code>ruby_disc:
+  type: music_disc
+  sound: "testpack:music.ruby_theme"
+  description: "Ruby Theme - A majestic melody"
+  duration: 180
+  comparator_output: 12
+  display:
+    name: "&lt;gradient:#ff5f6d:#ffc371&gt;Ruby Disc&lt;/gradient&gt;"
+  model:
+    sprite: "item/ruby_disc"</code></pre>
+            <h2>Configuration</h2>
             <table>
-                <tr><th>Plugin</th><th>Items</th><th>Blocks</th><th>Furniture</th><th>Recipes</th></tr>
-                <tr><td>Oraxen / Nexo</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
-                <tr><td>ItemsAdder</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
-                <tr><td>CraftEngine</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
-                <tr><td>Neko</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
-                <tr><td>MMOItems</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
-                <tr><td>MythicMobs</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
-                <tr><td>CrackShot</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
-                <tr><td>ModelEngine</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
+                <tr><th>Option</th><th>Type</th><th>Description</th></tr>
+                <tr><td><code>sound</code></td><td>string</td><td>Sound event to play</td></tr>
+                <tr><td><code>duration</code></td><td>int</td><td>Duration in seconds</td></tr>
+                <tr><td><code>comparator_output</code></td><td>int</td><td>Redstone signal (1-15)</td></tr>
             </table>
-            <p style="margin-top:0.5rem; font-size:0.875rem; color:var(--muted-fg);">
-                <span class="status status-supported" style="font-size:0.75rem;">✓</span> Imported&ensp;
-                <span class="status status-unsupported" style="font-size:0.75rem;">not yet</span> Exists in source plugin but not imported by Kalo yet&ensp;
-                <span class="status status-na" style="font-size:0.75rem;">N/A</span> Feature does not exist in source plugin
-            </p>
-            <p><strong>Notes:</strong></p>
-            <ul>
-                <li><strong>Neko</strong> only ever shipped an item type — it had no blocks, furniture or recipes. Imported items will render as their base material until a model section is added.</li>
-                <li><strong>CraftEngine</strong> — full support for items, blocks, furniture and recipes. CraftEngine sounds and categories are not imported.</li>
-                <li><strong>MMOItems, MythicMobs, CrackShot</strong> — these plugins focus on items (RPG items, mobs, weapons). Their abilities, skills and mechanics have no Kalo equivalent and are reported as unsupported.</li>
-                <li><strong>ModelEngine</strong> — imports model references as items. Bedrock geometry files (.geo.json) need to be placed in the pack manually. Entity animations and AI behaviors have no Kalo equivalent.</li>
-                <li>Oraxen and ItemsAdder <em>behaviours</em>/<em>mechanics</em> have no mechanical equivalent in Kalo features and are reported as unsupported.</li>
-            </ul>
-            <h2>Command</h2>
-            <pre><code>/kalo import oraxen
-/kalo import itemsadder</code></pre>
-            <p>The importer automatically copies textures and models from the source plugin into the Kalo pack — no manual file copying needed. After import, run <code>/kalo reload</code> to load the content.</p>
         </div>
     </main>
 </body>

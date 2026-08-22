@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quick Start - Kalo</title>
+    <title>API - Kalo</title>
     <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <nav style="background: #1a1a2e; padding: 15px; margin-bottom: 20px;">
+        <a href="../" style="color: #f39c12; text-decoration: none; font-weight: bold;">← Back to Home</a>
+    </nav>
     <aside class="sidebar">
         <div class="sidebar-header">
             <a href="index.html" class="sidebar-logo">
@@ -25,7 +28,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                     Home
                 </a>
-                <a href="getting-started.html" class="nav-link active">
+                <a href="getting-started.html" class="nav-link">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                     Quick Start
                 </a>
@@ -66,7 +69,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
                     Migration
                 </a>
-                <a href="api.html" class="nav-link">
+                <a href="api.html" class="nav-link active">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                     API
                 </a>
@@ -86,44 +89,21 @@
 
     <main class="main">
         <div class="content">
-            <h1>Quick Start</h1>
-            <h2>Prerequisites</h2>
-            <ul>
-                <li>Java 21+ (Java 25 for Paper 26.2)</li>
-                <li>Paper or Folia server</li>
-            </ul>
-            <h2>Installation</h2>
-            <pre><code># 1. Build Kalo
-git clone https://github.com/CyoriaSMP-Team/kalo.git
-cd kalo/main
-./gradlew build
-
-# 2. Install plugin
-cp build/libs/Kalo-*.jar /path/to/server/plugins/
-
-# 3. Create content pack
-mkdir -p plugins/Kalo/packs/myitem/configs
-mkdir -p plugins/Kalo/packs/myitem/assets/myitem/textures/item</code></pre>
-            <h2>First Item</h2>
-            <pre><code># plugins/Kalo/packs/myitem/configs/items.yml
-ruby_sword:
-  type: item
-  display:
-    name: "&lt;red&gt;Ruby Sword&lt;/red&gt;"
-    lore:
-      - "&lt;gray&gt;A powerful sword&lt;/gray&gt;"
-  model:
-    sprite: "item/ruby_sword"
-  item:
-    material: DIAMOND_SWORD
-    durability: 1561
-    damage: 7</code></pre>
-            <h2>Commands</h2>
+            <h1>API Reference</h1>
+            <h2>Maven</h2>
+            <pre><code>&lt;dependency&gt;
+  &lt;groupId&gt;com.github.CyoriaSMP-Team&lt;/groupId&gt;
+  &lt;artifactId&gt;kalo&lt;/artifactId&gt;
+  &lt;version&gt;0.1.0&lt;/version&gt;
+  &lt;scope&gt;provided&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+            <h2>Events</h2>
             <table>
-                <tr><th>Command</th><th>Description</th></tr>
-                <tr><td><code>/kalo reload</code></td><td>Reload all content packs</td></tr>
-                <tr><td><code>/kalo give &lt;player&gt; &lt;item&gt;</code></td><td>Give a Kalo item</td></tr>
-                <tr><td><code>/kalo migrate &lt;plugin&gt;</code></td><td>Migrate from other plugins</td></tr>
+                <tr><th>Event</th><th>Description</th></tr>
+                <tr><td><code>KaloItemInteractEvent</code></td><td>Player interacts with item</td></tr>
+                <tr><td><code>KaloBlockPlaceEvent</code></td><td>Block is placed</td></tr>
+                <tr><td><code>KaloBlockBreakEvent</code></td><td>Block is broken</td></tr>
+                <tr><td><code>KaloFurnitureInteractEvent</code></td><td>Furniture interaction</td></tr>
             </table>
         </div>
     </main>

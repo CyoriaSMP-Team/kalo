@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API - Kalo</title>
+    <title>GUIs - Kalo</title>
     <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <nav style="background: #1a1a2e; padding: 15px; margin-bottom: 20px;">
+        <a href="../" style="color: #f39c12; text-decoration: none; font-weight: bold;">← Back to Home</a>
+    </nav>
     <aside class="sidebar">
         <div class="sidebar-header">
             <a href="index.html" class="sidebar-logo">
@@ -48,7 +51,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
                     Music Discs
                 </a>
-                <a href="guis.html" class="nav-link">
+                <a href="guis.html" class="nav-link active">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
                     GUIs
                 </a>
@@ -66,7 +69,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
                     Migration
                 </a>
-                <a href="api.html" class="nav-link active">
+                <a href="api.html" class="nav-link">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                     API
                 </a>
@@ -86,21 +89,30 @@
 
     <main class="main">
         <div class="content">
-            <h1>API Reference</h1>
-            <h2>Maven</h2>
-            <pre><code>&lt;dependency&gt;
-  &lt;groupId&gt;com.github.CyoriaSMP-Team&lt;/groupId&gt;
-  &lt;artifactId&gt;kalo&lt;/artifactId&gt;
-  &lt;version&gt;0.1.0&lt;/version&gt;
-  &lt;scope&gt;provided&lt;/scope&gt;
-&lt;/dependency&gt;</code></pre>
-            <h2>Events</h2>
+            <h1>Custom GUIs</h1>
+            <h2>Basic Menu</h2>
+            <pre><code>main_menu:
+  type: gui
+  title: "&lt;gradient:#ff5f6d:#ffc371&gt;Server Menu&lt;/gradient&gt;"
+  rows: 3
+  items:
+    4:
+      material: NETHER_STAR
+      display_name: "&lt;gold&gt;Teleport&lt;/gold&gt;"
+      actions:
+        - "gui:testpack:teleport_menu"
+    22:
+      material: BARRIER
+      display_name: "&lt;red&gt;Close&lt;/red&gt;"
+      actions:
+        - "close"</code></pre>
+            <h2>Action Types</h2>
             <table>
-                <tr><th>Event</th><th>Description</th></tr>
-                <tr><td><code>KaloItemInteractEvent</code></td><td>Player interacts with item</td></tr>
-                <tr><td><code>KaloBlockPlaceEvent</code></td><td>Block is placed</td></tr>
-                <tr><td><code>KaloBlockBreakEvent</code></td><td>Block is broken</td></tr>
-                <tr><td><code>KaloFurnitureInteractEvent</code></td><td>Furniture interaction</td></tr>
+                <tr><th>Action</th><th>Format</th></tr>
+                <tr><td>Command</td><td><code>command:/cmd</code></td></tr>
+                <tr><td>Message</td><td><code>message:&lt;text&gt;</code></td></tr>
+                <tr><td>Close</td><td><code>close</code></td></tr>
+                <tr><td>Open GUI</td><td><code>gui:&lt;key&gt;</code></td></tr>
             </table>
         </div>
     </main>

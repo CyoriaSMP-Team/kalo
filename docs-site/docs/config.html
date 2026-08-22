@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GUIs - Kalo</title>
+    <title>Configuration - Kalo</title>
     <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <nav style="background: #1a1a2e; padding: 15px; margin-bottom: 20px;">
+        <a href="../" style="color: #f39c12; text-decoration: none; font-weight: bold;">← Back to Home</a>
+    </nav>
     <aside class="sidebar">
         <div class="sidebar-header">
             <a href="index.html" class="sidebar-logo">
@@ -48,7 +51,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
                     Music Discs
                 </a>
-                <a href="guis.html" class="nav-link active">
+                <a href="guis.html" class="nav-link">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
                     GUIs
                 </a>
@@ -70,7 +73,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                     API
                 </a>
-                <a href="config.html" class="nav-link">
+                <a href="config.html" class="nav-link active">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     Config
                 </a>
@@ -86,31 +89,29 @@
 
     <main class="main">
         <div class="content">
-            <h1>Custom GUIs</h1>
-            <h2>Basic Menu</h2>
-            <pre><code>main_menu:
-  type: gui
-  title: "&lt;gradient:#ff5f6d:#ffc371&gt;Server Menu&lt;/gradient&gt;"
-  rows: 3
-  items:
-    4:
-      material: NETHER_STAR
-      display_name: "&lt;gold&gt;Teleport&lt;/gold&gt;"
-      actions:
-        - "gui:testpack:teleport_menu"
-    22:
-      material: BARRIER
-      display_name: "&lt;red&gt;Close&lt;/red&gt;"
-      actions:
-        - "close"</code></pre>
-            <h2>Action Types</h2>
-            <table>
-                <tr><th>Action</th><th>Format</th></tr>
-                <tr><td>Command</td><td><code>command:/cmd</code></td></tr>
-                <tr><td>Message</td><td><code>message:&lt;text&gt;</code></td></tr>
-                <tr><td>Close</td><td><code>close</code></td></tr>
-                <tr><td>Open GUI</td><td><code>gui:&lt;key&gt;</code></td></tr>
-            </table>
+            <h1>Configuration</h1>
+            <h2>Config Structure</h2>
+            <pre><code>plugins/Kalo/
+├── config.yml           # Main config
+└── packs/
+    └── mypack/
+        ├── pack.yml     # Pack metadata
+        └── configs/
+            ├── items.yml
+            ├── blocks.yml
+            ├── furniture.yml
+            ├── paintings.yml
+            ├── music_discs.yml
+            ├── guis.yml
+            ├── sounds.yml
+            ├── glyphs.yml
+            └── recipes.yml</code></pre>
+            <h2>Pack Metadata</h2>
+            <pre><code># pack.yml
+name: My Pack
+version: 1.0.0
+description: Custom content for my server
+author: Me</code></pre>
         </div>
     </main>
 </body>

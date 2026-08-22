@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Discs - Kalo</title>
+    <title>Bedrock - Kalo</title>
     <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <nav style="background: #1a1a2e; padding: 15px; margin-bottom: 20px;">
+        <a href="../" style="color: #f39c12; text-decoration: none; font-weight: bold;">← Back to Home</a>
+    </nav>
     <aside class="sidebar">
         <div class="sidebar-header">
             <a href="index.html" class="sidebar-logo">
@@ -44,7 +47,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                     Paintings
                 </a>
-                <a href="music-discs.html" class="nav-link active">
+                <a href="music-discs.html" class="nav-link">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
                     Music Discs
                 </a>
@@ -55,7 +58,7 @@
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">Platform</div>
-                <a href="bedrock.html" class="nav-link">
+                <a href="bedrock.html" class="nav-link active">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                     Bedrock
                 </a>
@@ -86,25 +89,23 @@
 
     <main class="main">
         <div class="content">
-            <h1>Music Discs</h1>
-            <h2>Basic Disc</h2>
-            <pre><code>ruby_disc:
-  type: music_disc
-  sound: "testpack:music.ruby_theme"
-  description: "Ruby Theme - A majestic melody"
-  duration: 180
-  comparator_output: 12
-  display:
-    name: "&lt;gradient:#ff5f6d:#ffc371&gt;Ruby Disc&lt;/gradient&gt;"
-  model:
-    sprite: "item/ruby_disc"</code></pre>
-            <h2>Configuration</h2>
+            <h1>Bedrock Support</h1>
+            <p>Kalo automatically generates Bedrock resource packs for all content.</p>
             <table>
-                <tr><th>Option</th><th>Type</th><th>Description</th></tr>
-                <tr><td><code>sound</code></td><td>string</td><td>Sound event to play</td></tr>
-                <tr><td><code>duration</code></td><td>int</td><td>Duration in seconds</td></tr>
-                <tr><td><code>comparator_output</code></td><td>int</td><td>Redstone signal (1-15)</td></tr>
+                <tr><th>Feature</th><th>Status</th></tr>
+                <tr><td>Items</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Blocks</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Armor</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Furniture</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Paintings</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Sounds</td><td><span class="status status-supported">✓</span></td></tr>
             </table>
+            <h2>Setup</h2>
+            <pre><code># Install Geyser for Bedrock support
+# Kalo will auto-generate Bedrock packs
+
+# Check generated packs
+ls plugins/Kalo/packs/*/bedrock/</code></pre>
         </div>
     </main>
 </body>
