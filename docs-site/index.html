@@ -4,157 +4,394 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kalo - Documentation</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
     <style>
         :root {
-            --theme-color: #ff5f6d;
-            --sidebar-width: 260px;
+            --bg: #0A0A0F;
+            --bg-alt: #12121A;
+            --muted: #1A1A24;
+            --fg: #FAFAFA;
+            --muted-fg: #71717A;
+            --accent: #F59E0B;
+            --accent-fg: #0A0A0F;
+            --accent-muted: rgba(245, 158, 11, 0.15);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 255, 255, 0.15);
+            --card: rgba(26, 26, 36, 0.6);
+            --sidebar-w: 280px;
+            --font-display: 'Space Grotesk', system-ui, sans-serif;
+            --font-body: 'Inter', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
         }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
         body {
-            margin: 0;
-            padding: 0;
-            background: #1a1a2e;
-            color: #eee;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-body);
+            font-size: 16px;
+            line-height: 1.6;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
-        .sidebar {
+
+        /* Ambient orbs */
+        body::before, body::after {
+            content: '';
             position: fixed;
-            left: 0;
-            top: 0;
-            width: var(--sidebar-width);
-            height: 100vh;
-            background: #16213e;
-            padding: 20px 0;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::before {
+            top: -200px; left: 50%; transform: translateX(-50%);
+            width: 800px; height: 600px;
+            background: radial-gradient(ellipse, rgba(245,158,11,0.08) 0%, transparent 70%);
+            filter: blur(100px);
+        }
+        body::after {
+            bottom: -300px; right: -200px;
+            width: 600px; height: 600px;
+            background: radial-gradient(ellipse, rgba(245,158,11,0.05) 0%, transparent 70%);
+            filter: blur(120px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed; left: 0; top: 0;
+            width: var(--sidebar-w); height: 100vh;
+            background: var(--bg-alt);
+            border-right: 1px solid var(--border);
+            padding: 2rem 0;
             overflow-y: auto;
-            border-right: 1px solid #333;
+            z-index: 100;
+            display: flex; flex-direction: column;
         }
-        .sidebar h1 {
-            color: #ff5f6d;
-            font-size: 24px;
-            padding: 0 20px;
-            margin: 0 0 30px 0;
+        .sidebar-header {
+            padding: 0 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
         }
-        .sidebar h1 span {
-            color: #ffc371;
+        .sidebar-logo {
+            display: flex; align-items: center; gap: 0.75rem;
+            text-decoration: none; color: var(--fg);
         }
-        .sidebar nav a {
-            display: block;
-            padding: 10px 20px;
-            color: #aaa;
-            text-decoration: none;
-            transition: all 0.2s;
+        .sidebar-logo-icon {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent), #D97706);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem;
+            box-shadow: 0 0 20px rgba(245,158,11,0.3);
         }
-        .sidebar nav a:hover, .sidebar nav a.active {
-            background: rgba(255,95,109,0.1);
-            color: #ff5f6d;
+        .sidebar-logo-text {
+            font-family: var(--font-display);
+            font-size: 1.5rem; font-weight: 600;
+            letter-spacing: -0.025em;
         }
-        .sidebar nav a .emoji {
-            margin-right: 8px;
+        .sidebar-nav { flex: 1; padding: 1rem 0; }
+        .nav-section { padding: 0.5rem 1.5rem; margin-bottom: 0.5rem; }
+        .nav-section-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem; font-weight: 500;
+            color: var(--muted-fg);
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
         }
+        .nav-link {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.625rem 1rem;
+            color: var(--muted-fg); text-decoration: none;
+            font-size: 0.9375rem; font-weight: 500;
+            border-radius: 8px;
+            transition: all 200ms ease-out;
+            margin-bottom: 0.25rem;
+        }
+        .nav-link:hover { background: rgba(255,255,255,0.05); color: var(--fg); }
+        .nav-link.active { background: var(--accent-muted); color: var(--accent); }
+        .nav-link-icon { width: 20px; height: 20px; opacity: 0.7; }
+        .nav-link.active .nav-link-icon { opacity: 1; }
+        .sidebar-footer {
+            padding: 1.5rem; border-top: 1px solid var(--border);
+        }
+        .sidebar-footer a {
+            display: flex; align-items: center; gap: 0.5rem;
+            color: var(--muted-fg); text-decoration: none;
+            font-size: 0.875rem; transition: color 200ms;
+        }
+        .sidebar-footer a:hover { color: var(--accent); }
+
+        /* Main */
         .main {
-            margin-left: var(--sidebar-width);
-            padding: 40px 60px;
+            margin-left: var(--sidebar-w);
+            min-height: 100vh; position: relative; z-index: 1;
+        }
+        .content {
+            display: none;
+            padding: 6rem 4rem;
             max-width: 900px;
         }
-        h1 { color: #ff5f6d; font-size: 32px; }
-        h2 { color: #ffc371; font-size: 24px; margin-top: 40px; }
-        h3 { color: #ff9a9e; font-size: 20px; }
-        code {
-            background: #16213e;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Fira Code', monospace;
-            font-size: 14px;
+        .content.active { display: block; }
+
+        /* Typography */
+        h1, h2, h3, h4 {
+            font-family: var(--font-display);
+            font-weight: 600; letter-spacing: -0.025em;
+            color: var(--fg);
+        }
+        h1 { font-size: 2.5rem; line-height: 1.2; margin-bottom: 1.5rem; }
+        h2 {
+            font-size: 1.5rem; line-height: 1.3;
+            margin-top: 3rem; margin-bottom: 1rem;
+            color: var(--accent);
+        }
+        h3 { font-size: 1.25rem; line-height: 1.4; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1rem; color: var(--muted-fg); }
+
+        /* Hero */
+        .hero {
+            text-align: center; padding: 4rem 0;
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--accent-muted);
+            border: 1px solid rgba(245,158,11,0.3);
+            border-radius: 9999px;
+            font-family: var(--font-mono);
+            font-size: 0.875rem; font-weight: 500;
+            color: var(--accent); margin-bottom: 1.5rem;
+            box-shadow: 0 0 20px rgba(245,158,11,0.15);
+        }
+        .hero-badge-dot {
+            width: 8px; height: 8px;
+            background: var(--accent); border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+            50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(245,158,11,0); }
+        }
+        .hero h1 {
+            font-size: 3.5rem; font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--fg), var(--muted-fg));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-subtitle {
+            font-size: 1.25rem; color: var(--muted-fg);
+            margin-bottom: 2rem; max-width: 600px;
+            margin-left: auto; margin-right: auto;
+        }
+        .hero-badges { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+        .badge {
+            display: inline-flex; align-items: center; gap: 0.375rem;
+            padding: 0.5rem 1rem; border-radius: 8px;
+            font-size: 0.875rem; font-weight: 500;
+        }
+        .badge-free { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #22C55E; }
+        .badge-new { background: var(--accent-muted); border: 1px solid rgba(245,158,11,0.3); color: var(--accent); }
+        .badge-version { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #8B5CF6; }
+
+        /* Cards (Glass Effect) */
+        .card {
+            background: var(--card); backdrop-filter: blur(8px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 1.5rem; margin-bottom: 1.5rem;
+            transition: all 300ms ease-out;
+        }
+        .card:hover {
+            border-color: var(--border-hover);
+            background: rgba(26,26,36,0.8);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px rgba(0,0,0,0.3);
+        }
+
+        /* Code */
+        code { font-family: var(--font-mono); font-size: 0.875rem; }
+        :not(pre) > code {
+            background: var(--muted); padding: 0.25rem 0.5rem;
+            border-radius: 6px; color: var(--accent); font-size: 0.8125rem;
         }
         pre {
-            background: #16213e;
-            padding: 20px;
-            border-radius: 8px;
-            overflow-x: auto;
-            border: 1px solid #333;
+            background: var(--muted); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.5rem;
+            overflow-x: auto; margin-bottom: 1.5rem;
         }
-        pre code {
-            background: none;
-            padding: 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        th, td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid #333;
-        }
+        pre code { background: none; padding: 0; color: var(--fg); line-height: 1.7; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+        th, td { padding: 1rem 1.25rem; text-align: left; border-bottom: 1px solid var(--border); }
         th {
-            background: #16213e;
-            color: #ff5f6d;
+            background: var(--muted); font-family: var(--font-display);
+            font-weight: 600; color: var(--accent); font-size: 0.875rem;
+            text-transform: uppercase; letter-spacing: 0.025em;
         }
-        tr:hover {
-            background: rgba(255,95,109,0.05);
+        td { color: var(--muted-fg); }
+        tr:hover td { background: rgba(255,255,255,0.02); color: var(--fg); }
+
+        /* Lists */
+        ul, ol { margin-bottom: 1.5rem; padding-left: 1.5rem; }
+        li { margin-bottom: 0.5rem; color: var(--muted-fg); }
+        li::marker { color: var(--accent); }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem; margin-bottom: 2rem;
         }
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
+        .feature-card {
+            background: var(--card); backdrop-filter: blur(8px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 1.5rem; transition: all 300ms ease-out;
         }
-        .badge-free { background: #2ecc71; color: #fff; }
-        .badge-new { background: #ff5f6d; color: #fff; }
-        .badge-beta { background: #f39c12; color: #fff; }
-        .hero {
-            text-align: center;
-            padding: 60px 0;
+        .feature-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px rgba(0,0,0,0.3);
         }
-        .hero h1 { font-size: 48px; }
-        .hero p { color: #aaa; font-size: 18px; }
-        .card {
-            background: #16213e;
-            border-radius: 12px;
-            padding: 24px;
-            margin: 20px 0;
-            border: 1px solid #333;
+        .feature-card-icon {
+            width: 48px; height: 48px;
+            background: var(--accent-muted); border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; margin-bottom: 1rem;
         }
-        a { color: #ff5f6d; }
-        .content { display: none; }
-        .content.active { display: block; }
+        .feature-card-title {
+            font-family: var(--font-display); font-size: 1.125rem;
+            font-weight: 600; color: var(--fg); margin-bottom: 0.5rem;
+        }
+        .feature-card-text { color: var(--muted-fg); font-size: 0.9375rem; line-height: 1.5; }
+
+        /* Status */
+        .status {
+            display: inline-flex; align-items: center; gap: 0.375rem;
+            padding: 0.25rem 0.75rem; border-radius: 6px;
+            font-size: 0.8125rem; font-weight: 500;
+        }
+        .status-supported { background: rgba(34,197,94,0.15); color: #22C55E; }
+        .status-free { background: var(--accent-muted); color: var(--accent); }
+
+        /* Focus */
+        a:focus-visible, button:focus-visible, .nav-link:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-alt); }
+        ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--muted-fg); }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); transition: transform 300ms ease-out; }
+            .sidebar.open { transform: translateX(0); }
+            .main { margin-left: 0; }
+            .content { padding: 3rem 1.5rem; }
+            .hero h1 { font-size: 2.5rem; }
+            .feature-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <h1>🐈 <span>Kalo</span></h1>
-        <nav>
-            <a href="#" class="active" onclick="showPage('home')"><span class="emoji">🏠</span> Home</a>
-            <a href="#" onclick="showPage('getting-started')"><span class="emoji">🚀</span> Getting Started</a>
-            <a href="#" onclick="showPage('features')"><span class="emoji">📦</span> Features</a>
-            <a href="#" onclick="showPage('furniture')"><span class="emoji">🪑</span> Furniture</a>
-            <a href="#" onclick="showPage('paintings')"><span class="emoji">🎨</span> Paintings</a>
-            <a href="#" onclick="showPage('music-discs')"><span class="emoji">🎵</span> Music Discs</a>
-            <a href="#" onclick="showPage('guis')"><span class="emoji">🖥️</span> GUIs</a>
-            <a href="#" onclick="showPage('bedrock')"><span class="emoji">🌏</span> Bedrock</a>
-            <a href="#" onclick="showPage('migration')"><span class="emoji">🔄</span> Migration</a>
-            <a href="#" onclick="showPage('api')"><span class="emoji">🔌</span> API</a>
-            <a href="#" onclick="showPage('config')"><span class="emoji">⚙️</span> Configuration</a>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="#" class="sidebar-logo" onclick="showPage('home')">
+                <div class="sidebar-logo-icon">🐈</div>
+                <span class="sidebar-logo-text">Kalo</span>
+            </a>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Getting Started</div>
+                <a href="#" class="nav-link active" onclick="showPage('home')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    Home
+                </a>
+                <a href="#" class="nav-link" onclick="showPage('getting-started')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    Quick Start
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Content Types</div>
+                <a href="#" class="nav-link" onclick="showPage('features')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                    Overview
+                </a>
+                <a href="#" class="nav-link" onclick="showPage('furniture')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                    Furniture
+                </a>
+                <a href="#" class="nav-link" onclick="showPage('paintings')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    Paintings
+                </a>
+                <a href="#" class="nav-link" onclick="showPage('music-discs')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                    Music Discs
+                </a>
+                <a href="#" class="nav-link" onclick="showPage('guis')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    GUIs
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Platform</div>
+                <a href="#" class="nav-link" onclick="showPage('bedrock')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    Bedrock
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Developer</div>
+                <a href="#" class="nav-link" onclick="showPage('migration')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                    Migration
+                </a>
+                <a href="#" class="nav-link" onclick="showPage('api')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                    API
+                </a>
+                <a href="#" class="nav-link" onclick="showPage('config')">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Config
+                </a>
+            </div>
         </nav>
-    </div>
+        <div class="sidebar-footer">
+            <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                GitHub
+            </a>
+        </div>
+    </aside>
 
-    <div class="main">
+    <main class="main">
         <!-- HOME -->
         <div id="home" class="content active">
             <div class="hero">
-                <h1>🐈 Kalo</h1>
-                <p>Open Custom Content Engine for Minecraft</p>
-                <p>Build once. Play everywhere. No paywalls. No player caps.</p>
-                <p>
-                    <span class="badge badge-free">FREE</span>
-                    <span class="badge badge-new">NEW</span>
-                    <span class="badge badge-beta">v0.1.0</span>
-                </p>
+                <div class="hero-badge"><span class="hero-badge-dot"></span> Open Source & Free Forever</div>
+                <h1>Kalo</h1>
+                <p class="hero-subtitle">The open custom content engine for Minecraft. Build items, blocks, furniture, and immersive experiences — without limits or paywalls.</p>
+                <div class="hero-badges">
+                    <span class="badge badge-free">Free (MIT)</span>
+                    <span class="badge badge-new">v0.1.0</span>
+                    <span class="badge badge-version">Java 21+ / Bedrock</span>
+                </div>
             </div>
 
-            <h2>🚀 Quick Start</h2>
+            <h2>Quick Start</h2>
             <pre><code># Clone and build
 git clone https://github.com/CyoriaSMP-Team/kalo.git
 cd kalo/main
@@ -163,44 +400,35 @@ cd kalo/main
 # Install
 cp build/libs/Kalo-*.jar /path/to/server/plugins/</code></pre>
 
-            <h2>📦 Content Types</h2>
-            <table>
-                <tr><th>Type</th><th>Status</th><th>Features</th></tr>
-                <tr><td>🗡️ Items</td><td>✅</td><td>Sprite, Custom, Vanilla models</td></tr>
-                <tr><td>🧱 Blocks</td><td>✅</td><td>893 native + virtual</td></tr>
-                <tr><td>🪑 Furniture</td><td>✅</td><td>Rotation, seats, storage, hitbox</td></tr>
-                <tr><td>🛡️ Armor</td><td>✅</td><td>4 slots + elytra</td></tr>
-                <tr><td>🎨 Paintings</td><td>✅</td><td>1×1 to 4×4</td></tr>
-                <tr><td>🎵 Music Discs</td><td>✅</td><td>Custom sounds</td></tr>
-                <tr><td>🖥️ GUIs</td><td>✅</td><td>Inventory menus</td></tr>
-                <tr><td>🔊 Sounds</td><td>✅</td><td>Custom events</td></tr>
-                <tr><td>✍️ Glyphs</td><td>✅</td><td>Custom fonts</td></tr>
-                <tr><td>📋 Recipes</td><td>✅</td><td>7 stations</td></tr>
-            </table>
+            <h2>Content Types</h2>
+            <div class="feature-grid">
+                <div class="feature-card"><div class="feature-card-icon">🗡️</div><div class="feature-card-title">Items</div><div class="feature-card-text">Sprite, custom models, vanilla integration</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🧱</div><div class="feature-card-title">Blocks</div><div class="feature-card-text">893+ native and virtual blocks</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🪑</div><div class="feature-card-title">Furniture</div><div class="feature-card-text">Rotation, seats, storage, hitbox</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🛡️</div><div class="feature-card-title">Armor</div><div class="feature-card-text">4 slots + elytra support</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🎨</div><div class="feature-card-title">Paintings</div><div class="feature-card-text">1×1 to 4×4 custom paintings</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🎵</div><div class="feature-card-title">Music Discs</div><div class="feature-card-text">Custom sounds and music</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🖥️</div><div class="feature-card-title">GUIs</div><div class="feature-card-text">Server-side inventory menus</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🔊</div><div class="feature-card-title">Sounds</div><div class="feature-card-text">Custom sound events</div></div>
+            </div>
 
-            <h2>🌏 Platform Support</h2>
+            <h2>Platform Support</h2>
             <table>
                 <tr><th>Platform</th><th>Status</th></tr>
-                <tr><td>Paper (1.21.4 → 26.2)</td><td>✅</td></tr>
-                <tr><td>Folia</td><td>✅</td></tr>
-                <tr><td>Bedrock</td><td>✅ Built-in</td></tr>
+                <tr><td>Paper (1.21.4 → 26.2)</td><td><span class="status status-supported">✓ Supported</span></td></tr>
+                <tr><td>Folia</td><td><span class="status status-supported">✓ Supported</span></td></tr>
+                <tr><td>Bedrock</td><td><span class="status status-free">Built-in</span></td></tr>
             </table>
-
-            <h2>💰 Price</h2>
-            <p style="font-size: 24px; color: #2ecc71;"><strong>FREE (MIT License)</strong></p>
-            <p>No player caps. No premium features. No paywalls.</p>
         </div>
 
         <!-- GETTING STARTED -->
         <div id="getting-started" class="content">
-            <h1>🚀 Getting Started</h1>
-            
+            <h1>Quick Start</h1>
             <h2>Prerequisites</h2>
             <ul>
                 <li>Java 21+ (Java 25 for Paper 26.2)</li>
                 <li>Paper or Folia server</li>
             </ul>
-
             <h2>Installation</h2>
             <pre><code># 1. Build Kalo
 git clone https://github.com/CyoriaSMP-Team/kalo.git
@@ -213,22 +441,20 @@ cp build/libs/Kalo-*.jar /path/to/server/plugins/
 # 3. Create content pack
 mkdir -p plugins/Kalo/packs/myitem/configs
 mkdir -p plugins/Kalo/packs/myitem/assets/myitem/textures/item</code></pre>
-
             <h2>First Item</h2>
             <pre><code># plugins/Kalo/packs/myitem/configs/items.yml
 ruby_sword:
   type: item
   display:
-    name: "<red>Ruby Sword</red>"
+    name: "&lt;red&gt;Ruby Sword&lt;/red&gt;"
     lore:
-      - "<gray>A powerful sword</gray>"
+      - "&lt;gray&gt;A powerful sword&lt;/gray&gt;"
   model:
     sprite: "item/ruby_sword"
   item:
     material: DIAMOND_SWORD
     durability: 1561
     damage: 7</code></pre>
-
             <h2>Commands</h2>
             <table>
                 <tr><th>Command</th><th>Description</th></tr>
@@ -240,33 +466,29 @@ ruby_sword:
 
         <!-- FEATURES -->
         <div id="features" class="content">
-            <h1>📦 Features</h1>
-            
-            <h2>All Content Types</h2>
+            <h1>Content Types</h1>
             <p>Kalo supports 10 content types with full feature parity to paid alternatives.</p>
-
             <table>
                 <tr><th>Type</th><th>Kalo</th><th>Nexo</th><th>Oraxen</th></tr>
-                <tr><td>Items</td><td>✅</td><td>✅</td><td>✅</td></tr>
-                <tr><td>Blocks</td><td>✅ 893+</td><td>✅</td><td>✅</td></tr>
-                <tr><td>Furniture</td><td>✅</td><td>✅</td><td>✅</td></tr>
-                <tr><td>Armor</td><td>✅</td><td>✅</td><td>❌</td></tr>
-                <tr><td>Paintings</td><td>✅</td><td>✅</td><td>❌</td></tr>
-                <tr><td>Music Discs</td><td>✅</td><td>✅</td><td>❌</td></tr>
-                <tr><td>GUIs</td><td>✅</td><td>✅</td><td>❌</td></tr>
-                <tr><td>Bedrock</td><td>✅ Free</td><td>€40</td><td>❌</td></tr>
+                <tr><td>Items</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Blocks</td><td><span class="status status-supported">893+</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Furniture</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Armor</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
+                <tr><td>Paintings</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
+                <tr><td>Music Discs</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
+                <tr><td>GUIs</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
+                <tr><td>Bedrock</td><td><span class="status status-free">Free</span></td><td>€40</td><td>—</td></tr>
             </table>
         </div>
 
         <!-- FURNITURE -->
         <div id="furniture" class="content">
-            <h1>🪑 Furniture</h1>
-            
+            <h1>Furniture</h1>
             <h2>Basic Chair</h2>
             <pre><code>ruby_chair:
   type: furniture
   display:
-    name: "<gold>Ruby Chair</gold>"
+    name: "&lt;gold&gt;Ruby Chair&lt;/gold&gt;"
   model:
     custom: "furniture/ruby_chair"
   furniture:
@@ -279,39 +501,32 @@ ruby_sword:
       barriers: [[0,0,0]]
   java:
     mode: native</code></pre>
-
             <h2>Storage Furniture</h2>
             <pre><code>ruby_chest:
   type: furniture
   display:
-    name: "<gold>Ruby Chest</gold>"
+    name: "&lt;gold&gt;Ruby Chest&lt;/gold&gt;"
   model:
     custom: "furniture/ruby_chest"
   furniture:
     storage:
       type: STORAGE
       rows: 5
-      title: "<red>Storage</red>"
+      title: "&lt;red&gt;Storage&lt;/red&gt;"
   java:
     mode: native</code></pre>
-
             <h2>Features</h2>
-            <table>
-                <tr><th>Feature</th><th>Description</th></tr>
-                <tr><td>Rotation</td><td>16/8/4 directions</td></tr>
-                <tr><td>Seat</td><td>Players can sit</td></tr>
-                <tr><td>Hitbox</td><td>Barrier blocks</td></tr>
-                <tr><td>Storage</td><td>Persistent inventory</td></tr>
-                <tr><td>Jukebox</td><td>Play custom music</td></tr>
-                <tr><td>Waterloggable</td><td>Place in water</td></tr>
-                <tr><td>Light</td><td>Emit light 0-15</td></tr>
-            </table>
+            <div class="feature-grid">
+                <div class="feature-card"><div class="feature-card-icon">↻</div><div class="feature-card-title">Rotation</div><div class="feature-card-text">16, 8, or 4 directions</div></div>
+                <div class="feature-card"><div class="feature-card-icon">🪑</div><div class="feature-card-title">Seats</div><div class="feature-card-text">Players can sit on furniture</div></div>
+                <div class="feature-card"><div class="feature-card-icon">█</div><div class="feature-card-title">Hitbox</div><div class="feature-card-text">Barrier block collision</div></div>
+                <div class="feature-card"><div class="feature-card-icon">📦</div><div class="feature-card-title">Storage</div><div class="feature-card-text">Persistent inventory</div></div>
+            </div>
         </div>
 
         <!-- PAINTINGS -->
         <div id="paintings" class="content">
-            <h1>🎨 Paintings</h1>
-            
+            <h1>Paintings</h1>
             <h2>Basic Painting</h2>
             <pre><code>ruby_painting:
   type: painting
@@ -320,7 +535,6 @@ ruby_sword:
   asset_id: "testpack:ruby_painting"
   author: "Kalo"
   title: "Ruby Portrait"</code></pre>
-
             <h2>Multi-Block</h2>
             <pre><code>large_painting:
   type: painting
@@ -329,7 +543,6 @@ ruby_sword:
   asset_id: "testpack:large_painting"
   author: "Kalo"
   title: "Epic Landscape"</code></pre>
-
             <h2>Sizes</h2>
             <table>
                 <tr><th>Width</th><th>Height</th><th>Blocks</th></tr>
@@ -343,8 +556,7 @@ ruby_sword:
 
         <!-- MUSIC DISCS -->
         <div id="music-discs" class="content">
-            <h1>🎵 Music Discs</h1>
-            
+            <h1>Music Discs</h1>
             <h2>Basic Disc</h2>
             <pre><code>ruby_disc:
   type: music_disc
@@ -353,10 +565,9 @@ ruby_sword:
   duration: 180
   comparator_output: 12
   display:
-    name: "<gradient:#ff5f6d:#ffc371>Ruby Disc</gradient>"
+    name: "&lt;gradient:#ff5f6d:#ffc371&gt;Ruby Disc&lt;/gradient&gt;"
   model:
     sprite: "item/ruby_disc"</code></pre>
-
             <h2>Configuration</h2>
             <table>
                 <tr><th>Option</th><th>Type</th><th>Description</th></tr>
@@ -368,25 +579,23 @@ ruby_sword:
 
         <!-- GUIs -->
         <div id="guis" class="content">
-            <h1>🖥️ Custom GUIs</h1>
-            
+            <h1>Custom GUIs</h1>
             <h2>Basic Menu</h2>
             <pre><code>main_menu:
   type: gui
-  title: "<gradient:#ff5f6d:#ffc371>Server Menu</gradient>"
+  title: "&lt;gradient:#ff5f6d:#ffc371&gt;Server Menu&lt;/gradient&gt;"
   rows: 3
   items:
     4:
       material: NETHER_STAR
-      display_name: "<gold>Teleport</gold>"
+      display_name: "&lt;gold&gt;Teleport&lt;/gold&gt;"
       actions:
         - "gui:testpack:teleport_menu"
     22:
       material: BARRIER
-      display_name: "<red>Close</red>"
+      display_name: "&lt;red&gt;Close&lt;/red&gt;"
       actions:
         - "close"</code></pre>
-
             <h2>Action Types</h2>
             <table>
                 <tr><th>Action</th><th>Format</th></tr>
@@ -399,21 +608,17 @@ ruby_sword:
 
         <!-- BEDROCK -->
         <div id="bedrock" class="content">
-            <h1>🌏 Bedrock Support</h1>
-            
-            <h2>Features</h2>
+            <h1>Bedrock Support</h1>
             <p>Kalo automatically generates Bedrock resource packs for all content.</p>
-
             <table>
                 <tr><th>Feature</th><th>Status</th></tr>
-                <tr><td>Items</td><td>✅</td></tr>
-                <tr><td>Blocks</td><td>✅</td></tr>
-                <tr><td>Armor</td><td>✅</td></tr>
-                <tr><td>Furniture</td><td>✅</td></tr>
-                <tr><td>Paintings</td><td>✅</td></tr>
-                <tr><td>Sounds</td><td>✅</td></tr>
+                <tr><td>Items</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Blocks</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Armor</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Furniture</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Paintings</td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Sounds</td><td><span class="status status-supported">✓</span></td></tr>
             </table>
-
             <h2>Setup</h2>
             <pre><code># Install Geyser for Bedrock support
 # Kalo will auto-generate Bedrock packs
@@ -424,17 +629,15 @@ ls plugins/Kalo/packs/*/bedrock/</code></pre>
 
         <!-- MIGRATION -->
         <div id="migration" class="content">
-            <h1>🔄 Migration</h1>
-            
+            <h1>Migration</h1>
             <h2>Supported Plugins</h2>
             <table>
                 <tr><th>Plugin</th><th>Items</th><th>Blocks</th><th>Furniture</th></tr>
-                <tr><td>Oraxen</td><td>✅</td><td>✅</td><td>✅</td></tr>
-                <tr><td>ItemsAdder</td><td>✅</td><td>✅</td><td>✅</td></tr>
-                <tr><td>CraftEngine</td><td>✅</td><td>✅</td><td>❌</td></tr>
-                <tr><td>Neko</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                <tr><td>Oraxen</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>ItemsAdder</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>CraftEngine</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
+                <tr><td>Neko</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
             </table>
-
             <h2>Command</h2>
             <pre><code>/kalo migrate oraxen
 /kalo migrate itemsarader mypack</code></pre>
@@ -442,8 +645,7 @@ ls plugins/Kalo/packs/*/bedrock/</code></pre>
 
         <!-- API -->
         <div id="api" class="content">
-            <h1>🔌 API Reference</h1>
-            
+            <h1>API Reference</h1>
             <h2>Maven</h2>
             <pre><code>&lt;dependency&gt;
   &lt;groupId&gt;com.github.CyoriaSMP-Team&lt;/groupId&gt;
@@ -451,7 +653,6 @@ ls plugins/Kalo/packs/*/bedrock/</code></pre>
   &lt;version&gt;0.1.0&lt;/version&gt;
   &lt;scope&gt;provided&lt;/scope&gt;
 &lt;/dependency&gt;</code></pre>
-
             <h2>Events</h2>
             <table>
                 <tr><th>Event</th><th>Description</th></tr>
@@ -464,8 +665,7 @@ ls plugins/Kalo/packs/*/bedrock/</code></pre>
 
         <!-- CONFIGURATION -->
         <div id="config" class="content">
-            <h1>⚙️ Configuration</h1>
-            
+            <h1>Configuration</h1>
             <h2>Config Structure</h2>
             <pre><code>plugins/Kalo/
 ├── config.yml           # Main config
@@ -482,7 +682,6 @@ ls plugins/Kalo/packs/*/bedrock/</code></pre>
             ├── sounds.yml
             ├── glyphs.yml
             └── recipes.yml</code></pre>
-
             <h2>Pack Metadata</h2>
             <pre><code># pack.yml
 name: My Pack
@@ -490,25 +689,14 @@ version: 1.0.0
 description: Custom content for my server
 author: Me</code></pre>
         </div>
-    </div>
+    </main>
 
     <script>
         function showPage(page) {
-            // Hide all content
-            document.querySelectorAll('.content').forEach(el => {
-                el.classList.remove('active');
-            });
-            
-            // Show selected page
+            document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
             document.getElementById(page).classList.add('active');
-            
-            // Update nav
-            document.querySelectorAll('.sidebar nav a').forEach(el => {
-                el.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            // Scroll to top
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+            event.target.closest('.nav-link').classList.add('active');
             window.scrollTo(0, 0);
         }
     </script>
