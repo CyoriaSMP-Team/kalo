@@ -1,0 +1,36 @@
+# Combat Sword Example
+# A sword with multiple combat abilities
+
+type: item
+material: NETHERITE_SWORD
+name: "&c&lDragon Slayer"
+lore:
+  - "&7A legendary sword forged in dragon fire"
+  - "&7Deals massive damage with special abilities"
+  - ""
+  - "&6Abilities:"
+  - "&e  - Lifesteal: Heals 10% of damage dealt"
+  - "&e  - Fire: Sets target on fire for 3 seconds"
+  - "&e  - Knockback: Extra knockback on hit"
+  - "&e  - Critical: 25% chance for 2x damage"
+
+features:
+  ability:
+    id: kalo:ability
+    arguments:
+      # Combat abilities
+      lifesteal: 0.1
+      fire: 60
+      knockback: 1.5
+      critical_chance: 0.25
+      critical_multiplier: 2.0
+      
+      # Poison on hit
+      poison: 40
+      poison_amplifier: 0
+      
+      # Conditional triggers
+      trigger_on_hit: "lifesteal,fire,knockback"
+      
+      # Cooldown
+      cooldown: 20

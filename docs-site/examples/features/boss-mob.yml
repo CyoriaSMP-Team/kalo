@@ -1,0 +1,74 @@
+# Boss Mob Example
+# A powerful boss with multiple phases and skills
+
+type: entity
+entity-type: WITHER_SKELETON
+name: "&4&lDragon Lord"
+spawn-amount: 1
+
+features:
+  mob:
+    id: kalo:mob
+    arguments:
+      # Stats
+      health: 500
+      damage: 20
+      armor: 15
+      speed: 0.35
+      knockback_resistance: 0.8
+      follow_range: 32
+      
+      # Behavior
+      persistent: true
+      aggressive: true
+      flee_on_low_health: true
+      flee_health_threshold: 0.2
+      
+      # Appearance
+      custom_name: "&4&lDragon Lord"
+      name_visible: true
+      glow: true
+      
+      # Equipment
+      mainhand: NETHERITE_SWORD
+      helmet: NETHERITE_HELMET
+      chestplate: NETHERITE_CHESTPLATE
+      leggings: NETHERITE_LEGGINGS
+      boots: NETHERITE_BOOTS
+      
+      # Drops
+      drops: "DIAMOND:5,EMERALD:10,NETHERITE_INGOT:2"
+      exp: 500
+      
+      # AI
+      target_players: true
+      patrol: true
+      
+      # Conditions
+      condition_health_below: 0.3
+      
+      # Phases
+      phase_1_health: 0.75
+      phase_1_skills: "damage:15,effect:SPEED:200:1"
+      phase_2_health: 0.50
+      phase_2_skills: "damage:20,summon:zombie:5:10,particle:explosion:50"
+      phase_3_health: 0.25
+      phase_3_skills: "damage:30,launch:3,fire:100"
+      
+      # Immunities
+      fire_immune: false
+      damage_immune: false
+
+  skills:
+    id: kalo:skills
+    arguments:
+      on_spawn:
+        - "message:§4§lDragon Lord has appeared!"
+        - "particle:flame:100"
+        - "sound:ENTITY_ENDER_DRAGON_GROWL"
+      on_damage:
+        - "damage:10"
+        - "lifesteal:0.1"
+      ai_target: nearest
+      ai_aggro_range: 32
+      ai_attack_cooldown: 30

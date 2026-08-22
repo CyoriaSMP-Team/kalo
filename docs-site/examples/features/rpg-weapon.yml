@@ -1,0 +1,49 @@
+# RPG Weapon Example
+# A weapon with RPG stats and elemental damage
+
+type: item
+material: DIAMOND_SWORD
+name: "&b&lFrostbite"
+lore:
+  - "&7A sword infused with ice magic"
+  - "&7Deals additional ice damage"
+  - ""
+  - "&6Stats:"
+  - "&e  Strength: +15"
+  - "&e  Crit Chance: +10%"
+  - "&e  Crit Damage: +50%"
+  - ""
+  - "&6Elemental:"
+  - "&b  Ice Damage: +10"
+  - "&b  Ice Resist: +10%"
+
+features:
+  stats:
+    id: kalo:stats
+    arguments:
+      # Basic stats
+      strength: 15
+      crit_chance: 0.10
+      crit_damage: 0.50
+      
+      # Elemental stats
+      ice_damage: 10
+      ice_resist: 0.10
+      
+      # Lifesteal
+      lifesteal: 0.05
+
+  ability:
+    id: kalo:ability
+    arguments:
+      # Ice abilities
+      ice_damage: 10
+      slowness: 60
+      slowness_amplifier: 1
+      
+      # Critical hit
+      critical_chance: 0.15
+      critical_multiplier: 2.0
+      
+      # Trigger
+      trigger_on_hit: "ice_damage,slowness"

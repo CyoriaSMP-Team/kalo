@@ -269,6 +269,8 @@ li::marker { color: var(--accent); }
     font-size: 0.8125rem; font-weight: 500;
 }
 .status-supported { background: rgba(34,197,94,0.15); color: #22C55E; }
+.status-unsupported { background: rgba(251,191,36,0.15); color: #FBBF24; }
+.status-na { background: var(--muted); color: var(--muted-fg); }
 .status-free { background: var(--accent-muted); color: var(--accent); }
 
 /* Focus */

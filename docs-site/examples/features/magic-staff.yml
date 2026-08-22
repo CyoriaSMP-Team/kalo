@@ -1,0 +1,60 @@
+# Magic Staff Example
+# A staff with magic abilities and cooldowns
+
+type: item
+material: BLAZE_ROD
+name: "&5&lStaff of Arcane Power"
+lore:
+  - "&7A staff imbued with arcane energy"
+  - "&7Cast powerful spells"
+  - ""
+  - "&6Spells:"
+  - "&e  - Fireball: Launches a fireball"
+  - "&e  - Ice Storm: Freezes nearby enemies"
+  - "&e  - Lightning: Strikes target with lightning"
+  - ""
+  - "&6Stats:"
+  - "&e  Spell Power: +20"
+  - "&e  Mana: +100"
+
+features:
+  stats:
+    id: kalo:stats
+    arguments:
+      # Magic stats
+      spell_power: 1.5
+      mana: 100
+      mana_regen: 2.0
+      cooldown_reduction: 0.2
+
+  ability:
+    id: kalo:ability
+    arguments:
+      # Fire spells
+      fire_damage: 15
+      fire: 100
+      
+      # Ice spells
+      ice_damage: 15
+      slowness: 100
+      slowness_amplifier: 2
+      
+      # Lightning spells
+      lightning_damage: 20
+      
+      # Cooldown
+      cooldown: 40
+      
+      # Trigger on right click
+      trigger_on_right_click: "fire_damage,ice_damage,lightning_damage"
+
+  cooldown:
+    id: kalo:cooldown
+    arguments:
+      # Mana system
+      mana: 100
+      mana_regen: 2.0
+      mana_regen_delay: 20
+      
+      # Cooldown groups
+      cooldown_group_magic: 40

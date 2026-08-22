@@ -4,6 +4,10 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Adapts {@link OraxenImporter} to the {@link Importer} contract.
  *
@@ -54,5 +58,16 @@ public final class OraxenFormatImporter implements Importer {
         return recipes
                 ? OraxenImporter.convertRecipes(source, namespace, report)
                 : OraxenImporter.convert(source, namespace, report);
+    }
+
+    @Override
+    public @NotNull List<File> assetDirectories(@NotNull File pluginFolder) {
+        List<File> dirs = new ArrayList<>();
+        File pack = new File(pluginFolder, "pack");
+        File textures = new File(pack, "textures");
+        if (textures.isDirectory()) dirs.add(textures);
+        File models = new File(pack, "models");
+        if (models.isDirectory()) dirs.add(models);
+        return dirs;
     }
 }

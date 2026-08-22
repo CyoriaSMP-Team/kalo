@@ -5,6 +5,8 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,9 +63,13 @@ public final class CraftEngineImporter implements Importer {
 
         convertSection(source.getConfigurationSection("items"), "item", output, report);
         int blocks = convertSection(source.getConfigurationSection("blocks"), "block", output, report);
-        BlockImportNotice.addTo(report, blocks);
+        int furniture = convertSection(source.getConfigurationSection("furniture"), "furniture", output, report);
+        BlockImportNotice.addTo(report, blocks + furniture);
+        FurnitureImportNotice.addTo(report, furniture);
 
-        for (String other : List.of("furniture", "recipes", "sounds", "categories")) {
+        convertRecipes(source, output, namespace, report);
+
+        for (String other : List.of("sounds", "categories")) {
             if (source.contains(other)) {
                 ConfigurationSection section = source.getConfigurationSection(other);
                 int count = section != null ? section.getKeys(false).size() : 0;
@@ -164,6 +170,8 @@ public final class CraftEngineImporter implements Importer {
                 }
                 case "behavior", "behaviors", "behaviour", "behaviours" ->
                         report.unsupported(key + "." + child + " (Kalo uses features; port these by hand)");
+                case "entity", "hitbox", "sit", "seats", "rotation", "rotatable" ->
+                        report.unsupported(key + "." + child + " (CraftEngine furniture features have no Kalo equivalent)");
                 default -> report.unsupported(key + "." + child);
             }
         }
@@ -174,5 +182,89 @@ public final class CraftEngineImporter implements Importer {
                 }
             }
         }
+    }
+
+    private static void convertRecipes(@NotNull YamlConfiguration source,
+                                       @NotNull YamlConfiguration output,
+                                       @NotNull String namespace,
+                                       @NotNull ImportReport report) {
+        ConfigurationSection recipes = source.getConfigurationSection("recipes");
+        if (recipes == null) return;
+
+        for (String key : recipes.getKeys(false)) {
+            ConfigurationSection recipe = recipes.getConfigurationSection(key);
+            if (recipe == null) continue;
+
+            try {
+                convertRecipe(key, recipe, output, report);
+                report.imported(namespace + ":" + key);
+            } catch (Exception e) {
+                report.failed(key, e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        }
+    }
+
+    private static void convertRecipe(@NotNull String key,
+                                      @NotNull ConfigurationSection recipe,
+                                      @NotNull YamlConfiguration output,
+                                      @NotNull ImportReport report) {
+        String type = recipe.getString("type", "crafting_shaped");
+
+        if (type.equals("crafting_shaped")) {
+            List<String> shape = recipe.getStringList("shape");
+            ConfigurationSection ingredients = recipe.getConfigurationSection("ingredients");
+            String result = recipe.getString("result");
+            int amount = recipe.getInt("amount", 1);
+
+            if (result == null || ingredients == null || shape.isEmpty()) {
+                throw new IllegalArgumentException("recipe missing shape, ingredients, or result");
+            }
+
+            Map<String, Object> converted = new LinkedHashMap<>();
+            converted.put("type", "shaped");
+            converted.put("shape", shape);
+            converted.put("result", Map.of("key", result, "amount", amount));
+
+            Map<String, Object> ingredientMap = new LinkedHashMap<>();
+            for (String ingredientKey : ingredients.getKeys(false)) {
+                ingredientMap.put(ingredientKey, ingredients.get(ingredientKey));
+            }
+            converted.put("ingredients", ingredientMap);
+
+            output.createSection(key, converted);
+        } else if (type.equals("crafting_shapeless")) {
+            ConfigurationSection ingredients = recipe.getConfigurationSection("ingredients");
+            String result = recipe.getString("result");
+            int amount = recipe.getInt("amount", 1);
+
+            if (result == null || ingredients == null) {
+                throw new IllegalArgumentException("recipe missing ingredients or result");
+            }
+
+            Map<String, Object> converted = new LinkedHashMap<>();
+            converted.put("type", "shapeless");
+            converted.put("result", Map.of("key", result, "amount", amount));
+
+            List<Map<String, Object>> ingredientList = new ArrayList<>();
+            for (String ingredientKey : ingredients.getKeys(false)) {
+                ingredientList.add(Map.of("key", ingredientKey));
+            }
+            converted.put("ingredients", ingredientList);
+
+            output.createSection(key, converted);
+        } else {
+            report.unsupported(key + ".type = " + type + " (only crafting_shaped and crafting_shapeless are supported)");
+        }
+    }
+
+    @Override
+    public @NotNull List<File> assetDirectories(@NotNull File pluginFolder) {
+        List<File> dirs = new ArrayList<>();
+        File pack = new File(pluginFolder, "pack");
+        File textures = new File(pack, "textures");
+        if (textures.isDirectory()) dirs.add(textures);
+        File models = new File(pack, "models");
+        if (models.isDirectory()) dirs.add(models);
+        return dirs;
     }
 }

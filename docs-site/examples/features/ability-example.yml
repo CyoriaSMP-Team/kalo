@@ -1,0 +1,69 @@
+# Example: AbilityFeature configuration
+# This adds custom abilities to items
+
+ruby_sword:
+  type: item
+  display:
+    name: "&cRuby Sword"
+    lore:
+      - "&7A legendary sword with life steal"
+  model:
+    sprite: "item/ruby_sword"
+  java:
+    base_material: NETHERITE_SWORD
+  features:
+    lifesteal:
+      id: kalo:ability
+      arguments:
+        lifesteal: 2
+        fire: 100
+        knockback: 1.5
+
+# More examples:
+
+# Fire sword - sets target on fire
+flame_sword:
+  type: item
+  display:
+    name: "&6Flame Sword"
+  model:
+    sprite: "item/flame_sword"
+  java:
+    base_material: NETHERITE_SWORD
+  features:
+    fire_ability:
+      id: kalo:ability
+      arguments:
+        fire: 200
+        knockback: 2.0
+
+# Knockback stick - extra knockback
+knockback_stick:
+  type: item
+  display:
+    name: "&eKnockback Stick"
+  model:
+    sprite: "item/knockback_stick"
+  java:
+    base_material: STICK
+  features:
+    knockback_ability:
+      id: kalo:ability
+      arguments:
+        knockback: 3.0
+
+# Heal item - right-click to heal
+heal_orb:
+  type: item
+  display:
+    name: "&aHeal Orb"
+  model:
+    sprite: "item/heal_orb"
+  java:
+    base_material: NETHER_STAR
+  features:
+    heal_ability:
+      id: kalo:ability
+      arguments:
+        right_click: heal
+        amount: 10

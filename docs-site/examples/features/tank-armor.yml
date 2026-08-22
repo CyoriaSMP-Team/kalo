@@ -1,0 +1,54 @@
+# Tank Armor Example
+# Armor set with defensive stats and abilities
+
+type: item
+material: NETHERITE_CHESTPLATE
+name: "&6&lDragon Plate"
+lore:
+  - "&7Armor forged from dragon scales"
+  - "&7Provides immense protection"
+  - ""
+  - "&6Set Bonuses:"
+  - "&e  2 pieces: +10 Defense, +5% Damage Reduction"
+  - "&e  4 pieces: +20 Defense, +10% Damage Reduction, +50 Health"
+  - ""
+  - "&6Stats:"
+  - "&e  Defense: +15"
+  - "&e  Health: +20"
+  - "&e  Knockback Resistance: +20%"
+
+features:
+  stats:
+    id: kalo:stats
+    arguments:
+      # Defense stats
+      defense: 15
+      health: 20
+      damage_reduction: 0.10
+      
+      # Resistance
+      fire_resist: 0.20
+      ice_resist: 0.20
+      lightning_resist: 0.20
+      poison_resist: 0.20
+
+  ability:
+    id: kalo:ability
+    arguments:
+      # Defensive abilities
+      damage_absorb: 5.0
+      thorns_chance: 0.3
+      thorns_damage: 3.0
+      
+      # Healing
+      regeneration_duration: 100
+      regeneration_amplifier: 1
+      
+      # Trigger on take damage
+      trigger_on_take_damage: "damage_absorb,thorns"
+
+  cooldown:
+    id: kalo:cooldown
+    arguments:
+      # Cooldown groups
+      cooldown_group_defense: 60

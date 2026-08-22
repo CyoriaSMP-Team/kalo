@@ -1,0 +1,69 @@
+# Example: StatsFeature configuration
+# This adds RPG stats to items
+
+diamond_armor:
+  type: armor
+  display:
+    name: "&bDiamond Armor of Strength"
+  model:
+    sprite: "item/diamond_armor"
+  java:
+    base_material: DIAMOND_CHESTPLATE
+  features:
+    strength_stats:
+      id: kalo:stats
+      arguments:
+        strength: 5
+        defense: 3
+        health: 10
+
+# Sword with critical hit chance
+critical_sword:
+  type: item
+  display:
+    name: "&cCritical Sword"
+  model:
+    sprite: "item/critical_sword"
+  java:
+    base_material: NETHERITE_SWORD
+  features:
+    crit_stats:
+      id: kalo:stats
+      arguments:
+        strength: 3
+        crit_chance: 25
+        crit_damage: 2.0
+
+# Armor with high defense
+tank_armor:
+  type: armor
+  display:
+    name: "&7Tank Armor"
+  model:
+    sprite: "item/tank_armor"
+  java:
+    base_material: NETHERITE_CHESTPLATE
+  features:
+    tank_stats:
+      id: kalo:stats
+      arguments:
+        defense: 10
+        health: 20
+        knockback_resistance: 0.5
+
+# Weapon with lifesteal
+vampire_blade:
+  type: item
+  display:
+    name: "&4Vampire Blade"
+  model:
+    sprite: "item/vampire_blade"
+  java:
+    base_material: NETHERITE_SWORD
+  features:
+    vampire_stats:
+      id: kalo:stats
+      arguments:
+        strength: 4
+        lifesteal: 15
+        crit_chance: 10

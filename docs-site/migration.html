@@ -75,6 +75,13 @@
                     Config
                 </a>
             </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Tools</div>
+                <a href="gui-visualizer.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    GUI Visualizer
+                </a>
+            </div>
         </nav>
         <div class="sidebar-footer">
             <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">
@@ -88,16 +95,35 @@
         <div class="content">
             <h1>Migration</h1>
             <h2>Supported Plugins</h2>
+            <p>Migration reads each plugin's config files and converts them to Kalo definitions. The importer reports anything it cannot carry (behaviours, unrecognised keys) rather than guessing — a quietly dropped mechanic is a bug a server owner finds out about from their players.</p>
             <table>
-                <tr><th>Plugin</th><th>Items</th><th>Blocks</th><th>Furniture</th></tr>
-                <tr><td>Oraxen</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
-                <tr><td>ItemsAdder</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
-                <tr><td>CraftEngine</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
-                <tr><td>Neko</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td>—</td></tr>
+                <tr><th>Plugin</th><th>Items</th><th>Blocks</th><th>Furniture</th><th>Recipes</th></tr>
+                <tr><td>Oraxen / Nexo</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>ItemsAdder</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>CraftEngine</td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td><td><span class="status status-supported">✓</span></td></tr>
+                <tr><td>Neko</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
+                <tr><td>MMOItems</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
+                <tr><td>MythicMobs</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
+                <tr><td>CrackShot</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
+                <tr><td>ModelEngine</td><td><span class="status status-supported">✓</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td><td><span class="status status-na">N/A</span></td></tr>
             </table>
+            <p style="margin-top:0.5rem; font-size:0.875rem; color:var(--muted-fg);">
+                <span class="status status-supported" style="font-size:0.75rem;">✓</span> Imported&ensp;
+                <span class="status status-unsupported" style="font-size:0.75rem;">not yet</span> Exists in source plugin but not imported by Kalo yet&ensp;
+                <span class="status status-na" style="font-size:0.75rem;">N/A</span> Feature does not exist in source plugin
+            </p>
+            <p><strong>Notes:</strong></p>
+            <ul>
+                <li><strong>Neko</strong> only ever shipped an item type — it had no blocks, furniture or recipes. Imported items will render as their base material until a model section is added.</li>
+                <li><strong>CraftEngine</strong> — full support for items, blocks, furniture and recipes. CraftEngine sounds and categories are not imported.</li>
+                <li><strong>MMOItems, MythicMobs, CrackShot</strong> — these plugins focus on items (RPG items, mobs, weapons). Their abilities, skills and mechanics have no Kalo equivalent and are reported as unsupported.</li>
+                <li><strong>ModelEngine</strong> — imports model references as items. Bedrock geometry files (.geo.json) need to be placed in the pack manually. Entity animations and AI behaviors have no Kalo equivalent.</li>
+                <li>Oraxen and ItemsAdder <em>behaviours</em>/<em>mechanics</em> have no mechanical equivalent in Kalo features and are reported as unsupported.</li>
+            </ul>
             <h2>Command</h2>
-            <pre><code>/kalo migrate oraxen
-/kalo migrate itemsarader mypack</code></pre>
+            <pre><code>/kalo import oraxen
+/kalo import itemsadder</code></pre>
+            <p>The importer automatically copies textures and models from the source plugin into the Kalo pack — no manual file copying needed. After import, run <code>/kalo reload</code> to load the content.</p>
         </div>
     </main>
 </body>

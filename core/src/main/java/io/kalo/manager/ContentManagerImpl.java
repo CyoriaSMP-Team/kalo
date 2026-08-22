@@ -4,6 +4,15 @@ import io.kalo.content.ContentsPack;
 import io.kalo.content.ContentsPackImpl;
 import io.kalo.content.PackLoader;
 import io.kalo.content.feature.builtin.HelloWorldFeature;
+import io.kalo.content.feature.builtin.AbilityFeature;
+import io.kalo.content.feature.builtin.StatsFeature;
+import io.kalo.content.feature.builtin.AnimationFeature;
+import io.kalo.content.feature.builtin.MobFeature;
+import io.kalo.content.feature.builtin.ModelFeature;
+import io.kalo.content.feature.builtin.SkillFeature;
+import io.kalo.content.feature.builtin.CooldownFeature;
+import io.kalo.content.feature.builtin.ParticleFeature;
+import io.kalo.content.feature.builtin.SoundFeature;
 import io.kalo.content.item.Item;
 import io.kalo.content.item.ItemImpl;
 import io.kalo.event.RegistryInitializeEvent;
@@ -35,6 +44,15 @@ public final class ContentManagerImpl implements ContentManager, Managerial, Rel
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onRegistryInitialize(RegistryInitializeEvent event) {
         RegistryManager.GlobalRegistries.registries().features().register(HelloWorldFeature.KEY, new HelloWorldFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(AbilityFeature.KEY, new AbilityFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(StatsFeature.KEY, new StatsFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(AnimationFeature.KEY, new AnimationFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(MobFeature.KEY, new MobFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(ModelFeature.KEY, new ModelFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(SkillFeature.KEY, new SkillFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(CooldownFeature.KEY, new CooldownFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(ParticleFeature.KEY, new ParticleFeature.Factory());
+        RegistryManager.GlobalRegistries.registries().features().register(SoundFeature.KEY, new SoundFeature.Factory());
 
         loadPacks(event.getRegistries());
     }

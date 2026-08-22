@@ -3,6 +3,10 @@ package io.kalo.migration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
 /** Adapts {@link ItemsAdderImporter} to the {@link Importer} contract. */
 public final class ItemsAdderFormatImporter implements Importer {
 
@@ -25,5 +29,16 @@ public final class ItemsAdderFormatImporter implements Importer {
                                    @NotNull String namespace,
                                    @NotNull ImportReport report) {
         return ItemsAdderImporter.convert(source, report);
+    }
+
+    @Override
+    public @NotNull List<File> assetDirectories(@NotNull File pluginFolder) {
+        List<File> dirs = new ArrayList<>();
+        File resourcepack = new File(pluginFolder, "resourcepack");
+        File textures = new File(resourcepack, "textures");
+        if (textures.isDirectory()) dirs.add(textures);
+        File models = new File(resourcepack, "models");
+        if (models.isDirectory()) dirs.add(models);
+        return dirs;
     }
 }

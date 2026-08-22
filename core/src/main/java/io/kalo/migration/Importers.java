@@ -21,7 +21,11 @@ public final class Importers {
             new OraxenFormatImporter(),
             new ItemsAdderFormatImporter(),
             new NekoImporter(),
-            new CraftEngineImporter()
+            new CraftEngineImporter(),
+            new MMOItemsImporter(),
+            new MythicMobsImporter(),
+            new CrackShotImporter(),
+            new ModelEngineImporter()
     ));
 
     private Importers() {

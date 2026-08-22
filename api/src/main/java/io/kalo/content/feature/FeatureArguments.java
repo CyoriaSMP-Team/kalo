@@ -35,6 +35,16 @@ public record FeatureArguments(@NotNull Map<String, String> map) {
         return value;
     }
 
+    /** Returns the raw string map for features that need to parse values themselves. */
+    public @NotNull Map<String, String> raw() {
+        return map;
+    }
+
+    /** Returns a copy of the raw map as Object values for convenience. */
+    public @NotNull Map<String, Object> rawObject() {
+        return new java.util.HashMap<>(map);
+    }
+
     public static @NotNull Builder builder() {
         return new Builder();
     }

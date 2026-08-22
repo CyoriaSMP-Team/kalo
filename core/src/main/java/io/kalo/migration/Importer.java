@@ -3,6 +3,9 @@ package io.kalo.migration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
+import java.util.List;
+
 /**
  * Converts one other plugin's config format into Kalo pack YAML.
  *
@@ -38,4 +41,18 @@ public interface Importer {
     @NotNull String convert(@NotNull YamlConfiguration source,
                             @NotNull String namespace,
                             @NotNull ImportReport report);
+
+    /**
+     * Returns the relative directories within the source plugin's data folder that
+     * contain assets (textures, models) referenced by the converted content.
+     *
+     * <p>These directories are copied into the Kalo pack's {@code assets/} folder
+     * during import so the content works immediately without manual file copying.</p>
+     *
+     * @param pluginFolder the source plugin's data folder
+     * @return list of relative directory paths to copy, or empty if no assets
+     */
+    default @NotNull List<File> assetDirectories(@NotNull File pluginFolder) {
+        return List.of();
+    }
 }
