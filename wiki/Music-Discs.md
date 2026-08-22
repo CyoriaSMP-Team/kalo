@@ -1,8 +1,4 @@
----
-title: Music Discs
----
-
-# 🎵 Music Discs Guide
+# 🎵 Music Discs
 
 Custom jukebox-playable music discs.
 
@@ -12,7 +8,7 @@ Custom jukebox-playable music discs.
 ruby_disc:
   type: music_disc
   sound: "myitem:music.ruby_theme"
-  description: "Ruby Theme - A majestic melody"
+  description: "Ruby Theme"
   duration: 180
   comparator_output: 12
   model:
@@ -23,17 +19,10 @@ ruby_disc:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `sound` | key | required | Sound event to play |
+| `sound` | key | required | Sound event |
 | `description` | string | required | Tooltip text |
 | `duration` | int | 60 | Duration in seconds |
 | `comparator_output` | int | 7 | Redstone signal (1-15) |
-
-## Sound Files
-
-Place sound files in:
-```
-assets/<pack>/sounds/music/<sound_name>.ogg
-```
 
 ## Examples
 
@@ -50,7 +39,7 @@ jingle_disc:
     sprite: "item/jingle_disc"
 ```
 
-### Full Album Disc
+### Full Track
 
 ```yaml
 album_disc:
@@ -61,15 +50,29 @@ album_disc:
   comparator_output: 14
   display:
     name: "<gold>Album Disc</gold>"
-    lore:
-      - "<gray>Plays the full album</gray>"
   model:
     sprite: "item/album_disc"
 ```
 
-## Usage
+## Sounds
 
-Players can:
-1. Hold the disc and right-click a jukebox
-2. The disc plays and shows in the jukebox tooltip
-3. Comparator outputs signal strength based on `comparator_output`
+Place in: `assets/<pack>/sounds/music/<sound_name>.ogg`
+
+---
+
+## See Also
+
+- [[Items]] — Custom items
+- [[Furniture]] — Jukebox furniture
+
+---
+
+## 📜 Footer
+
+**Kalo** — Open Custom Content Engine for Minecraft
+
+[GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
+
+> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+
+*Build once. Play everywhere.*

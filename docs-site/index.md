@@ -1,5 +1,8 @@
 ---
+layout: default
 title: Home
+nav_order: 1
+permalink: /
 ---
 
 # 🐈 Kalo Documentation
@@ -7,6 +10,8 @@ title: Home
 **Open Custom Content Engine for Minecraft**
 
 Build once. Play everywhere. No paywalls. No player caps.
+
+---
 
 ## Quick Links
 
@@ -21,11 +26,13 @@ Build once. Play everywhere. No paywalls. No player caps.
 - [🔌 API](api) — Developer API reference
 - [⚙️ Configuration](configuration) — All config options
 
+---
+
 ## What is Kalo?
 
 Kalo is a free and open-source engine for building custom items, blocks, furniture, and armor on Paper and Folia servers. One YAML definition compiles to both Java and Bedrock resource packs.
 
-### Key Features
+## Key Features
 
 | Feature | Status |
 |---------|--------|
@@ -59,4 +66,3 @@ mkdir -p plugins/Kalo/packs/myitem/configs
 
 - [GitHub Issues](https://github.com/CyoriaSMP-Team/kalo/issues)
 - [Discord](https://discord.gg/kalo) (coming soon)
-

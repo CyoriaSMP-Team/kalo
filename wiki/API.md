@@ -1,10 +1,4 @@
----
-title: API Reference
----
-
 # 🔌 API Reference
-
-Kalo provides a public API for third-party plugins.
 
 ## Add-on API
 
@@ -33,28 +27,22 @@ public interface ContentType<T extends Content> {
 
 ## Events
 
-### RegistryInitializeEvent
-
-Fired when registries are initialized. Register custom types here.
-
-### ResourcePackGenerationEvent
-
-Fired when resource pack is generated. Add custom assets here.
-
-### AsyncResourcePackGenerationEvent
-
-Async version of pack generation event.
+| Event | Description |
+|-------|-------------|
+| `RegistryInitializeEvent` | Register custom types |
+| `ResourcePackGenerationEvent` | Add custom assets |
+| `AsyncResourcePackGenerationEvent` | Async pack generation |
 
 ## Placeholders (PlaceholderAPI)
 
 | Placeholder | Description |
 |-------------|-------------|
 | `%kalo_held_id%` | Kalo id of held item |
-| `%kalo_held_name%` | Display name of held item |
-| `%kalo_is_held_<key>%` | Is player holding this item |
+| `%kalo_held_name%` | Display name |
+| `%kalo_is_held_<key>%` | Is holding item |
 | `%kalo_count_<key>%` | Count in inventory |
-| `%kalo_items%` | Total registered items |
-| `%kalo_blocks%` | Total registered blocks |
+| `%kalo_items%` | Total items |
+| `%kalo_blocks%` | Total blocks |
 
 ## Content Model
 
@@ -107,6 +95,25 @@ Optional<Item> item = manager.getItemByStack(itemStack);
 ```java
 Registries registries = RegistryManager.GlobalRegistries.registries();
 registries.item().entries().forEach(entry -> {
-    // Process each registered item
+    // Process each item
 });
 ```
+
+---
+
+## See Also
+
+- [[Configuration]] — Config options
+- [[Commands]] — Available commands
+
+---
+
+## 📜 Footer
+
+**Kalo** — Open Custom Content Engine for Minecraft
+
+[GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
+
+> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+
+*Build once. Play everywhere.*

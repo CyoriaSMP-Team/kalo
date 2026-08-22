@@ -1,5 +1,7 @@
 ---
-title: Bedrock Support
+layout: default
+title: 🌏 Bedrock
+nav_order: 5
 ---
 
 # 🌏 Bedrock Support

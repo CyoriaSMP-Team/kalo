@@ -1,5 +1,7 @@
 ---
-title: Furniture
+layout: default
+title: 🪑 Furniture
+nav_order: 4
 ---
 
 # 🪑 Furniture Guide

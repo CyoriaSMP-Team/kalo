@@ -1,10 +1,6 @@
----
-title: Paintings
----
+# 🎨 Paintings
 
-# 🎨 Paintings Guide
-
-Custom paintings with configurable dimensions and metadata.
+Custom paintings with configurable dimensions.
 
 ## Basic Painting
 
@@ -22,15 +18,15 @@ ruby_painting:
 |--------|------|---------|-------------|
 | `width` | int | 1 | Width in blocks (1-4) |
 | `height` | int | 1 | Height in blocks (1-4) |
-| `asset_id` | string | required | Texture asset identifier |
+| `asset_id` | string | required | Texture identifier |
 | `author` | string | null | Painting author |
 | `title` | string | null | Painting title |
-| `animated` | boolean | false | Has frame animation |
+| `animated` | boolean | false | Has animation |
 | `frame_duration` | int | 20 | Ticks per frame |
 
 ## Examples
 
-### Small Painting (1x1)
+### Small (1x1)
 
 ```yaml
 ruby_small:
@@ -42,7 +38,7 @@ ruby_small:
   title: "Ruby Portrait"
 ```
 
-### Large Painting (4x4)
+### Large (4x4)
 
 ```yaml
 ruby_large:
@@ -54,7 +50,7 @@ ruby_large:
   title: "Ruby Masterpiece"
 ```
 
-### Animated Painting
+### Animated
 
 ```yaml
 ruby_animated:
@@ -68,11 +64,23 @@ ruby_animated:
 
 ## Textures
 
-Place painting textures in:
-```
-assets/<pack>/textures/painting/<asset_id>.png
-```
+Place in: `assets/<pack>/textures/painting/<asset_id>.png`
 
-## Placement
+---
 
-Paintings are placed using the vanilla painting mechanic. Players can place them on walls like normal paintings.
+## See Also
+
+- [[Items]] — Custom items
+- [[Configuration]] — All config options
+
+---
+
+## 📜 Footer
+
+**Kalo** — Open Custom Content Engine for Minecraft
+
+[GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
+
+> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+
+*Build once. Play everywhere.*

@@ -51,3 +51,15 @@ Build once. Play everywhere. No paywalls. No player caps.
 > **Status:** Pre-alpha (v0.1.0)
 > **License:** MIT
 > **Java:** 21+ (Paper 1.21.4) / 25 (Paper 26.2)
+
+---
+
+## 📜 Footer
+
+**Kalo** — Open Custom Content Engine for Minecraft
+
+[GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
+
+> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+
+*Build once. Play everywhere.*

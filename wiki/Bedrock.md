@@ -85,3 +85,15 @@ Virtual blocks use `ItemDisplay` entities, which Geyser cannot translate to Bedr
 
 - [[Getting-Started]] — Installation guide
 - [[Configuration]] — All config options
+
+---
+
+## 📜 Footer
+
+**Kalo** — Open Custom Content Engine for Minecraft
+
+[GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
+
+> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+
+*Build once. Play everywhere.*

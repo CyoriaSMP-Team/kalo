@@ -54,3 +54,15 @@ Your custom item is now in-game!
 - [[Items]] — Learn about custom items
 - [[Furniture]] — Create rotatable furniture
 - [[Configuration]] — All config options
+
+---
+
+## 📜 Footer
+
+**Kalo** — Open Custom Content Engine for Minecraft
+
+[GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
+
+> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+
+*Build once. Play everywhere.*

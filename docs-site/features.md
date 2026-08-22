@@ -1,5 +1,7 @@
 ---
-title: Features
+layout: default
+title: 📦 Features
+nav_order: 3
 ---
 
 # 📦 Features
@@ -100,8 +102,6 @@ ruby_painting:
   title: "Ruby Portrait"
 ```
 
-**See:** [Paintings Guide](paintings)
-
 ### 🎵 Music Discs
 
 Custom jukebox-playable discs.
@@ -116,8 +116,6 @@ ruby_disc:
   model:
     sprite: "item/ruby_disc"
 ```
-
-**See:** [Music Discs Guide](music-discs)
 
 ### 🖥️ Custom GUIs
 
@@ -135,8 +133,6 @@ main_menu:
       actions:
         - "gui:myitem:teleport_menu"
 ```
-
-**See:** [Custom GUIs Guide](guis)
 
 ### 🔊 Sounds
 

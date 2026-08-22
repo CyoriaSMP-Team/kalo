@@ -1,9 +1,3 @@
----
-layout: default
-title: ⚙️ Configuration
-nav_order: 6
----
-
 # ⚙️ Configuration
 
 ## Main Config
@@ -133,3 +127,23 @@ assets/<pack>/
 └── lang/
     └── en_us.json
 ```
+
+---
+
+## See Also
+
+- [[Items]] — Items config
+- [[Blocks]] — Blocks config
+- [[Furniture]] — Furniture config
+
+---
+
+## 📜 Footer
+
+**Kalo** — Open Custom Content Engine for Minecraft
+
+[GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
+
+> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+
+*Build once. Play everywhere.*
