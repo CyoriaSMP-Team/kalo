@@ -447,9 +447,9 @@
 
     <section class="hero">
         <div class="container">
-            <div class="hero-badge">
+            <div class="hero-badge" id="version-badge">
                 <span class="hero-badge-dot"></span>
-                v0.1.0 — Now Available
+                <span id="version-text">Loading...</span>
             </div>
             <img src="docs/assets/images/kalo-logo.png" alt="Kalo" class="hero-logo">
             <h1>Open <span>Custom Content</span><br>Engine for Minecraft</h1>
@@ -681,5 +681,19 @@ mkdir -p plugins/Kalo/packs/mypack/configs</pre>
             </div>
         </div>
     </footer>
+        <script>
+            async function loadVersion() {
+                try {
+                    const response = await fetch("version.json");
+                    const data = await response.json();
+                    document.getElementById("version-text").textContent = `${data.name} — ${data.status}`;
+                    document.getElementById("version-badge").style.display = "inline-flex";
+                } catch (error) {
+                    document.getElementById("version-text").textContent = "v0.1.0 — Now Available";
+                }
+            }
+            loadVersion();
+            setInterval(loadVersion, 30000);
+        </script>
 </body>
 </html>

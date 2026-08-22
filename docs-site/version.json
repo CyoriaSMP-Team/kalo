@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "name": "v0.1.0",
+  "status": "Now Available",
+  "releaseDate": "2026-08-22",
+  "features": {
+    "abilities": 57,
+    "skills": 41,
+    "stats": 26,
+    "conditions": 9,
+    "migrationPlugins": 8,
+    "contentTypes": 10
+  }
+}
