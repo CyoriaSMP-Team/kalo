@@ -12,6 +12,15 @@ import io.kalo.content.armor.ArmorRegistryEntryImpl;
 import io.kalo.content.item.Item;
 import io.kalo.content.item.ItemRegistryEntry;
 import io.kalo.content.item.ItemRegistryEntryImpl;
+import io.kalo.content.painting.Painting;
+import io.kalo.content.painting.PaintingRegistryEntry;
+import io.kalo.content.painting.PaintingRegistryEntryImpl;
+import io.kalo.content.musicdisc.MusicDisc;
+import io.kalo.content.musicdisc.MusicDiscRegistryEntry;
+import io.kalo.content.musicdisc.MusicDiscRegistryEntryImpl;
+import io.kalo.content.gui.Gui;
+import io.kalo.content.gui.GuiRegistryEntry;
+import io.kalo.content.gui.GuiRegistryEntryImpl;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +49,21 @@ public class RegistriesImpl implements Registries {
     @Getter @Accessors(fluent = true)
     private final EntryWritableRegistry<Armor, ArmorRegistryEntry> armor = create(
             new EntryScalableRegistry<>(ArmorRegistryEntryImpl::new)
+    );
+
+    @Getter @Accessors(fluent = true)
+    private final EntryWritableRegistry<Painting, PaintingRegistryEntry> painting = create(
+            new EntryScalableRegistry<>(PaintingRegistryEntryImpl::new)
+    );
+
+    @Getter @Accessors(fluent = true)
+    private final EntryWritableRegistry<MusicDisc, MusicDiscRegistryEntry> musicDisc = create(
+            new EntryScalableRegistry<>(MusicDiscRegistryEntryImpl::new)
+    );
+
+    @Getter @Accessors(fluent = true)
+    private final EntryWritableRegistry<Gui, GuiRegistryEntry> gui = create(
+            new EntryScalableRegistry<>(GuiRegistryEntryImpl::new)
     );
 
     protected <T extends Registry<?>> T create(@NotNull T registry) {

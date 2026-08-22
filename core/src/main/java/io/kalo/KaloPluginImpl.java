@@ -7,6 +7,8 @@ import io.kalo.manager.Managerial;
 import io.kalo.manager.RegistryManagerImpl;
 import io.kalo.manager.Reloadable;
 import io.kalo.manager.ResourcePackManagerImpl;
+import io.kalo.platform.java.FurnitureListener;
+import io.kalo.platform.java.GuiListener;
 import io.kalo.platform.java.JavaBlockListener;
 import io.kalo.platform.java.JavaRecipeListener;
 import io.kalo.platform.java.VirtualBlockStore;
@@ -34,6 +36,8 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
     private final CommandManager commandManager = new CommandManager();
     private final VirtualBlockStore virtualBlockStore = new VirtualBlockStore();
     private JavaBlockListener blockListener;
+    private FurnitureListener furnitureListener;
+    private GuiListener guiListener;
 
     private final List<Managerial> managers = List.of(
             registryManager,
@@ -66,7 +70,11 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         managers.forEach(manager -> manager.preload(context));
 
         blockListener = new JavaBlockListener(registryManager.blockStateAllocator(), virtualBlockStore);
+        furnitureListener = new FurnitureListener();
+        guiListener = new GuiListener();
         getServer().getPluginManager().registerEvents(blockListener, this);
+        getServer().getPluginManager().registerEvents(furnitureListener, this);
+        getServer().getPluginManager().registerEvents(guiListener, this);
         getServer().getPluginManager().registerEvents(new JavaRecipeListener(), this);
 
         // Content loads here rather than on ServerLoadEvent, which is what Neko did.
@@ -113,6 +121,14 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
             HandlerList.unregisterAll(blockListener);
             blockListener = null;
         }
+        if (furnitureListener != null) {
+            HandlerList.unregisterAll(furnitureListener);
+            furnitureListener = null;
+        }
+        if (guiListener != null) {
+            HandlerList.unregisterAll(guiListener);
+            guiListener = null;
+        }
 
         try {
             virtualBlockStore.close();
@@ -158,6 +174,12 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         if (blockListener != null) {
             blockListener.rebuildLookup();
             blockListener.refreshLoadedChunks(this);
+        }
+        if (furnitureListener != null) {
+            furnitureListener.rebuildLookup();
+        }
+        if (guiListener != null) {
+            guiListener.rebuildLookup();
         }
         resourcePackManager.reloadManager(context);
     }

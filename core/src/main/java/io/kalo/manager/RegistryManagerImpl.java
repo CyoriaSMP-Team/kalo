@@ -6,6 +6,9 @@ import io.kalo.content.item.ItemType;
 import io.kalo.content.block.BlockType;
 import io.kalo.content.furniture.FurnitureType;
 import io.kalo.content.armor.ArmorType;
+import io.kalo.content.painting.PaintingType;
+import io.kalo.content.musicdisc.MusicDiscType;
+import io.kalo.content.gui.GuiType;
 import io.kalo.content.recipe.RecipeType;
 import io.kalo.content.sound.SoundType;
 import io.kalo.content.glyph.GlyphType;
@@ -162,6 +165,9 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
             types.register(BlockType.KEY, new BlockType(blockStateAllocator));
             types.register(FurnitureType.KEY, new FurnitureType(blockStateAllocator));
             types.register(ArmorType.KEY, new ArmorType());
+            types.register(PaintingType.KEY, new PaintingType());
+            types.register(MusicDiscType.KEY, new MusicDiscType());
+            types.register(GuiType.KEY, new GuiType());
             types.register(RecipeType.KEY, recipeType);
             types.register(SoundType.KEY, soundType);
             types.register(GlyphType.KEY, glyphType);
@@ -173,6 +179,9 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
             block().merge(registries.block());
             furniture().merge(registries.furniture());
             armor().merge(registries.armor());
+            painting().merge(registries.painting());
+            musicDisc().merge(registries.musicDisc());
+            gui().merge(registries.gui());
         }
     }
 }

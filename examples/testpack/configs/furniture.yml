@@ -1,5 +1,114 @@
-# A hand-authored model rather than a cube: exercises the Java custom-model path
-# and, on Bedrock, the geometry conversion.
+# Furniture examples showcasing all new features:
+# - Rotation (rotatable, restricted_rotation)
+# - Seating (seat mechanic)
+# - Hitbox (barrier-based collision)
+# - Storage (persistent inventories)
+# - Display transforms (brightness, shadow, scale)
+# - Waterlogging and light emission
+
+# Ruby Chair - rotatable with seating
+ruby_chair:
+  type: furniture
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Chair</gradient>"
+    lore:
+      - "<gray>A comfortable chair carved from ruby.</gray>"
+  model:
+    custom: "furniture/ruby_chair"
+  behaviour:
+    hardness: 2.0
+    requires_tool: false
+  furniture:
+    rotatable: true
+    restricted_rotation: strict        # 8 facings (N, NE, E, SE, S, SW, W, NW)
+    seat:
+      height: 0.5
+      offset: [0.0, 0.5, 0.0]
+    hitbox:
+      barriers: [[0,0,0]]
+    waterloggable: false
+  java:
+    mode: native
+  bedrock:
+    enabled: true
+
+# Ruby Table - rotatable with extended hitbox
+ruby_table:
+  type: furniture
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Table</gradient>"
+    lore:
+      - "<gray>A sturdy table for your base.</gray>"
+  model:
+    custom: "furniture/ruby_table"
+  behaviour:
+    hardness: 2.5
+    requires_tool: false
+  furniture:
+    rotatable: true
+    restricted_rotation: very_strict   # 4 facings (N, E, S, W)
+    hitbox:
+      barriers:
+        - [0,0,0]
+        - [1,0,0]                     # Extends 1 block in X direction
+    waterloggable: false
+  java:
+    mode: native
+  bedrock:
+    enabled: true
+
+# Ruby Storage Chest - persistent inventory
+ruby_chest:
+  type: furniture
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Chest</gradient>"
+    lore:
+      - "<gray>Store your precious rubies here.</gray>"
+      - "<dark_gray>5 rows of storage</dark_gray>"
+  model:
+    custom: "furniture/ruby_chest"
+  behaviour:
+    hardness: 3.0
+    requires_tool: true
+  furniture:
+    rotatable: false
+    storage:
+      type: STORAGE                    # Shared storage (everyone can access)
+      rows: 5
+      title: "<red>Ruby Chest</red>"
+      open_sound: entity.chest.open
+      close_sound: entity.chest.close
+    hitbox:
+      barriers: [[0,0,0]]
+  java:
+    mode: native
+  bedrock:
+    enabled: true
+
+# Ruby Lamp - emits light, waterloggable
+ruby_lamp:
+  type: furniture
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Lamp</gradient>"
+    lore:
+      - "<gray>A glowing lamp made of ruby.</gray>"
+  model:
+    custom: "furniture/ruby_lamp"
+  behaviour:
+    hardness: 1.0
+    requires_tool: false
+  furniture:
+    rotatable: false
+    light: 15                          # Maximum light level
+    waterloggable: true                # Can be placed underwater
+    hitbox:
+      barriers: [[0,0,0]]
+  java:
+    mode: native
+  bedrock:
+    enabled: true
+
+# Ruby Pedestal - virtual block (unlimited content keys)
 ruby_pedestal:
   type: furniture
   display:
@@ -11,7 +120,62 @@ ruby_pedestal:
   behaviour:
     hardness: 2.0
     requires_tool: false
+  furniture:
+    rotatable: false
+    hitbox:
+      barriers: [[0,0,0]]
   java:
     mode: virtual
+  bedrock:
+    enabled: true
+
+# Ruby Disposal Bin - disposal storage (items deleted when closed)
+ruby_disposal:
+  type: furniture
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Disposal</gradient>"
+    lore:
+      - "<gray>Toss unwanted items here.</gray>"
+      - "<red><bold>Items are destroyed!</bold></red>"
+  model:
+    custom: "furniture/ruby_disposal"
+  behaviour:
+    hardness: 2.0
+    requires_tool: false
+  furniture:
+    rotatable: false
+    storage:
+      type: DISPOSAL                   # Items deleted when inventory closes
+      rows: 3
+      title: "<red>Disposal Bin</red>"
+    hitbox:
+      barriers: [[0,0,0]]
+  java:
+    mode: native
+  bedrock:
+    enabled: true
+
+# Ruby Jukebox - plays custom music discs
+ruby_jukebox:
+  type: furniture
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Jukebox</gradient>"
+    lore:
+      - "<gray>Play your favorite custom discs.</gray>"
+  model:
+    custom: "furniture/ruby_jukebox"
+  behaviour:
+    hardness: 2.0
+    requires_tool: false
+  furniture:
+    rotatable: false
+    jukebox:
+      volume: 1.0
+      pitch: 1.0
+      permission: "kalo.jukebox.play"  # Optional permission
+    hitbox:
+      barriers: [[0,0,0]]
+  java:
+    mode: native
   bedrock:
     enabled: true

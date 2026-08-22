@@ -105,6 +105,9 @@ public final class ContentManagerImpl implements ContentManager, Managerial, Rel
         if (conflict == null) conflict = firstConflict(target.block(), source.block());
         if (conflict == null) conflict = firstConflict(target.furniture(), source.furniture());
         if (conflict == null) conflict = firstConflict(target.armor(), source.armor());
+        if (conflict == null) conflict = firstConflict(target.painting(), source.painting());
+        if (conflict == null) conflict = firstConflict(target.musicDisc(), source.musicDisc());
+        if (conflict == null) conflict = firstConflict(target.gui(), source.gui());
         return conflict;
     }
 

@@ -1,0 +1,98 @@
+# Custom GUIs (inventory menus)
+# GUIs are server-side menus with configurable slots and actions
+
+# Main server menu
+main_menu:
+  type: gui
+  title: "<gradient:#ff5f6d:#ffc371>Server Menu</gradient>"
+  rows: 3
+  items:
+    4:
+      material: NETHER_STAR
+      display_name: "<gold>Teleport</gold>"
+      lore:
+        - "<gray>Teleport to different areas</gray>"
+      actions:
+        - "gui:testpack:teleport_menu"
+    10:
+      material: DIAMOND_SWORD
+      display_name: "<red>Kit PvP</gold>"
+      lore:
+        - "<gray>Get PvP gear</gray>"
+      actions:
+        - "command:kit pvp %player%"
+        - "message:<green>You received the PvP kit!"
+    12:
+      material: CHEST
+      display_name: "<gold>Shop</gold>"
+      lore:
+        - "<gray>Browse the server shop</gray>"
+      actions:
+        - "command:shop open %player%"
+    14:
+      material: BOOK
+      display_name: "<blue>Rules</gold>"
+      lore:
+        - "<gray>Read server rules</gray>"
+      actions:
+        - "command:rules %player%"
+    16:
+      material: EMERALD
+      display_name: "<green>Vote</gold>"
+      lore:
+        - "<gray>Vote for the server</gray>"
+      actions:
+        - "command:vote %player%"
+    22:
+      material: BARRIER
+      display_name: "<red>Close</gold>"
+      lore:
+        - "<gray>Close this menu</gray>"
+      actions:
+        - "close"
+
+# Teleport submenu
+teleport_menu:
+  type: gui
+  title: "<gradient:#74b9ff:#0984e3>Teleport</gradient>"
+  rows: 3
+  items:
+    10:
+      material: GRASS_BLOCK
+      display_name: "<green>Spawn</gold>"
+      lore:
+        - "<gray>Teleport to spawn</gray>"
+      actions:
+        - "command:spawn %player%"
+        - "close"
+    12:
+      material: NETHERRACK
+      display_name: "<red>Nether</gold>"
+      lore:
+        - "<gray>Teleport to nether</gray>"
+      actions:
+        - "command:tp %player% world_nether 0 64 0"
+        - "close"
+    14:
+      material: END_STONE
+      display_name: "<purple>End</gold>"
+      lore:
+        - "<gray>Teleport to end</gray>"
+      actions:
+        - "command:tp %player% world_the_end 0 64 0"
+        - "close"
+    16:
+      material: PLAYER_HEAD
+      display_name: "<aqua>Home</gold>"
+      lore:
+        - "<gray>Teleport to your home</gray>"
+      actions:
+        - "command:home %player%"
+        - "close"
+    22:
+      material: ARROW
+      display_name: "<yellow>Back</gold>"
+      lore:
+        - "<gray>Go back to main menu</gray>"
+      actions:
+        - "gui:testpack:main_menu"

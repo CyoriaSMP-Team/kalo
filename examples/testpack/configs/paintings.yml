@@ -1,0 +1,27 @@
+# Custom paintings
+# Paintings are vanilla painting variants with custom textures
+# Place the texture in assets/testpack/textures/painting/
+
+ruby_painting_small:
+  type: painting
+  width: 1
+  height: 1
+  asset_id: "testpack:ruby_painting_small"
+  author: "Kalo"
+  title: "Ruby Portrait"
+
+ruby_painting_wide:
+  type: painting
+  width: 3
+  height: 2
+  asset_id: "testpack:ruby_painting_wide"
+  author: "Kalo"
+  title: "Ruby Landscape"
+
+ruby_painting_tall:
+  type: painting
+  width: 2
+  height: 4
+  asset_id: "testpack:ruby_painting_tall"
+  author: "Kalo"
+  title: "Ruby Tower"

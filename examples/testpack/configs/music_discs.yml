@@ -1,0 +1,31 @@
+# Custom music discs
+# Music discs are jukebox-playable items with custom sounds
+# Place the sound file in assets/testpack/sounds/music/
+
+ruby_disc:
+  type: music_disc
+  sound: "testpack:music.ruby_theme"
+  description: "Ruby Theme - A majestic melody"
+  duration: 180
+  comparator_output: 12
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Disc</gradient>"
+    lore:
+      - "<gray>Plays Ruby Theme</gray>"
+      - "<dark_gray>Duration: 3:00</dark_gray>"
+  model:
+    sprite: "item/ruby_disc"
+
+calm_disc:
+  type: music_disc
+  sound: "testpack:music.calm_melody"
+  description: "Calm Melody - Peaceful and serene"
+  duration: 240
+  comparator_output: 8
+  display:
+    name: "<gradient:#74b9ff:#0984e3>Calm Disc</gradient>"
+    lore:
+      - "<gray>Plays Calm Melody</gray>"
+      - "<dark_gray>Duration: 4:00</dark_gray>"
+  model:
+    sprite: "item/calm_disc"
