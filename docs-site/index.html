@@ -4,29 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kalo - Open Custom Content Engine for Minecraft</title>
-    <link rel="stylesheet" href="docs/assets/css/styles.css">
+    <link rel="icon" type="image/png" href="docs/assets/images/kalo-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d1b2a 100%);
             color: #fff;
             min-height: 100vh;
         }
         
         .hero {
             text-align: center;
-            padding: 100px 20px;
-            background: rgba(0, 0, 0, 0.3);
+            padding: 120px 20px 80px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        .hero img {
+            width: 200px;
+            height: auto;
+            margin-bottom: 30px;
         }
         
         .hero h1 {
+            font-family: 'Space Grotesk', sans-serif;
             font-size: 4rem;
+            font-weight: 700;
             margin-bottom: 20px;
             background: linear-gradient(90deg, #f39c12, #e74c3c, #9b59b6);
             -webkit-background-clip: text;
@@ -38,98 +45,125 @@
             font-size: 1.5rem;
             color: #bdc3c7;
             margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
         
-        .hero .cta {
+        .hero .badges {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+        
+        .badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .badge-free { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid #2ecc71; }
+        .badge-version { background: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid #3498db; }
+        .badge-java { background: rgba(243, 156, 18, 0.2); color: #f39c12; border: 1px solid #f39c12; }
+        
+        .cta {
             display: inline-block;
-            padding: 15px 40px;
+            padding: 18px 45px;
             background: linear-gradient(90deg, #f39c12, #e74c3c);
             color: #fff;
             text-decoration: none;
             border-radius: 30px;
             font-size: 1.2rem;
-            font-weight: bold;
+            font-weight: 600;
             transition: transform 0.3s, box-shadow 0.3s;
         }
         
-        .hero .cta:hover {
+        .cta:hover {
             transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(243, 156, 18, 0.4);
+            box-shadow: 0 15px 40px rgba(243, 156, 18, 0.4);
         }
         
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 30px;
-            padding: 60px 20px;
-            max-width: 1200px;
+            padding: 80px 40px;
+            max-width: 1400px;
             margin: 0 auto;
         }
         
         .feature-card {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 30px;
-            text-align: center;
-            transition: transform 0.3s, box-shadow 0.3s;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 40px;
+            transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
         }
         
         .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            transform: translateY(-8px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            border-color: #f39c12;
         }
         
         .feature-card .icon {
-            font-size: 3rem;
-            margin-bottom: 20px;
+            font-size: 3.5rem;
+            margin-bottom: 25px;
         }
         
         .feature-card h3 {
-            font-size: 1.5rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.6rem;
             margin-bottom: 15px;
             color: #f39c12;
         }
         
         .feature-card p {
-            color: #bdc3c7;
-            line-height: 1.6;
+            color: #95a5a6;
+            line-height: 1.7;
         }
         
         .stats {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            padding: 60px 20px;
-            max-width: 1000px;
+            gap: 25px;
+            padding: 80px 40px;
+            max-width: 1200px;
             margin: 0 auto;
-            text-align: center;
         }
         
         .stat-item {
-            background: rgba(243, 156, 18, 0.2);
-            border-radius: 10px;
-            padding: 30px;
+            background: rgba(243, 156, 18, 0.1);
+            border: 1px solid rgba(243, 156, 18, 0.3);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
         }
         
         .stat-item .number {
-            font-size: 3rem;
-            font-weight: bold;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
             color: #f39c12;
         }
         
         .stat-item .label {
-            color: #bdc3c7;
+            color: #95a5a6;
             margin-top: 10px;
+            font-size: 1.1rem;
         }
         
         .cta-section {
             text-align: center;
-            padding: 80px 20px;
+            padding: 100px 40px;
             background: rgba(0, 0, 0, 0.3);
         }
         
         .cta-section h2 {
-            font-size: 2.5rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.8rem;
             margin-bottom: 30px;
         }
         
@@ -142,78 +176,86 @@
         
         .cta-section .btn {
             display: inline-block;
-            padding: 15px 30px;
+            padding: 18px 40px;
             text-decoration: none;
             border-radius: 30px;
-            font-weight: bold;
+            font-weight: 600;
             transition: transform 0.3s;
         }
         
-        .cta-section .btn:hover {
-            transform: translateY(-3px);
-        }
+        .cta-section .btn:hover { transform: translateY(-3px); }
         
-        .cta-section .btn-primary {
+        .btn-primary {
             background: linear-gradient(90deg, #f39c12, #e74c3c);
             color: #fff;
         }
         
-        .cta-section .btn-secondary {
-            background: rgba(255, 255, 255, 0.2);
+        .btn-secondary {
+            background: transparent;
             color: #fff;
             border: 2px solid #f39c12;
         }
         
         footer {
             text-align: center;
-            padding: 30px;
+            padding: 40px;
             background: rgba(0, 0, 0, 0.5);
             color: #7f8c8d;
         }
         
-        footer a {
-            color: #f39c12;
-            text-decoration: none;
+        footer a { color: #f39c12; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .features { padding: 40px 20px; }
         }
     </style>
 </head>
 <body>
     <section class="hero">
-        <h1>🎮 Kalo</h1>
-        <p class="tagline">Open Custom Content Engine for Minecraft</p>
-        <a href="docs/index.html" class="cta">Get Started →</a>
+        <img src="docs/assets/images/kalo-logo.png" alt="Kalo">
+        <h1>Kalo</h1>
+        <p class="tagline">The open custom content engine for Minecraft. Build items, blocks, furniture, and immersive experiences — without limits or paywalls.</p>
+        <div class="badges">
+            <span class="badge badge-free">Free (MIT)</span>
+            <span class="badge badge-version">v0.1.0</span>
+            <span class="badge badge-java">Java 21+ / Bedrock</span>
+        </div>
+        <a href="docs/" class="cta">Get Started →</a>
     </section>
     
     <section class="features">
         <div class="feature-card">
             <div class="icon">🎯</div>
             <h3>57 Abilities</h3>
-            <p>Combat, movement, defense, utility, and magic abilities for items and blocks.</p>
+            <p>Combat, movement, defense, utility, and magic abilities. Conditional triggers and ability combinations.</p>
         </div>
         <div class="feature-card">
             <div class="icon">⚔️</div>
             <h3>41 Skills</h3>
-            <p>Complex mob AI with combat, movement, summoning, and environment skills.</p>
+            <p>Complex mob AI with combat, movement, summoning, and environment skills. Phase system for bosses.</p>
         </div>
         <div class="feature-card">
             <div class="icon">📊</div>
             <h3>26 Stats</h3>
-            <p>RPG stats including elemental damage, resistance, and advanced combat stats.</p>
+            <p>RPG stats including elemental damage, resistance, crit chance, dodge, and advanced combat stats.</p>
         </div>
         <div class="feature-card">
             <div class="icon">🐺</div>
             <h3>Mob System</h3>
-            <p>9 conditions, phases, immunities, and full AI control for custom mobs.</p>
+            <p>9 conditions, phases, immunities, equipment, and full AI control for custom mobs.</p>
         </div>
         <div class="feature-card">
             <div class="icon">🔄</div>
             <h3>Migration</h3>
-            <p>Migrate from 8 plugins: Oraxen, ItemsAdder, MythicMobs, MMOItems, and more.</p>
+            <p>Migrate from 8 plugins: Oraxen, ItemsAdder, MythicMobs, MMOItems, ModelEngine, and more.</p>
         </div>
         <div class="feature-card">
             <div class="icon">🌐</div>
             <h3>Cross-Platform</h3>
-            <p>Deep Geyser integration for Bedrock Edition support.</p>
+            <p>Deep Geyser integration for Bedrock Edition support. One plugin, all platforms.</p>
         </div>
     </section>
     
@@ -239,14 +281,14 @@
     <section class="cta-section">
         <h2>Ready to Get Started?</h2>
         <div class="buttons">
-            <a href="docs/index.html" class="btn btn-primary">📖 Documentation</a>
+            <a href="docs/" class="btn btn-primary">📖 Documentation</a>
             <a href="https://github.com/CyoriaSMP-Team/kalo" class="btn btn-secondary">⭐ GitHub</a>
         </div>
     </section>
     
     <footer>
         <p>Kalo — Open Custom Content Engine for Minecraft</p>
-        <p><a href="https://github.com/CyoriaSMP-Team/kalo">GitHub</a> • MIT License</p>
+        <p><a href="https://github.com/CyoriaSMP-Team/kalo">GitHub</a> • <a href="docs/">Documentation</a> • MIT License</p>
     </footer>
 </body>
 </html>
