@@ -74,3 +74,23 @@ defaults:
       path: "configuration"
     values:
       nav_order: 6
+  - scope:
+      path: "paintings"
+    values:
+      nav_order: 7
+  - scope:
+      path: "music-discs"
+    values:
+      nav_order: 8
+  - scope:
+      path: "guis"
+    values:
+      nav_order: 9
+  - scope:
+      path: "migration"
+    values:
+      nav_order: 10
+  - scope:
+      path: "api"
+    values:
+      nav_order: 11
