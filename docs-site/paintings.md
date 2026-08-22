@@ -73,3 +73,4 @@ Custom paintings automatically render on Bedrock through the existing painting r
 **Next:** [Music Discs]({% link music-discs.md %})
 
 **Previous:** [Furniture]({% link furniture.md %})
+
