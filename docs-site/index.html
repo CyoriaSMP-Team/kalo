@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalo - Documentation</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+    <style>
+        :root {
+            --theme-color: #ff5f6d;
+            --sidebar-width: 260px;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: #16213e;
+            padding: 20px 0;
+            overflow-y: auto;
+            border-right: 1px solid #333;
+        }
+        .sidebar h1 {
+            color: #ff5f6d;
+            font-size: 24px;
+            padding: 0 20px;
+            margin: 0 0 30px 0;
+        }
+        .sidebar h1 span {
+            color: #ffc371;
+        }
+        .sidebar nav a {
+            display: block;
+            padding: 10px 20px;
+            color: #aaa;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .sidebar nav a:hover, .sidebar nav a.active {
+            background: rgba(255,95,109,0.1);
+            color: #ff5f6d;
+        }
+        .sidebar nav a .emoji {
+            margin-right: 8px;
+        }
+        .main {
+            margin-left: var(--sidebar-width);
+            padding: 40px 60px;
+            max-width: 900px;
+        }
+        h1 { color: #ff5f6d; font-size: 32px; }
+        h2 { color: #ffc371; font-size: 24px; margin-top: 40px; }
+        h3 { color: #ff9a9e; font-size: 20px; }
+        code {
+            background: #16213e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+        }
+        pre {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid #333;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th {
+            background: #16213e;
+            color: #ff5f6d;
+        }
+        tr:hover {
+            background: rgba(255,95,109,0.05);
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .badge-free { background: #2ecc71; color: #fff; }
+        .badge-new { background: #ff5f6d; color: #fff; }
+        .badge-beta { background: #f39c12; color: #fff; }
+        .hero {
+            text-align: center;
+            padding: 60px 0;
+        }
+        .hero h1 { font-size: 48px; }
+        .hero p { color: #aaa; font-size: 18px; }
+        .card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+            border: 1px solid #333;
+        }
+        a { color: #ff5f6d; }
+        .content { display: none; }
+        .content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h1>🐈 <span>Kalo</span></h1>
+        <nav>
+            <a href="#" class="active" onclick="showPage('home')"><span class="emoji">🏠</span> Home</a>
+            <a href="#" onclick="showPage('getting-started')"><span class="emoji">🚀</span> Getting Started</a>
+            <a href="#" onclick="showPage('features')"><span class="emoji">📦</span> Features</a>
+            <a href="#" onclick="showPage('furniture')"><span class="emoji">🪑</span> Furniture</a>
+            <a href="#" onclick="showPage('paintings')"><span class="emoji">🎨</span> Paintings</a>
+            <a href="#" onclick="showPage('music-discs')"><span class="emoji">🎵</span> Music Discs</a>
+            <a href="#" onclick="showPage('guis')"><span class="emoji">🖥️</span> GUIs</a>
+            <a href="#" onclick="showPage('bedrock')"><span class="emoji">🌏</span> Bedrock</a>
+            <a href="#" onclick="showPage('migration')"><span class="emoji">🔄</span> Migration</a>
+            <a href="#" onclick="showPage('api')"><span class="emoji">🔌</span> API</a>
+            <a href="#" onclick="showPage('config')"><span class="emoji">⚙️</span> Configuration</a>
+        </nav>
+    </div>
+
+    <div class="main">
+        <!-- HOME -->
+        <div id="home" class="content active">
+            <div class="hero">
+                <h1>🐈 Kalo</h1>
+                <p>Open Custom Content Engine for Minecraft</p>
+                <p>Build once. Play everywhere. No paywalls. No player caps.</p>
+                <p>
+                    <span class="badge badge-free">FREE</span>
+                    <span class="badge badge-new">NEW</span>
+                    <span class="badge badge-beta">v0.1.0</span>
+                </p>
+            </div>
+
+            <h2>🚀 Quick Start</h2>
+            <pre><code># Clone and build
+git clone https://github.com/CyoriaSMP-Team/kalo.git
+cd kalo/main
+./gradlew build
+
+# Install
+cp build/libs/Kalo-*.jar /path/to/server/plugins/</code></pre>
+
+            <h2>📦 Content Types</h2>
+            <table>
+                <tr><th>Type</th><th>Status</th><th>Features</th></tr>
+                <tr><td>🗡️ Items</td><td>✅</td><td>Sprite, Custom, Vanilla models</td></tr>
+                <tr><td>🧱 Blocks</td><td>✅</td><td>893 native + virtual</td></tr>
+                <tr><td>🪑 Furniture</td><td>✅</td><td>Rotation, seats, storage, hitbox</td></tr>
+                <tr><td>🛡️ Armor</td><td>✅</td><td>4 slots + elytra</td></tr>
+                <tr><td>🎨 Paintings</td><td>✅</td><td>1×1 to 4×4</td></tr>
+                <tr><td>🎵 Music Discs</td><td>✅</td><td>Custom sounds</td></tr>
+                <tr><td>🖥️ GUIs</td><td>✅</td><td>Inventory menus</td></tr>
+                <tr><td>🔊 Sounds</td><td>✅</td><td>Custom events</td></tr>
+                <tr><td>✍️ Glyphs</td><td>✅</td><td>Custom fonts</td></tr>
+                <tr><td>📋 Recipes</td><td>✅</td><td>7 stations</td></tr>
+            </table>
+
+            <h2>🌏 Platform Support</h2>
+            <table>
+                <tr><th>Platform</th><th>Status</th></tr>
+                <tr><td>Paper (1.21.4 → 26.2)</td><td>✅</td></tr>
+                <tr><td>Folia</td><td>✅</td></tr>
+                <tr><td>Bedrock</td><td>✅ Built-in</td></tr>
+            </table>
+
+            <h2>💰 Price</h2>
+            <p style="font-size: 24px; color: #2ecc71;"><strong>FREE (MIT License)</strong></p>
+            <p>No player caps. No premium features. No paywalls.</p>
+        </div>
+
+        <!-- GETTING STARTED -->
+        <div id="getting-started" class="content">
+            <h1>🚀 Getting Started</h1>
+            
+            <h2>Prerequisites</h2>
+            <ul>
+                <li>Java 21+ (Java 25 for Paper 26.2)</li>
+                <li>Paper or Folia server</li>
+            </ul>
+
+            <h2>Installation</h2>
+            <pre><code># 1. Build Kalo
+git clone https://github.com/CyoriaSMP-Team/kalo.git
+cd kalo/main
+./gradlew build
+
+# 2. Install plugin
+cp build/libs/Kalo-*.jar /path/to/server/plugins/
+
+# 3. Create content pack
+mkdir -p plugins/Kalo/packs/myitem/configs
+mkdir -p plugins/Kalo/packs/myitem/assets/myitem/textures/item</code></pre>
+
+            <h2>First Item</h2>
+            <pre><code># plugins/Kalo/packs/myitem/configs/items.yml
+ruby_sword:
+  type: item
+  display:
+    name: "<red>Ruby Sword</red>"
+    lore:
+      - "<gray>A powerful sword</gray>"
+  model:
+    sprite: "item/ruby_sword"
+  item:
+    material: DIAMOND_SWORD
+    durability: 1561
+    damage: 7</code></pre>
+
+            <h2>Commands</h2>
+            <table>
+                <tr><th>Command</th><th>Description</th></tr>
+                <tr><td><code>/kalo reload</code></td><td>Reload all content packs</td></tr>
+                <tr><td><code>/kalo give &lt;player&gt; &lt;item&gt;</code></td><td>Give a Kalo item</td></tr>
+                <tr><td><code>/kalo migrate &lt;plugin&gt;</code></td><td>Migrate from other plugins</td></tr>
+            </table>
+        </div>
+
+        <!-- FEATURES -->
+        <div id="features" class="content">
+            <h1>📦 Features</h1>
+            
+            <h2>All Content Types</h2>
+            <p>Kalo supports 10 content types with full feature parity to paid alternatives.</p>
+
+            <table>
+                <tr><th>Type</th><th>Kalo</th><th>Nexo</th><th>Oraxen</th></tr>
+                <tr><td>Items</td><td>✅</td><td>✅</td><td>✅</td></tr>
+                <tr><td>Blocks</td><td>✅ 893+</td><td>✅</td><td>✅</td></tr>
+                <tr><td>Furniture</td><td>✅</td><td>✅</td><td>✅</td></tr>
+                <tr><td>Armor</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                <tr><td>Paintings</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                <tr><td>Music Discs</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                <tr><td>GUIs</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                <tr><td>Bedrock</td><td>✅ Free</td><td>€40</td><td>❌</td></tr>
+            </table>
+        </div>
+
+        <!-- FURNITURE -->
+        <div id="furniture" class="content">
+            <h1>🪑 Furniture</h1>
+            
+            <h2>Basic Chair</h2>
+            <pre><code>ruby_chair:
+  type: furniture
+  display:
+    name: "<gold>Ruby Chair</gold>"
+  model:
+    custom: "furniture/ruby_chair"
+  furniture:
+    rotatable: true
+    restricted_rotation: strict
+    seat:
+      height: 0.5
+      offset: [0.0, 0.5, 0.0]
+    hitbox:
+      barriers: [[0,0,0]]
+  java:
+    mode: native</code></pre>
+
+            <h2>Storage Furniture</h2>
+            <pre><code>ruby_chest:
+  type: furniture
+  display:
+    name: "<gold>Ruby Chest</gold>"
+  model:
+    custom: "furniture/ruby_chest"
+  furniture:
+    storage:
+      type: STORAGE
+      rows: 5
+      title: "<red>Storage</red>"
+  java:
+    mode: native</code></pre>
+
+            <h2>Features</h2>
+            <table>
+                <tr><th>Feature</th><th>Description</th></tr>
+                <tr><td>Rotation</td><td>16/8/4 directions</td></tr>
+                <tr><td>Seat</td><td>Players can sit</td></tr>
+                <tr><td>Hitbox</td><td>Barrier blocks</td></tr>
+                <tr><td>Storage</td><td>Persistent inventory</td></tr>
+                <tr><td>Jukebox</td><td>Play custom music</td></tr>
+                <tr><td>Waterloggable</td><td>Place in water</td></tr>
+                <tr><td>Light</td><td>Emit light 0-15</td></tr>
+            </table>
+        </div>
+
+        <!-- PAINTINGS -->
+        <div id="paintings" class="content">
+            <h1>🎨 Paintings</h1>
+            
+            <h2>Basic Painting</h2>
+            <pre><code>ruby_painting:
+  type: painting
+  width: 1
+  height: 1
+  asset_id: "testpack:ruby_painting"
+  author: "Kalo"
+  title: "Ruby Portrait"</code></pre>
+
+            <h2>Multi-Block</h2>
+            <pre><code>large_painting:
+  type: painting
+  width: 4
+  height: 3
+  asset_id: "testpack:large_painting"
+  author: "Kalo"
+  title: "Epic Landscape"</code></pre>
+
+            <h2>Sizes</h2>
+            <table>
+                <tr><th>Width</th><th>Height</th><th>Blocks</th></tr>
+                <tr><td>1</td><td>1</td><td>1×1</td></tr>
+                <tr><td>1</td><td>2</td><td>1×2</td></tr>
+                <tr><td>2</td><td>2</td><td>2×2</td></tr>
+                <tr><td>4</td><td>3</td><td>4×3</td></tr>
+                <tr><td>4</td><td>4</td><td>4×4</td></tr>
+            </table>
+        </div>
+
+        <!-- MUSIC DISCS -->
+        <div id="music-discs" class="content">
+            <h1>🎵 Music Discs</h1>
+            
+            <h2>Basic Disc</h2>
+            <pre><code>ruby_disc:
+  type: music_disc
+  sound: "testpack:music.ruby_theme"
+  description: "Ruby Theme - A majestic melody"
+  duration: 180
+  comparator_output: 12
+  display:
+    name: "<gradient:#ff5f6d:#ffc371>Ruby Disc</gradient>"
+  model:
+    sprite: "item/ruby_disc"</code></pre>
+
+            <h2>Configuration</h2>
+            <table>
+                <tr><th>Option</th><th>Type</th><th>Description</th></tr>
+                <tr><td><code>sound</code></td><td>string</td><td>Sound event to play</td></tr>
+                <tr><td><code>duration</code></td><td>int</td><td>Duration in seconds</td></tr>
+                <tr><td><code>comparator_output</code></td><td>int</td><td>Redstone signal (1-15)</td></tr>
+            </table>
+        </div>
+
+        <!-- GUIs -->
+        <div id="guis" class="content">
+            <h1>🖥️ Custom GUIs</h1>
+            
+            <h2>Basic Menu</h2>
+            <pre><code>main_menu:
+  type: gui
+  title: "<gradient:#ff5f6d:#ffc371>Server Menu</gradient>"
+  rows: 3
+  items:
+    4:
+      material: NETHER_STAR
+      display_name: "<gold>Teleport</gold>"
+      actions:
+        - "gui:testpack:teleport_menu"
+    22:
+      material: BARRIER
+      display_name: "<red>Close</red>"
+      actions:
+        - "close"</code></pre>
+
+            <h2>Action Types</h2>
+            <table>
+                <tr><th>Action</th><th>Format</th></tr>
+                <tr><td>Command</td><td><code>command:/cmd</code></td></tr>
+                <tr><td>Message</td><td><code>message:&lt;text&gt;</code></td></tr>
+                <tr><td>Close</td><td><code>close</code></td></tr>
+                <tr><td>Open GUI</td><td><code>gui:&lt;key&gt;</code></td></tr>
+            </table>
+        </div>
+
+        <!-- BEDROCK -->
+        <div id="bedrock" class="content">
+            <h1>🌏 Bedrock Support</h1>
+            
+            <h2>Features</h2>
+            <p>Kalo automatically generates Bedrock resource packs for all content.</p>
+
+            <table>
+                <tr><th>Feature</th><th>Status</th></tr>
+                <tr><td>Items</td><td>✅</td></tr>
+                <tr><td>Blocks</td><td>✅</td></tr>
+                <tr><td>Armor</td><td>✅</td></tr>
+                <tr><td>Furniture</td><td>✅</td></tr>
+                <tr><td>Paintings</td><td>✅</td></tr>
+                <tr><td>Sounds</td><td>✅</td></tr>
+            </table>
+
+            <h2>Setup</h2>
+            <pre><code># Install Geyser for Bedrock support
+# Kalo will auto-generate Bedrock packs
+
+# Check generated packs
+ls plugins/Kalo/packs/*/bedrock/</code></pre>
+        </div>
+
+        <!-- MIGRATION -->
+        <div id="migration" class="content">
+            <h1>🔄 Migration</h1>
+            
+            <h2>Supported Plugins</h2>
+            <table>
+                <tr><th>Plugin</th><th>Items</th><th>Blocks</th><th>Furniture</th></tr>
+                <tr><td>Oraxen</td><td>✅</td><td>✅</td><td>✅</td></tr>
+                <tr><td>ItemsAdder</td><td>✅</td><td>✅</td><td>✅</td></tr>
+                <tr><td>CraftEngine</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                <tr><td>Neko</td><td>✅</td><td>✅</td><td>❌</td></tr>
+            </table>
+
+            <h2>Command</h2>
+            <pre><code>/kalo migrate oraxen
+/kalo migrate itemsarader mypack</code></pre>
+        </div>
+
+        <!-- API -->
+        <div id="api" class="content">
+            <h1>🔌 API Reference</h1>
+            
+            <h2>Maven</h2>
+            <pre><code>&lt;dependency&gt;
+  &lt;groupId&gt;com.github.CyoriaSMP-Team&lt;/groupId&gt;
+  &lt;artifactId&gt;kalo&lt;/artifactId&gt;
+  &lt;version&gt;0.1.0&lt;/version&gt;
+  &lt;scope&gt;provided&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+
+            <h2>Events</h2>
+            <table>
+                <tr><th>Event</th><th>Description</th></tr>
+                <tr><td><code>KaloItemInteractEvent</code></td><td>Player interacts with item</td></tr>
+                <tr><td><code>KaloBlockPlaceEvent</code></td><td>Block is placed</td></tr>
+                <tr><td><code>KaloBlockBreakEvent</code></td><td>Block is broken</td></tr>
+                <tr><td><code>KaloFurnitureInteractEvent</code></td><td>Furniture interaction</td></tr>
+            </table>
+        </div>
+
+        <!-- CONFIGURATION -->
+        <div id="config" class="content">
+            <h1>⚙️ Configuration</h1>
+            
+            <h2>Config Structure</h2>
+            <pre><code>plugins/Kalo/
+├── config.yml           # Main config
+└── packs/
+    └── mypack/
+        ├── pack.yml     # Pack metadata
+        └── configs/
+            ├── items.yml
+            ├── blocks.yml
+            ├── furniture.yml
+            ├── paintings.yml
+            ├── music_discs.yml
+            ├── guis.yml
+            ├── sounds.yml
+            ├── glyphs.yml
+            └── recipes.yml</code></pre>
+
+            <h2>Pack Metadata</h2>
+            <pre><code># pack.yml
+name: My Pack
+version: 1.0.0
+description: Custom content for my server
+author: Me</code></pre>
+        </div>
+    </div>
+
+    <script>
+        function showPage(page) {
+            // Hide all content
+            document.querySelectorAll('.content').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Show selected page
+            document.getElementById(page).classList.add('active');
+            
+            // Update nav
+            document.querySelectorAll('.sidebar nav a').forEach(el => {
+                el.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>
