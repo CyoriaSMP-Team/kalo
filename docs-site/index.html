@@ -83,11 +83,13 @@
         }
         .sidebar-logo-icon {
             width: 40px; height: 40px;
-            background: linear-gradient(135deg, var(--accent), #D97706);
             border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.25rem;
+            overflow: hidden;
             box-shadow: 0 0 20px rgba(245,158,11,0.3);
+        }
+        .sidebar-logo-icon img {
+            width: 100%; height: 100%;
+            object-fit: cover;
         }
         .sidebar-logo-text {
             font-family: var(--font-display);
@@ -307,7 +309,7 @@
     <aside class="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-logo" onclick="showPage('home')">
-                <div class="sidebar-logo-icon">🐈</div>
+                <div class="sidebar-logo-icon"><img src="assets/images/kalo-logo.png" alt="Kalo"></div>
                 <span class="sidebar-logo-text">Kalo</span>
             </a>
         </div>
@@ -381,6 +383,7 @@
         <!-- HOME -->
         <div id="home" class="content active">
             <div class="hero">
+                <img src="assets/images/kalo-logo.png" alt="Kalo Logo" style="width: 280px; height: auto; margin-bottom: 2rem; filter: drop-shadow(0 0 40px rgba(245,158,11,0.3));">
                 <div class="hero-badge"><span class="hero-badge-dot"></span> Open Source & Free Forever</div>
                 <h1>Kalo</h1>
                 <p class="hero-subtitle">The open custom content engine for Minecraft. Build items, blocks, furniture, and immersive experiences — without limits or paywalls.</p>
