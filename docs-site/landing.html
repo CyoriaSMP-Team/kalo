@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalo - Open Custom Content Engine for Minecraft</title>
+    <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #0A0A0F;
+            --bg-alt: #12121A;
+            --bg-card: #1A1A24;
+            --fg: #FAFAFA;
+            --muted: #71717A;
+            --accent: #F59E0B;
+            --accent-hover: #D97706;
+            --accent-glow: rgba(245, 158, 11, 0.4);
+            --green: #22C55E;
+            --purple: #8B5CF6;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Ambient orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .orb-1 {
+            top: -400px; left: 50%; transform: translateX(-50%);
+            width: 1000px; height: 800px;
+            background: radial-gradient(ellipse, rgba(245,158,11,0.06) 0%, transparent 60%);
+            filter: blur(120px);
+        }
+        .orb-2 {
+            bottom: -500px; right: -300px;
+            width: 800px; height: 800px;
+            background: radial-gradient(ellipse, rgba(139,92,246,0.04) 0%, transparent 60%);
+            filter: blur(150px);
+        }
+        .orb-3 {
+            top: 50%; left: -300px;
+            width: 600px; height: 600px;
+            background: radial-gradient(ellipse, rgba(34,197,94,0.03) 0%, transparent 60%);
+            filter: blur(100px);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Nav */
+        nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--fg);
+        }
+        .nav-logo img {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+        }
+        .nav-logo span {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        .nav-links a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            transition: color 200ms;
+        }
+        .nav-links a:hover { color: var(--fg); }
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg);
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 200ms;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9375rem;
+        }
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 0 30px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: var(--fg);
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 200ms;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.25);
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 8rem 0 6rem;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.3);
+            border-radius: 9999px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--green);
+            margin-bottom: 2rem;
+        }
+        .hero-badge-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .hero-logo {
+            width: 280px;
+            height: auto;
+            margin-bottom: 2rem;
+        }
+        .hero h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(3rem, 8vw, 5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero h1 span {
+            background: linear-gradient(135deg, var(--accent) 0%, #FBBF24 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--muted);
+            max-width: 600px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.7;
+        }
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+        }
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            flex-wrap: wrap;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--fg);
+        }
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--muted);
+        }
+
+        /* Features */
+        .section {
+            padding: 6rem 0;
+        }
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .section-subtitle {
+            text-align: center;
+            color: var(--muted);
+            font-size: 1.125rem;
+            max-width: 600px;
+            margin: 0 auto 4rem;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .feature-card {
+            background: rgba(26, 26, 36, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 300ms ease-out;
+        }
+        .feature-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(245, 158, 11, 0.1);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1.25rem;
+        }
+        .feature-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        .feature-desc {
+            color: var(--muted);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+        }
+
+        /* Comparison */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(26, 26, 36, 0.4);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .comparison-table th,
+        .comparison-table td {
+            padding: 1rem 1.25rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .comparison-table th {
+            background: rgba(26, 26, 36, 0.8);
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+        }
+        .comparison-table th:first-child,
+        .comparison-table td:first-child {
+            text-align: left;
+        }
+        .comparison-table th.highlight {
+            color: var(--accent);
+            font-size: 1rem;
+        }
+        .comparison-table td {
+            color: var(--muted);
+        }
+        .comparison-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--fg);
+        }
+        .check {
+            color: var(--green);
+            font-weight: 600;
+        }
+        .cross {
+            color: #52525B;
+        }
+        .price-free {
+            color: var(--green);
+            font-weight: 700;
+        }
+        .price-paid {
+            color: var(--muted);
+        }
+
+        /* Code */
+        .code-section {
+            background: rgba(26, 26, 36, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .code-section pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.8;
+            color: var(--fg);
+        }
+        .code-comment { color: #52525B; }
+        .code-string { color: var(--accent); }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 3rem 0;
+            margin-top: 4rem;
+        }
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+        .footer-links a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 200ms;
+        }
+        .footer-links a:hover { color: var(--accent); }
+        .footer-copy {
+            color: #52525B;
+            font-size: 0.875rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hero { padding: 6rem 0 4rem; }
+            .hero h1 { font-size: 2.5rem; }
+            .hero-stats { gap: 2rem; }
+            .section { padding: 4rem 0; }
+            .section-title { font-size: 2rem; }
+            .features-grid { grid-template-columns: 1fr; }
+            .comparison-table { font-size: 0.8125rem; }
+            .comparison-table th,
+            .comparison-table td { padding: 0.75rem 0.5rem; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-alt); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <nav>
+        <div class="nav-inner">
+            <a href="#" class="nav-logo">
+                <img src="assets/images/kalo-logo.png" alt="Kalo">
+                <span>Kalo</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#compare">Compare</a>
+                <a href="#quickstart">Quick Start</a>
+                <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">GitHub</a>
+                <a href="index.html" class="btn-secondary">Docs</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <div class="hero-badge">
+                <span class="hero-badge-dot"></span>
+                v0.1.0 — Now Available
+            </div>
+            <img src="assets/images/kalo-logo.png" alt="Kalo" class="hero-logo">
+            <h1>Open <span>Custom Content</span><br>Engine for Minecraft</h1>
+            <p class="hero-subtitle">Build items, blocks, furniture, and immersive experiences — without limits or paywalls. Free. Open Source. Forever.</p>
+            <div class="hero-buttons">
+                <a href="#quickstart" class="btn-primary">Get Started Free →</a>
+                <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank" class="btn-secondary">View on GitHub</a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <div class="stat-value" style="color: var(--green);">$0</div>
+                    <div class="stat-label">Forever Free</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">10+</div>
+                    <div class="stat-label">Content Types</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">2</div>
+                    <div class="stat-label">Platforms (Java + Bedrock)</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">MIT</div>
+                    <div class="stat-label">Open Source</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="features">
+        <div class="container">
+            <h2 class="section-title">Everything You Need</h2>
+            <p class="section-subtitle">10 content types in one plugin. What others charge for, we give away.</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🗡️</div>
+                    <div class="feature-title">Custom Items</div>
+                    <div class="feature-desc">Sprite-based items with custom models, durability, and vanilla integration.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧱</div>
+                    <div class="feature-title">Custom Blocks</div>
+                    <div class="feature-desc">893+ native and virtual blocks using vanilla block states.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🪑</div>
+                    <div class="feature-title">Furniture</div>
+                    <div class="feature-desc">Rotatable furniture with seats, hitbox, storage, and jukebox support.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <div class="feature-title">Custom Armor</div>
+                    <div class="feature-desc">4 armor slots + elytra with full equipment textures.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <div class="feature-title">Custom Paintings</div>
+                    <div class="feature-desc">1×1 to 4×4 custom paintings with animation support.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎵</div>
+                    <div class="feature-title">Music Discs</div>
+                    <div class="feature-desc">Custom jukebox-playable discs with comparator output.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🖥️</div>
+                    <div class="feature-title">Custom GUIs</div>
+                    <div class="feature-desc">Server-side inventory menus with actions and events.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌏</div>
+                    <div class="feature-title">Bedrock Support</div>
+                    <div class="feature-desc">Native Bedrock Edition support. No extra plugins needed.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-title">Folia Ready</div>
+                    <div class="feature-desc">Thread-safe for Paper/Folia with async chunk loading.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="compare" style="background: rgba(26, 26, 36, 0.3);">
+        <div class="container">
+            <h2 class="section-title">Why Switch to Kalo?</h2>
+            <p class="section-subtitle">Compare with the competition. See why thousands are making the switch.</p>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">Feature</th>
+                        <th class="highlight">Kalo</th>
+                        <th><a href="https://nexomc.com" target="_blank" style="color: inherit; text-decoration: none;">Nexo</a></th>
+                        <th><a href="https://oraxen.com" target="_blank" style="color: inherit; text-decoration: none;">Oraxen</a></th>
+                        <th><a href="https://itemsadder.com" target="_blank" style="color: inherit; text-decoration: none;">ItemsAdder</a></th>
+                        <th><a href="https://craftengine.net" target="_blank" style="color: inherit; text-decoration: none;">CraftEngine</a></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="text-align: left;">Custom Items</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Custom Blocks</td>
+                        <td><span class="check">893+</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Furniture</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Custom Armor</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Paintings</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Music Discs</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Custom GUIs</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Bedrock Support</td>
+                        <td><span class="price-free">Free</span></td>
+                        <td class="price-paid">€40</td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Folia Support</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Open Source</td>
+                        <td><span class="check">MIT</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr style="background: rgba(245, 158, 11, 0.05);">
+                        <td style="text-align: left; font-weight: 600; color: var(--fg);">Price</td>
+                        <td style="font-weight: 700; color: var(--green); font-size: 1.125rem;">FREE</td>
+                        <td class="price-paid">€68</td>
+                        <td class="price-free">Free</td>
+                        <td class="price-paid">~$25</td>
+                        <td class="price-paid">~$15</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="section" id="quickstart">
+        <div class="container">
+            <h2 class="section-title">Start in 30 Seconds</h2>
+            <p class="section-subtitle">Clone, build, and install. That's it.</p>
+            <div class="code-section">
+<pre><span class="code-comment"># 1. Clone the repo</span>
+git clone https://github.com/CyoriaSMP-Team/kalo.git
+<span class="code-comment"># 2. Build</span>
+cd kalo/main && ./gradlew build
+<span class="code-comment"># 3. Install</span>
+cp build/libs/Kalo-*.jar /your-server/plugins/
+<span class="code-comment"># 4. Create your first item</span>
+mkdir -p plugins/Kalo/packs/mypack/configs</pre>
+            </div>
+            <div style="text-align: center; margin-top: 2rem;">
+                <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank" class="btn-primary">View Full Documentation →</a>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div>
+                    <a href="#" class="nav-logo" style="margin-bottom: 0.5rem;">
+                        <img src="assets/images/kalo-logo.png" alt="Kalo" style="width: 28px; height: 28px;">
+                        <span style="font-size: 1.25rem;">Kalo</span>
+                    </a>
+                    <div class="footer-copy">Open Custom Content Engine for Minecraft</div>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">GitHub</a>
+                    <a href="https://github.com/CyoriaSMP-Team/kalo/wiki" target="_blank">Wiki</a>
+                    <a href="index.html">Documentation</a>
+                    <a href="https://github.com/CyoriaSMP-Team/kalo/issues" target="_blank">Issues</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
