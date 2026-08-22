@@ -59,3 +59,4 @@ mkdir -p plugins/Kalo/packs/myitem/configs
 
 - [GitHub Issues](https://github.com/CyoriaSMP-Team/kalo/issues)
 - [Discord](https://discord.gg/kalo) (coming soon)
+
