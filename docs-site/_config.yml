@@ -5,6 +5,10 @@ url: "https://cyoriasmp-team.github.io"
 
 remote_theme: just-the-docs/just-the-docs@v0.10.0
 
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+
 color_scheme: dark
 
 permalink: pretty
