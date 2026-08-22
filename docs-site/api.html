@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kalo - Documentation</title>
+    <title>API - Kalo</title>
     <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +21,7 @@
         <nav class="sidebar-nav">
             <div class="nav-section">
                 <div class="nav-section-title">Getting Started</div>
-                <a href="index.html" class="nav-link active">
+                <a href="index.html" class="nav-link">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                     Home
                 </a>
@@ -66,7 +66,7 @@
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
                     Migration
                 </a>
-                <a href="api.html" class="nav-link">
+                <a href="api.html" class="nav-link active">
                     <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                     API
                 </a>
@@ -86,45 +86,21 @@
 
     <main class="main">
         <div class="content">
-            <div class="hero">
-                <img src="assets/images/kalo-logo.png" alt="Kalo" style="width: 320px; height: auto; margin-bottom: 1.5rem;">
-                <h1>Kalo</h1>
-                <div class="hero-badge"><span class="hero-badge-dot"></span> Open Source & Free Forever</div>
-                <p class="hero-subtitle">The open custom content engine for Minecraft. Build items, blocks, furniture, and immersive experiences — without limits or paywalls.</p>
-                <div class="hero-badges">
-                    <span class="badge badge-free">Free (MIT)</span>
-                    <span class="badge badge-new">v0.1.0</span>
-                    <span class="badge badge-version">Java 21+ / Bedrock</span>
-                </div>
-            </div>
-
-            <h2>Quick Start</h2>
-            <pre><code># Clone and build
-git clone https://github.com/CyoriaSMP-Team/kalo.git
-cd kalo/main
-./gradlew build
-
-# Install
-cp build/libs/Kalo-*.jar /path/to/server/plugins/</code></pre>
-
-            <h2>Content Types</h2>
-            <div class="feature-grid">
-                <div class="feature-card"><div class="feature-card-icon">🗡️</div><div class="feature-card-title">Items</div><div class="feature-card-text">Sprite, custom models, vanilla integration</div></div>
-                <div class="feature-card"><div class="feature-card-icon">🧱</div><div class="feature-card-title">Blocks</div><div class="feature-card-text">893+ native and virtual blocks</div></div>
-                <div class="feature-card"><div class="feature-card-icon">🪑</div><div class="feature-card-title">Furniture</div><div class="feature-card-text">Rotation, seats, storage, hitbox</div></div>
-                <div class="feature-card"><div class="feature-card-icon">🛡️</div><div class="feature-card-title">Armor</div><div class="feature-card-text">4 slots + elytra support</div></div>
-                <div class="feature-card"><div class="feature-card-icon">🎨</div><div class="feature-card-title">Paintings</div><div class="feature-card-text">1×1 to 4×4 custom paintings</div></div>
-                <div class="feature-card"><div class="feature-card-icon">🎵</div><div class="feature-card-title">Music Discs</div><div class="feature-card-text">Custom sounds and music</div></div>
-                <div class="feature-card"><div class="feature-card-icon">🖥️</div><div class="feature-card-title">GUIs</div><div class="feature-card-text">Server-side inventory menus</div></div>
-                <div class="feature-card"><div class="feature-card-icon">🔊</div><div class="feature-card-title">Sounds</div><div class="feature-card-text">Custom sound events</div></div>
-            </div>
-
-            <h2>Platform Support</h2>
+            <h1>API Reference</h1>
+            <h2>Maven</h2>
+            <pre><code>&lt;dependency&gt;
+  &lt;groupId&gt;com.github.CyoriaSMP-Team&lt;/groupId&gt;
+  &lt;artifactId&gt;kalo&lt;/artifactId&gt;
+  &lt;version&gt;0.1.0&lt;/version&gt;
+  &lt;scope&gt;provided&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+            <h2>Events</h2>
             <table>
-                <tr><th>Platform</th><th>Status</th></tr>
-                <tr><td>Paper (1.21.4 → 26.2)</td><td><span class="status status-supported">✓ Supported</span></td></tr>
-                <tr><td>Folia</td><td><span class="status status-supported">✓ Supported</span></td></tr>
-                <tr><td>Bedrock</td><td><span class="status status-free">Built-in</span></td></tr>
+                <tr><th>Event</th><th>Description</th></tr>
+                <tr><td><code>KaloItemInteractEvent</code></td><td>Player interacts with item</td></tr>
+                <tr><td><code>KaloBlockPlaceEvent</code></td><td>Block is placed</td></tr>
+                <tr><td><code>KaloBlockBreakEvent</code></td><td>Block is broken</td></tr>
+                <tr><td><code>KaloFurnitureInteractEvent</code></td><td>Furniture interaction</td></tr>
             </table>
         </div>
     </main>

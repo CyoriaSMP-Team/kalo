@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom GUI Visualizer - Kalo</title>
+    <link rel="icon" type="image/png" href="assets/images/kalo-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <style>
+        /* GUI Visualizer Specific Styles */
+        .gv-container {
+            display: flex;
+            gap: 2rem;
+            height: calc(100vh - 8rem);
+        }
+        
+        .gv-sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        
+        .gv-canvas-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .gv-toolbar {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .gv-toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        
+        .gv-toolbar-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--muted-fg);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .gv-canvas {
+            flex: 1;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .gv-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        
+        .gv-window {
+            position: relative;
+            background: rgba(30, 30, 40, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        
+        .gv-window-header {
+            height: 24px;
+            background: rgba(40, 40, 50, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+        }
+        
+        .gv-window-title {
+            font-size: 11px;
+            color: var(--muted-fg);
+        }
+        
+        .gv-slot-grid {
+            display: grid;
+            gap: 4px;
+            padding: 8px;
+        }
+        
+        .gv-slot {
+            width: 36px;
+            height: 36px;
+            background: rgba(50, 50, 60, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            position: relative;
+        }
+        
+        .gv-slot.player {
+            background: rgba(60, 60, 80, 0.8);
+        }
+        
+        .gv-texture-overlay {
+            position: absolute;
+            cursor: move;
+            border: 2px dashed var(--accent);
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 10;
+            transition: border-color 0.2s;
+        }
+        
+        .gv-texture-overlay:hover {
+            border-color: var(--accent-hover);
+        }
+        
+        .gv-texture-overlay.selected {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-muted);
+        }
+        
+        .gv-drop-zone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--muted-fg);
+            pointer-events: none;
+        }
+        
+        .gv-drop-zone-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .gv-drop-zone-text {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .gv-drop-zone-hint {
+            font-size: 0.875rem;
+            opacity: 0.7;
+        }
+        
+        /* Controls */
+        .gv-control-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .gv-control-group-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .gv-control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        
+        .gv-control-label {
+            font-size: 0.875rem;
+            color: var(--fg);
+        }
+        
+        .gv-control-input {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .gv-input {
+            background: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: var(--fg);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            width: 80px;
+            text-align: center;
+        }
+        
+        .gv-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .gv-btn {
+            background: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: var(--fg);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 200ms;
+        }
+        
+        .gv-btn:hover {
+            background: var(--border);
+        }
+        
+        .gv-btn-accent {
+            background: var(--accent);
+            color: var(--accent-fg);
+            border-color: var(--accent);
+        }
+        
+        .gv-btn-accent:hover {
+            background: var(--accent-hover);
+        }
+        
+        .gv-slider {
+            -webkit-appearance: none;
+            width: 100px;
+            height: 6px;
+            background: var(--muted);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .gv-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .gv-select {
+            background: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: var(--fg);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+        
+        .gv-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        /* Output Section */
+        .gv-output-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        
+        .gv-output-block {
+            background: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .gv-output-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .gv-output-value {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: var(--fg);
+            word-break: break-all;
+        }
+        
+        .gv-copy-btn {
+            margin-top: 0.5rem;
+        }
+        
+        /* Help Section */
+        .gv-help {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: var(--accent-muted);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 8px;
+        }
+        
+        .gv-help-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+        
+        .gv-help-text {
+            font-size: 0.8125rem;
+            color: var(--muted-fg);
+            line-height: 1.5;
+        }
+        
+        .gv-help-key {
+            display: inline-block;
+            background: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.125rem 0.375rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--fg);
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="index.html" class="sidebar-logo">
+                <div class="sidebar-logo-icon"><img src="assets/images/kalo-logo.png" alt="Kalo"></div>
+                <span class="sidebar-logo-text">Kalo</span>
+            </a>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Getting Started</div>
+                <a href="index.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    Home
+                </a>
+                <a href="getting-started.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    Quick Start
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Content Types</div>
+                <a href="features.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                    Overview
+                </a>
+                <a href="furniture.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                    Furniture
+                </a>
+                <a href="paintings.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    Paintings
+                </a>
+                <a href="music-discs.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                    Music Discs
+                </a>
+                <a href="guis.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    GUIs
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Platform</div>
+                <a href="bedrock.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    Bedrock
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Developer</div>
+                <a href="migration.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                    Migration
+                </a>
+                <a href="api.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                    API
+                </a>
+                <a href="config.html" class="nav-link">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Config
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Tools</div>
+                <a href="gui-visualizer.html" class="nav-link active">
+                    <svg class="nav-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    GUI Visualizer
+                </a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                GitHub
+            </a>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="content" style="max-width: 100%; padding: 2rem;">
+            <h1 style="margin-bottom: 0.5rem;">Custom GUI Visualizer</h1>
+            <p style="color: var(--muted-fg); margin-bottom: 1.5rem;">
+                Drag your GUI art onto the container window until its slots line up, and leave with both halves of the setup: the glyph height, ascent and title shift Java draws it with, and a ready-to-paste gui.yml entry for Bedrock.
+            </p>
+            
+            <div class="gv-container">
+                <!-- Sidebar Controls -->
+                <div class="gv-sidebar">
+                    <!-- Upload Texture -->
+                    <div class="gv-control-group">
+                        <div class="gv-control-group-title">Upload Texture</div>
+                        <div style="margin-bottom: 1rem;">
+                            <input type="file" id="textureUpload" accept="image/*" style="display: none;">
+                            <button class="gv-btn gv-btn-accent" style="width: 100%;" onclick="document.getElementById('textureUpload').click()">
+                                Add Texture
+                            </button>
+                        </div>
+                        <div id="textureList" style="max-height: 150px; overflow-y: auto;"></div>
+                    </div>
+                    
+                    <!-- Menu Settings -->
+                    <div class="gv-control-group">
+                        <div class="gv-control-group-title">Menu Settings</div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Rows</span>
+                            <select id="rowSelect" class="gv-select" onchange="updateGrid()">
+                                <option value="1">1x9</option>
+                                <option value="2">2x9</option>
+                                <option value="3">3x9</option>
+                                <option value="4">4x9</option>
+                                <option value="5">5x9</option>
+                                <option value="6" selected>6x9</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Opacity -->
+                    <div class="gv-control-group">
+                        <div class="gv-control-group-title">Opacity</div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">GUI</span>
+                            <div class="gv-control-input">
+                                <input type="range" id="guiOpacity" class="gv-slider" min="0" max="100" value="100" oninput="updateOpacity()">
+                                <span id="guiOpacityValue" style="font-family: var(--font-mono); font-size: 0.875rem; width: 40px; text-align: right;">100%</span>
+                            </div>
+                        </div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Art</span>
+                            <div class="gv-control-input">
+                                <input type="range" id="artOpacity" class="gv-slider" min="0" max="100" value="100" oninput="updateOpacity()">
+                                <span id="artOpacityValue" style="font-family: var(--font-mono); font-size: 0.875rem; width: 40px; text-align: right;">100%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scale -->
+                    <div class="gv-control-group">
+                        <div class="gv-control-group-title">Scale</div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Scale</span>
+                            <div class="gv-control-input">
+                                <button class="gv-btn" onclick="adjustScale(-0.1)">-</button>
+                                <input type="number" id="scaleInput" class="gv-input" value="1.00" step="0.1" min="0.1" max="3.0" onchange="updateScale()">
+                                <button class="gv-btn" onclick="adjustScale(0.1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Offset -->
+                    <div class="gv-control-group">
+                        <div class="gv-control-group-title">Offset</div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">X</span>
+                            <div class="gv-control-input">
+                                <button class="gv-btn" onclick="adjustOffset('x', -1)">-</button>
+                                <input type="number" id="offsetX" class="gv-input" value="0" step="1" onchange="updateOffset()">
+                                <button class="gv-btn" onclick="adjustOffset('x', 1)">+</button>
+                            </div>
+                        </div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Y</span>
+                            <div class="gv-control-input">
+                                <button class="gv-btn" onclick="adjustOffset('y', -1)">-</button>
+                                <input type="number" id="offsetY" class="gv-input" value="0" step="1" onchange="updateOffset()">
+                                <button class="gv-btn" onclick="adjustOffset('y', 1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Glyph Values -->
+                    <div class="gv-control-group">
+                        <div class="gv-control-group-title">Java Glyph Values</div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Height</span>
+                            <input type="number" id="glyphHeight" class="gv-input" value="0" onchange="updateOutput()">
+                        </div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Ascent</span>
+                            <input type="number" id="glyphAscent" class="gv-input" value="0" onchange="updateOutput()">
+                        </div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Title-shift</span>
+                            <input type="number" id="glyphTitleShift" class="gv-input" value="0" onchange="updateOutput()">
+                        </div>
+                    </div>
+                    
+                    <!-- Background -->
+                    <div class="gv-control-group">
+                        <div class="gv-control-group-title">Background</div>
+                        <div class="gv-control-row">
+                            <span class="gv-control-label">Mode</span>
+                            <select id="backgroundMode" class="gv-select" onchange="updateBackground()">
+                                <option value="default">Default (window)</option>
+                                <option value="inventory">Inventory rows only</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Output -->
+                    <div class="gv-output-section">
+                        <div class="gv-control-group-title">Output</div>
+                        <div class="gv-output-block">
+                            <div class="gv-output-label">gui.yml entry</div>
+                            <pre id="guiYamlOutput" class="gv-output-value" style="white-space: pre-wrap; font-size: 0.8125rem;"># Add a texture to generate gui.yml entries.</pre>
+                            <button class="gv-btn gv-copy-btn" onclick="copyOutput('guiYamlOutput')">Copy</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Help -->
+                    <div class="gv-help">
+                        <div class="gv-help-title">Keyboard Shortcuts</div>
+                        <div class="gv-help-text">
+                            <p><span class="gv-help-key">Arrow</span> Nudge selected texture 1px</p>
+                            <p><span class="gv-help-key">Alt+Arrow</span> Nudge 0.5px</p>
+                            <p><span class="gv-help-key">Shift+Arrow</span> Nudge 8px</p>
+                            <p><span class="gv-help-key">+/-</span> Adjust glyph height 1px</p>
+                            <p><span class="gv-help-key">Shift+ +/-</span> Adjust 8px</p>
+                            <p><span class="gv-help-key">Alt+Drag</span> Resize texture</p>
+                            <p><span class="gv-help-key">Delete</span> Remove selected texture</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Canvas Area -->
+                <div class="gv-canvas-area">
+                    <!-- Toolbar -->
+                    <div class="gv-toolbar">
+                        <div class="gv-toolbar-group">
+                            <span class="gv-toolbar-label">Background</span>
+                        </div>
+                        <div class="gv-toolbar-group">
+                            <span class="gv-toolbar-label">Slot grid</span>
+                        </div>
+                        <div class="gv-toolbar-group">
+                            <span class="gv-toolbar-label">Texture outline</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Canvas -->
+                    <div class="gv-canvas" id="gvCanvas">
+                        <svg class="gv-grid" id="gridSvg"></svg>
+                        <div class="gv-window" id="gvWindow">
+                            <div class="gv-window-header">
+                                <span class="gv-window-title" id="windowTitle">Container Menu</span>
+                            </div>
+                            <div class="gv-slot-grid" id="slotGrid"></div>
+                        </div>
+                        <div class="gv-drop-zone" id="dropZone">
+                            <div class="gv-drop-zone-icon">📁</div>
+                            <div class="gv-drop-zone-text">Drag the texture to position it</div>
+                            <div class="gv-drop-zone-hint">Alt-drag (or right-drag) to resize</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // State
+        const state = {
+            textures: [],
+            selectedTexture: null,
+            rows: 6,
+            scale: 1.0,
+            offsetX: 0,
+            offsetY: 0,
+            guiOpacity: 100,
+            artOpacity: 100,
+            glyphHeight: 0,
+            glyphAscent: 0,
+            glyphTitleShift: 0,
+            backgroundMode: 'default',
+            isDragging: false,
+            isResizing: false,
+            dragStart: { x: 0, y: 0 },
+            textureStart: { x: 0, y: 0, width: 0, height: 0 }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateGrid();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            const canvas = document.getElementById('gvCanvas');
+            const fileInput = document.getElementById('textureUpload');
+            
+            // File upload
+            fileInput.addEventListener('change', handleFileUpload);
+            
+            // Drag and drop on canvas
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                canvas.style.borderColor = 'var(--accent)';
+            });
+            
+            canvas.addEventListener('dragleave', () => {
+                canvas.style.borderColor = 'var(--border)';
+            });
+            
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                canvas.style.borderColor = 'var(--border)';
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleDroppedFile(e.dataTransfer.files[0], e);
+                }
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', handleKeyDown);
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                addTexture(file);
+            }
+        }
+
+        function handleDroppedFile(file, e) {
+            if (file.type.startsWith('image/')) {
+                addTexture(file, e);
+            }
+        }
+
+        function addTexture(file, e = null) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const texture = {
+                    id: Date.now(),
+                    name: file.name,
+                    src: event.target.result,
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    originalWidth: 0,
+                    originalHeight: 0
+                };
+                
+                // Get original dimensions
+                const img = new Image();
+                img.onload = () => {
+                    texture.originalWidth = img.width;
+                    texture.originalHeight = img.height;
+                    
+                    // Calculate initial size based on slot size (36px * scale)
+                    const slotSize = 36 * state.scale;
+                    const slotsWide = Math.min(9, Math.ceil(img.width / 16));
+                    const slotsTall = Math.min(state.rows, Math.ceil(img.height / 16));
+                    
+                    texture.width = slotsWide * slotSize;
+                    texture.height = slotsTall * slotSize;
+                    
+                    // Center if dropped on canvas
+                    if (e) {
+                        const canvas = document.getElementById('gvCanvas');
+                        const rect = canvas.getBoundingClientRect();
+                        texture.x = e.clientX - rect.left - texture.width / 2;
+                        texture.y = e.clientY - rect.top - texture.height / 2;
+                    }
+                    
+                    state.textures.push(texture);
+                    state.selectedTexture = texture.id;
+                    renderTextures();
+                    updateTextureList();
+                    updateOutput();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderTextures() {
+            const canvas = document.getElementById('gvCanvas');
+            
+            // Remove existing textures
+            canvas.querySelectorAll('.gv-texture-overlay').forEach(el => el.remove());
+            
+            state.textures.forEach(texture => {
+                const div = document.createElement('div');
+                div.className = 'gv-texture-overlay';
+                div.id = `texture-${texture.id}`;
+                div.style.left = `${texture.x}px`;
+                div.style.top = `${texture.y}px`;
+                div.style.width = `${texture.width}px`;
+                div.style.height = `${texture.height}px`;
+                div.style.backgroundImage = `url(${texture.src})`;
+                div.style.opacity = state.artOpacity / 100;
+                
+                if (texture.id === state.selectedTexture) {
+                    div.classList.add('selected');
+                }
+                
+                // Mouse events for dragging
+                div.addEventListener('mousedown', (e) => {
+                    if (e.button === 2 || e.altKey) {
+                        // Resize mode
+                        state.isResizing = true;
+                    } else {
+                        // Drag mode
+                        state.isDragging = true;
+                    }
+                    
+                    state.selectedTexture = texture.id;
+                    state.dragStart = { x: e.clientX, y: e.clientY };
+                    state.textureStart = { 
+                        x: texture.x, 
+                        y: texture.y, 
+                        width: texture.width, 
+                        height: texture.height 
+                    };
+                    
+                    renderTextures();
+                    e.preventDefault();
+                });
+                
+                // Right-click for resize
+                div.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                canvas.appendChild(div);
+            });
+            
+            // Mouse move and up events
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        function handleMouseMove(e) {
+            if (!state.selectedTexture) return;
+            
+            const texture = state.textures.find(t => t.id === state.selectedTexture);
+            if (!texture) return;
+            
+            const dx = e.clientX - state.dragStart.x;
+            const dy = e.clientY - state.dragStart.y;
+            
+            if (state.isDragging) {
+                texture.x = state.textureStart.x + dx;
+                texture.y = state.textureStart.y + dy;
+            } else if (state.isResizing) {
+                const scale = state.scale;
+                texture.width = Math.max(36, state.textureStart.width + dx);
+                texture.height = Math.max(36, state.textureStart.height + dy);
+            }
+            
+            const div = document.getElementById(`texture-${texture.id}`);
+            if (div) {
+                div.style.left = `${texture.x}px`;
+                div.style.top = `${texture.y}px`;
+                div.style.width = `${texture.width}px`;
+                div.style.height = `${texture.height}px`;
+            }
+            
+            updateOutput();
+        }
+
+        function handleMouseUp() {
+            state.isDragging = false;
+            state.isResizing = false;
+        }
+
+        function handleKeyDown(e) {
+            if (!state.selectedTexture) return;
+            
+            const texture = state.textures.find(t => t.id === state.selectedTexture);
+            if (!texture) return;
+            
+            let nudgeAmount = 1;
+            if (e.altKey) nudgeAmount = 0.5;
+            if (e.shiftKey) nudgeAmount = 8;
+            
+            // Arrow keys for nudging texture
+            if (e.key.startsWith('Arrow')) {
+                e.preventDefault();
+                
+                switch (e.key) {
+                    case 'ArrowLeft':
+                        texture.x -= nudgeAmount;
+                        break;
+                    case 'ArrowRight':
+                        texture.x += nudgeAmount;
+                        break;
+                    case 'ArrowUp':
+                        texture.y -= nudgeAmount;
+                        break;
+                    case 'ArrowDown':
+                        texture.y += nudgeAmount;
+                        break;
+                }
+                
+                renderTextures();
+                updateOutput();
+                return;
+            }
+            
+            // +/- for glyph height
+            if (e.key === '+' || e.key === '=') {
+                e.preventDefault();
+                let amount = 1;
+                if (e.shiftKey) amount = 8;
+                
+                state.glyphHeight += amount;
+                document.getElementById('glyphHeight').value = state.glyphHeight;
+                updateOutput();
+                return;
+            }
+            
+            if (e.key === '-') {
+                e.preventDefault();
+                let amount = 1;
+                if (e.shiftKey) amount = 8;
+                
+                state.glyphHeight = Math.max(0, state.glyphHeight - amount);
+                document.getElementById('glyphHeight').value = state.glyphHeight;
+                updateOutput();
+                return;
+            }
+            
+            // Delete key
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (document.activeElement.tagName !== 'INPUT') {
+                    e.preventDefault();
+                    removeTexture(state.selectedTexture);
+                }
+            }
+        }
+
+        function updateGrid() {
+            const rows = parseInt(document.getElementById('rowSelect').value);
+            state.rows = rows;
+            
+            const slotGrid = document.getElementById('slotGrid');
+            const window_ = document.getElementById('gvWindow');
+            const gridSvg = document.getElementById('gridSvg');
+            
+            const slotSize = 36;
+            const gap = 4;
+            const padding = 8;
+            
+            // Calculate window size
+            const gridWidth = 9 * slotSize + 8 * gap;
+            const gridHeight = rows * slotSize + (rows - 1) * gap;
+            const totalWidth = gridWidth + padding * 2;
+            const totalHeight = gridHeight + padding * 2 + 24; // 24px for header
+            
+            window_.style.width = `${totalWidth}px`;
+            window_.style.height = `${totalHeight}px`;
+            
+            // Update slot grid
+            slotGrid.style.gridTemplateColumns = `repeat(9, ${slotSize}px)`;
+            slotGrid.style.gridTemplateRows = `repeat(${rows}, ${slotSize}px)`;
+            slotGrid.innerHTML = '';
+            
+            // Player inventory rows (rows 4-5 for 6-row menu)
+            const playerStartRow = rows - 2;
+            
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'gv-slot';
+                    
+                    // Mark player inventory slots
+                    if (row >= playerStartRow) {
+                        slot.classList.add('player');
+                    }
+                    
+                    slotGrid.appendChild(slot);
+                }
+            }
+            
+            // Update grid SVG
+            gridSvg.setAttribute('width', totalWidth);
+            gridSvg.setAttribute('height', totalHeight);
+            gridSvg.innerHTML = `
+                <defs>
+                    <pattern id="gridPattern" width="${slotSize + gap}" height="${slotSize + gap}" patternUnits="userSpaceOnUse">
+                        <rect width="${slotSize}" height="${slotSize}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#gridPattern)"/>
+            `;
+            
+            updateWindowOpacity();
+        }
+
+        function updateOpacity() {
+            state.guiOpacity = parseInt(document.getElementById('guiOpacity').value);
+            state.artOpacity = parseInt(document.getElementById('artOpacity').value);
+            
+            document.getElementById('guiOpacityValue').textContent = `${state.guiOpacity}%`;
+            document.getElementById('artOpacityValue').textContent = `${state.artOpacity}%`;
+            
+            updateWindowOpacity();
+            renderTextures();
+        }
+
+        function updateWindowOpacity() {
+            const window_ = document.getElementById('gvWindow');
+            window_.style.opacity = state.guiOpacity / 100;
+        }
+
+        function adjustScale(delta) {
+            state.scale = Math.max(0.1, Math.min(3.0, state.scale + delta));
+            document.getElementById('scaleInput').value = state.scale.toFixed(2);
+            renderTextures();
+        }
+
+        function updateScale() {
+            state.scale = parseFloat(document.getElementById('scaleInput').value) || 1.0;
+            state.scale = Math.max(0.1, Math.min(3.0, state.scale));
+            document.getElementById('scaleInput').value = state.scale.toFixed(2);
+            renderTextures();
+        }
+
+        function adjustOffset(axis, delta) {
+            const input = document.getElementById(`offset${axis.toUpperCase()}`);
+            let value = parseInt(input.value) || 0;
+            
+            if (event && event.shiftKey) {
+                value += delta * 8;
+            } else {
+                value += delta;
+            }
+            
+            input.value = value;
+            updateOffset();
+        }
+
+        function updateOffset() {
+            state.offsetX = parseInt(document.getElementById('offsetX').value) || 0;
+            state.offsetY = parseInt(document.getElementById('offsetY').value) || 0;
+            
+            const window_ = document.getElementById('gvWindow');
+            window_.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px)`;
+            
+            updateOutput();
+        }
+
+        function updateBackground() {
+            state.backgroundMode = document.getElementById('backgroundMode').value;
+            
+            const window_ = document.getElementById('gvWindow');
+            
+            switch (state.backgroundMode) {
+                case 'default':
+                    window_.style.background = 'rgba(30, 30, 40, 0.9)';
+                    break;
+                case 'inventory':
+                    window_.style.background = 'transparent';
+                    break;
+                case 'none':
+                    window_.style.background = 'transparent';
+                    window_.style.border = 'none';
+                    break;
+            }
+            
+            updateOutput();
+        }
+
+        function updateTextureList() {
+            const list = document.getElementById('textureList');
+            list.innerHTML = '';
+            
+            state.textures.forEach(texture => {
+                const item = document.createElement('div');
+                item.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem;
+                    background: var(--muted);
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    margin-bottom: 0.5rem;
+                    cursor: pointer;
+                `;
+                
+                if (texture.id === state.selectedTexture) {
+                    item.style.borderColor = 'var(--accent)';
+                }
+                
+                item.innerHTML = `
+                    <img src="${texture.src}" style="width: 32px; height: 32px; object-fit: contain;">
+                    <span style="flex: 1; font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${texture.name}</span>
+                    <button class="gv-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="removeTexture(${texture.id})">×</button>
+                `;
+                
+                item.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'BUTTON') {
+                        state.selectedTexture = texture.id;
+                        renderTextures();
+                        updateTextureList();
+                    }
+                });
+                
+                list.appendChild(item);
+            });
+        }
+
+        function removeTexture(id) {
+            state.textures = state.textures.filter(t => t.id !== id);
+            if (state.selectedTexture === id) {
+                state.selectedTexture = state.textures.length > 0 ? state.textures[0].id : null;
+            }
+            renderTextures();
+            updateTextureList();
+            updateOutput();
+        }
+
+        function updateOutput() {
+            state.glyphHeight = parseInt(document.getElementById('glyphHeight').value) || 0;
+            state.glyphAscent = parseInt(document.getElementById('glyphAscent').value) || 0;
+            state.glyphTitleShift = parseInt(document.getElementById('glyphTitleShift').value) || 0;
+            
+            const output = document.getElementById('guiYamlOutput');
+            
+            if (state.textures.length === 0) {
+                output.textContent = '# Add a texture to generate gui.yml entries.';
+                return;
+            }
+            
+            const texture = state.textures.find(t => t.id === state.selectedTexture) || state.textures[0];
+            
+            // Calculate offset relative to window center
+            const window_ = document.getElementById('gvWindow');
+            const windowRect = window_.getBoundingClientRect();
+            const canvas = document.getElementById('gvCanvas');
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            const windowCenterX = windowRect.left - canvasRect.left + windowRect.width / 2;
+            const windowCenterY = windowRect.top - canvasRect.top + windowRect.height / 2;
+            
+            const relativeX = Math.round(texture.x + texture.width / 2 - windowCenterX);
+            const relativeY = Math.round(texture.y + texture.height / 2 - windowCenterY);
+            
+            // Generate gui.yml entry
+            const yaml = `# gui.yml entry
+# Size: ${Math.round(texture.width / (36 * state.scale))}x${Math.round(texture.height / (36 * state.scale))} slots
+# Position: ${relativeX}, ${relativeY}
+# Java glyph values: height: ${state.glyphHeight}, ascent: ${state.glyphAscent}, title-shift: ${state.glyphTitleShift}
+
+glyph:
+  texture: "${texture.name.replace(/\.[^/.]+$/, '')}"
+  height: ${state.glyphHeight}
+  ascent: ${state.glyphAscent}
+
+gui:
+  title: "&title"
+  title-shift: ${state.glyphTitleShift}
+  width: ${Math.round(texture.width)}
+  height: ${Math.round(texture.height)}
+  offsetX: ${relativeX}
+  offsetY: ${relativeY}
+  background: "${state.backgroundMode}"
+  texture: "${texture.name.replace(/\.[^/.]+$/, '')}"`;
+            
+            output.textContent = yaml;
+        }
+
+        function copyOutput(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = element.nextElementSibling;
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
