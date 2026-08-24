@@ -8,6 +8,35 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 ## Unreleased
 
+### Added
+
+- **Export system** (`io.kalo.export`) — an API that writes a pack back out in five
+  formats: a KaloPack archive for backup and sharing, portable canonical JSON, and
+  Oraxen / ItemsAdder / Nexo YAML for moving content the other way. Every conversion
+  reports exported / partial / unsupported by name rather than being silently lossy.
+  Reachable from add-ons today; no command wraps it yet.
+- **Built-in feature set** (`io.kalo.content.feature`) — abilities, skills, stats,
+  particles, animations, cooldowns, sounds, models and mobs, registered through the
+  same feature registry an add-on uses.
+- Docs site restructured: landing page at the root, documentation under `/docs`,
+  deployed to Cloudflare Pages with a realtime version badge.
+
+### Removed
+
+- **Vaporware commands and placeholder classes.** `/kalo benchmark` simulated work with
+  `Thread.sleep` and then printed an invented performance comparison;
+  `/kalo market browse|install` talked to a marketplace service that does not exist;
+  `/kalo scan` and `/kalo migrate-live` counted YAML files as "content", flagged every
+  renamed vanilla item as custom, and did all of it off the main thread. The classes
+  behind them (`TextureGenerator`, `ContentMarketplace`, `MultiServerSync`,
+  `PerformanceOptimizer`, `LiveServerScanner`) were placeholders labelled as such in
+  their own javadoc. They are gone. The honest paths remain: `/kalo import` for config
+  conversion, `/kalo doctor` for diagnosis, and the `performanceBenchmark` Gradle task
+  for real numbers.
+- Build artifacts that had been committed by mistake: `.idea/`, `.serena/`,
+  `.wrangler/`, a stray `org/bukkit/attribute/Attribute.class` at the repository root,
+  and a `gradle.properties.bak-*`. All are ignored now.
+
 ## 0.1.0
 
 ### Fixed

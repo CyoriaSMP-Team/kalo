@@ -1,7 +1,0 @@
-plugin_version=0.0.1
-
-# Minecraft moved to calendar versioning; Paper artifacts are build-pinned rather than
-# rolling snapshots, so the API coordinate is tracked separately from the game version.
-minecraft_version=26.2
-paper_api_version=1.21.4-R0.1-SNAPSHOT
-paper_plugin_api_version=1.21.4

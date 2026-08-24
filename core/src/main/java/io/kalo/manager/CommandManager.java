@@ -64,38 +64,6 @@ public final class CommandManager implements Managerial {
                 .permission(Permission.of(PERMISSION_PREFIX + "doctor"))
                 .handler(ctx -> runDoctor(ctx.sender().getSender())));
 
-        // Performance benchmark command
-        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
-                .literal("benchmark")
-                .permission(Permission.of(PERMISSION_PREFIX + "benchmark"))
-                .handler(ctx -> runBenchmark(ctx.sender().getSender())));
-
-        // Live server scan command
-        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
-                .literal("scan")
-                .permission(Permission.of(PERMISSION_PREFIX + "scan"))
-                .handler(ctx -> runLiveScan(ctx.sender().getSender())));
-
-        // One-click live migration command
-        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
-                .literal("migrate-live")
-                .permission(Permission.of(PERMISSION_PREFIX + "migrate"))
-                .handler(ctx -> runLiveMigration(ctx.sender().getSender())));
-
-        // Marketplace commands
-        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
-                .literal("market")
-                .literal("browse")
-                .permission(Permission.of(PERMISSION_PREFIX + "market"))
-                .handler(ctx -> runMarketBrowse(ctx.sender().getSender())));
-
-        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
-                .literal("market")
-                .literal("install")
-                .permission(Permission.of(PERMISSION_PREFIX + "market"))
-                .required("pack", StringParser.stringParser())
-                .handler(ctx -> runMarketInstall(ctx.sender().getSender(), ctx.get("pack"))));
-
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("migrate-world")
                 .permission(Permission.of(PERMISSION_PREFIX + "migrate"))
@@ -527,91 +495,6 @@ public final class CommandManager implements Managerial {
     private static @NotNull String messageOf(@NotNull Throwable failure) {
         String message = failure.getMessage();
         return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
-    }
-
-    // === Killer Feature Commands ===
-
-    private static void runBenchmark(@NotNull CommandSender sender) {
-        sender.sendMessage(Component.text("Running performance benchmark...", NamedTextColor.YELLOW));
-        
-        io.kalo.performance.PerformanceOptimizer optimizer = io.kalo.performance.PerformanceOptimizer.getInstance();
-        
-        // Run benchmark
-        optimizer.startTiming("pack_generation");
-        // Simulate pack generation
-        try { Thread.sleep(100); } catch (InterruptedException ignored) {}
-        optimizer.endTiming("pack_generation");
-        
-        optimizer.startTiming("content_loading");
-        // Simulate content loading
-        try { Thread.sleep(50); } catch (InterruptedException ignored) {}
-        optimizer.endTiming("content_loading");
-        
-        var result = optimizer.benchmark();
-        sender.sendMessage(Component.text(result.toString(), NamedTextColor.GREEN));
-        sender.sendMessage(Component.text("\nKalo is faster than Oraxen, ItemsAdder, and ModelEngine!", NamedTextColor.AQUA));
-    }
-
-    private static void runLiveScan(@NotNull CommandSender sender) {
-        sender.sendMessage(Component.text("Scanning live server for migratable content...", NamedTextColor.YELLOW));
-        
-        io.kalo.migration.LiveServerScanner scanner = io.kalo.migration.LiveServerScanner.getInstance();
-        scanner.scanServer().whenComplete((result, error) -> {
-            if (error != null) {
-                sender.sendMessage(Component.text("Scan failed: " + error.getMessage(), NamedTextColor.RED));
-                return;
-            }
-            sender.sendMessage(Component.text(result.toString(), NamedTextColor.GREEN));
-        });
-    }
-
-    private static void runLiveMigration(@NotNull CommandSender sender) {
-        sender.sendMessage(Component.text("Starting one-click live migration...", NamedTextColor.YELLOW));
-        
-        io.kalo.migration.LiveServerScanner scanner = io.kalo.migration.LiveServerScanner.getInstance();
-        scanner.migrateLive().whenComplete((result, error) -> {
-            if (error != null) {
-                sender.sendMessage(Component.text("Migration failed: " + error.getMessage(), NamedTextColor.RED));
-                return;
-            }
-            sender.sendMessage(Component.text(result.toString(), NamedTextColor.GREEN));
-        });
-    }
-
-    private static void runMarketBrowse(@NotNull CommandSender sender) {
-        sender.sendMessage(Component.text("Browsing Kalo Marketplace...", NamedTextColor.YELLOW));
-        
-        io.kalo.marketplace.ContentMarketplace marketplace = io.kalo.marketplace.ContentMarketplace.getInstance();
-        marketplace.browseContent().whenComplete((packs, error) -> {
-            if (error != null) {
-                sender.sendMessage(Component.text("Browse failed: " + error.getMessage(), NamedTextColor.RED));
-                return;
-            }
-            sender.sendMessage(Component.text("=== Available Content Packs ===", NamedTextColor.AQUA));
-            for (var pack : packs) {
-                sender.sendMessage(Component.text("  • " + pack.name() + " v" + pack.version() + " by " + pack.author(), NamedTextColor.GREEN));
-                sender.sendMessage(Component.text("    " + pack.description(), NamedTextColor.GRAY));
-            }
-            sender.sendMessage(Component.text("\nUse /kalo market install <pack> to install", NamedTextColor.YELLOW));
-        });
-    }
-
-    private static void runMarketInstall(@NotNull CommandSender sender, @NotNull String packName) {
-        sender.sendMessage(Component.text("Installing pack: " + packName + "...", NamedTextColor.YELLOW));
-        
-        io.kalo.marketplace.ContentMarketplace marketplace = io.kalo.marketplace.ContentMarketplace.getInstance();
-        marketplace.installPack(packName).whenComplete((success, error) -> {
-            if (error != null) {
-                sender.sendMessage(Component.text("Install failed: " + error.getMessage(), NamedTextColor.RED));
-                return;
-            }
-            if (success) {
-                sender.sendMessage(Component.text("Successfully installed pack: " + packName, NamedTextColor.GREEN));
-                sender.sendMessage(Component.text("Run /kalo reload to load the new content", NamedTextColor.YELLOW));
-            } else {
-                sender.sendMessage(Component.text("Failed to install pack", NamedTextColor.RED));
-            }
-        });
     }
 
     @Override
