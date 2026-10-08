@@ -418,6 +418,55 @@
             .comparison-table td { padding: 0.75rem 0.5rem; }
         }
 
+
+        /* Responsive, usable navigation and scroll-safe comparisons */
+        .nav-toggle { display: none; }
+        .comparison-scroll { width: 100%; overflow-x: auto; border-radius: 16px; }
+        .comparison-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .comparison-table { min-width: 780px; }
+        .comparison-help { text-align: center; color: var(--muted); font-size: .875rem; margin-top: 1rem; }
+        .download-link { text-align: center; margin-bottom: 2rem; }
+        .download-link a { display: inline-block; }
+        .code-section pre { overflow-x: auto; max-width: 100%; }
+        .nav-toggle:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+        @media (max-width: 960px) {
+            .features-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+            .nav-links { gap: 1rem; }
+            .section { padding: 4.5rem 0; }
+        }
+        @media (max-width: 820px) {
+            .nav-inner { position: relative; padding: .8rem 1.1rem; }
+            .nav-toggle { display:flex; flex-direction:column; justify-content:center; gap:5px; width:44px; height:44px; padding:10px; background:var(--bg-alt); border:1px solid var(--border); border-radius:10px; cursor:pointer; }
+            .nav-toggle span { height:2px; width:100%; border-radius:2px; background:var(--fg); }
+            .nav-links { display:none; flex-direction:column; align-items:stretch; position:absolute; top:100%; left:0; right:0; background:#12121A; padding:1rem; border-bottom:1px solid var(--border); box-shadow:0 16px 28px #0008; }
+            .nav-links.is-open { display:flex; }
+            .nav-links a { display:block; padding:.75rem 1rem; }
+            .hero { min-height:auto; padding:7.5rem 0 4rem; }
+            .hero h1 { font-size:clamp(2rem,7vw,3.2rem); }
+            .hero-logo { width:clamp(120px,25vw,175px); }
+            .footer-links { flex-wrap:wrap; gap:1rem; }
+        }
+        @media (max-width: 560px) {
+            .container { padding:0 1rem; }
+            .hero h1 { font-size:clamp(1.9rem,9vw,2.7rem); overflow-wrap:anywhere; }
+            .hero h1 br { display:none; }
+            .hero-subtitle { font-size:1rem; }
+            .hero-buttons { flex-direction:column; }
+            .hero-buttons a { display:block; text-align:center; }
+            .hero-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.5rem .5rem; }
+            .features-grid { grid-template-columns:minmax(0,1fr); }
+            .feature-card { padding:1.4rem; }
+            .section { padding:3.2rem 0; }
+            .section-title { font-size:clamp(1.6rem,7vw,2rem); }
+            .section-subtitle { font-size:1rem; margin-bottom:2.5rem; }
+            .code-section { padding:1rem; }
+            .code-section pre { font-size:.75rem; }
+            .footer-inner { flex-direction:column; align-items:flex-start; }
+        }
+        @media (prefers-reduced-motion:reduce) {
+            *, *::before, *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
+        }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-alt); }
@@ -435,11 +484,12 @@
                 <img src="docs/assets/images/kalo-logo.png" alt="Kalo">
                 <span>Kalo</span>
             </a>
-            <div class="nav-links">
+            <button type="button" class="nav-toggle" aria-controls="mobile-menu" aria-expanded="false" aria-label="Open navigation"><span></span><span></span><span></span></button>
+            <div class="nav-links" id="mobile-menu">
                 <a href="#features">Features</a>
                 <a href="#compare">Compare</a>
                 <a href="#quickstart">Quick Start</a>
-                <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">GitHub</a>
+                <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank" rel="noopener noreferrer">GitHub</a>
                 <a href="docs/" class="btn-secondary">Docs</a>
             </div>
         </div>
@@ -455,8 +505,9 @@
             <h1>Open <span>Custom Content</span><br>Engine for Minecraft</h1>
             <p class="hero-subtitle">Build items, blocks, furniture, and immersive experiences — without limits or paywalls. Free. Open Source. Forever.</p>
             <div class="hero-buttons">
-                <a href="#quickstart" class="btn-primary">Get Started Free →</a>
-                <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank" class="btn-secondary">View on GitHub</a>
+                <a href="https://github.com/CyoriaSMP-Team/kalo/releases/latest" class="btn-primary">Download Kalo →</a>
+                <a href="#quickstart" class="btn-secondary">Quick Start</a>
+                <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank" rel="noopener noreferrer" class="btn-secondary">View on GitHub</a>
             </div>
             <div class="hero-stats">
                 <div class="stat">
@@ -492,7 +543,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">🧱</div>
                     <div class="feature-title">Custom Blocks</div>
-                    <div class="feature-desc">893 Native States + Unlimited Virtual Content</div>
+                    <div class="feature-desc">893 native states; virtual blocks for Java Edition</div>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">🪑</div>
@@ -585,16 +636,16 @@
         <div class="container">
             <h2 class="section-title">Why Switch to Kalo?</h2>
             <p class="section-subtitle">Compare with the competition. See how Kalo compares.</p>
-            <p style="text-align: center; color: var(--muted); font-size: 0.875rem; margin-bottom: 1rem;">Prices as of Aug 2026. Features may vary by version.</p>
-            <table class="comparison-table">
+            <p style="text-align: center; color: var(--muted); font-size: 0.875rem; margin-bottom: 1rem;">Prices checked in October 2026; verify vendor pricing before purchase. Nexo Core and optional Bedrock add-on are priced separately.</p>
+            <div class="comparison-scroll" tabindex="0" role="region" aria-label="Scrollable plugin comparison"><table class="comparison-table">
                 <thead>
                     <tr>
                         <th style="text-align: left;">Feature</th>
                         <th class="highlight">Kalo</th>
-                        <th><a href="https://nexomc.com" target="_blank" style="color: inherit; text-decoration: none;">Nexo</a></th>
-                        <th><a href="https://oraxen.com" target="_blank" style="color: inherit; text-decoration: none;">Oraxen</a></th>
-                        <th><a href="https://itemsadder.com" target="_blank" style="color: inherit; text-decoration: none;">ItemsAdder</a></th>
-                        <th><a href="https://craftengine.net" target="_blank" style="color: inherit; text-decoration: none;">CraftEngine</a></th>
+                        <th><a href="https://nexomc.com" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">Nexo</a></th>
+                        <th><a href="https://oraxen.com" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">Oraxen</a></th>
+                        <th><a href="https://itemsadder.com" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">ItemsAdder</a></th>
+                        <th><a href="https://craftengine.net" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">CraftEngine</a></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -657,7 +708,7 @@
                     <tr>
                         <td style="text-align: left;">Bedrock Support</td>
                         <td><span class="price-free">Free</span></td>
-                        <td class="price-paid">€40</td>
+                        <td class="price-paid">€39.99 add-on</td>
                         <td><span class="cross">—</span></td>
                         <td><span class="cross">—</span></td>
                         <td><span class="cross">—</span></td>
@@ -679,22 +730,24 @@
                         <td><span class="cross">—</span></td>
                     </tr>
                     <tr style="background: rgba(245, 158, 11, 0.05);">
-                        <td style="text-align: left; font-weight: 600; color: var(--fg);">Price</td>
+                        <td style="text-align: left; font-weight: 600; color: var(--fg);">Core plugin price</td>
                         <td style="font-weight: 700; color: var(--green); font-size: 1.125rem;">FREE</td>
-                        <td class="price-paid">€68</td>
+                        <td class="price-paid">€19.99</td>
                         <td class="price-free">Free</td>
-                        <td class="price-paid">~$25</td>
-                        <td class="price-paid">~$15</td>
+                        <td class="price-paid">See vendor</td>
+                        <td class="price-paid">See vendor</td>
                     </tr>
                 </tbody>
-            </table>
+            </table></div>
+            <p class="comparison-help">Swipe to compare plugins on a small screen. Bedrock virtual blocks are not supported by Kalo.</p>
         </div>
     </section>
 
     <section class="section" id="quickstart">
         <div class="container">
             <h2 class="section-title">Quick Start</h2>
-            <p class="section-subtitle">Clone, build, and install. That's it.</p>
+            <p class="section-subtitle">Install the latest release JAR or build from source.</p>
+            <p class="download-link"><a href="https://github.com/CyoriaSMP-Team/kalo/releases/latest" class="btn-primary">Download latest release →</a></p>
             <div class="code-section">
 <pre><span class="code-comment"># 1. Clone the repo</span>
 git clone https://github.com/CyoriaSMP-Team/kalo.git
@@ -722,10 +775,10 @@ mkdir -p plugins/Kalo/packs/mypack/configs</pre>
                     <div class="footer-copy">Open Custom Content Engine for Minecraft</div>
                 </div>
                 <div class="footer-links">
-                    <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">GitHub</a>
-                    <a href="https://github.com/CyoriaSMP-Team/kalo/wiki" target="_blank">Wiki</a>
+                    <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <a href="https://github.com/CyoriaSMP-Team/kalo/wiki" target="_blank" rel="noopener noreferrer">Wiki</a>
                     <a href="docs/">Documentation</a>
-                    <a href="https://github.com/CyoriaSMP-Team/kalo/issues" target="_blank">Issues</a>
+                    <a href="https://github.com/CyoriaSMP-Team/kalo/issues" target="_blank" rel="noopener noreferrer">Issues</a>
                 </div>
             </div>
         </div>
@@ -733,14 +786,29 @@ mkdir -p plugins/Kalo/packs/mypack/configs</pre>
         <script>
             async function loadVersion() {
                 try {
-                    const response = await fetch("version.json");
+                    const response = await fetch("version.json", { cache: "no-store" });
+                    if (!response.ok) throw Error("Version not available");
                     const data = await response.json();
                     document.getElementById("version-text").textContent = `${data.name} — ${data.status}`;
                     document.getElementById("version-badge").style.display = "inline-flex";
                 } catch (error) {
-                    document.getElementById("version-text").textContent = "v0.1.0 — Now Available";
+                    document.getElementById("version-text").textContent = "Release information unavailable";
                 }
             }
+
+            const toggle = document.querySelector(".nav-toggle");
+            const links = document.getElementById("mobile-menu");
+            function menu(open) {
+              links.classList.toggle("is-open", open);
+              toggle.setAttribute("aria-expanded", String(open));
+              toggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+            }
+            toggle.addEventListener("click", () => menu(toggle.getAttribute("aria-expanded") !== "true"));
+            links.addEventListener("click", e => { if (e.target.closest("a")) menu(false); });
+            document.addEventListener("keydown", e => { if (e.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") { menu(false); toggle.focus(); } });
+            document.addEventListener("click", e => { if (!e.target.closest(".nav-inner")) menu(false); });
+            window.addEventListener("resize", () => { if (innerWidth > 820) menu(false); });
+
             loadVersion();
             setInterval(loadVersion, 30000);
         </script>
