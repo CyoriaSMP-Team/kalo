@@ -23,6 +23,4 @@
     wrapper.setAttribute("role","region");wrapper.setAttribute("aria-label","Scrollable documentation table");
     table.before(wrapper);wrapper.append(table);
   });
-  const version=document.querySelector("[data-kalo-version]");
-  if(version)fetch("../version.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Version unavailable");return r.json();}).then(d=>{if(d.name)version.textContent=d.name;}).catch(()=>{version.textContent="Latest release";});
 })();

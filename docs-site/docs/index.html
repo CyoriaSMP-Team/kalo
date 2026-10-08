@@ -95,7 +95,7 @@
                 <p class="hero-subtitle">The open custom content engine for Minecraft. Build items, blocks, furniture, and immersive experiences — without limits or paywalls.</p>
                 <div class="hero-badges">
                     <span class="badge badge-free">Free (MIT)</span>
-                    <span class="badge badge-new" data-kalo-version>Latest release</span>
+                    <span class="badge badge-new" data-kalo-version data-release-fallback="../version.json" aria-live="polite">Checking release...</span>
                     <span class="badge badge-version">Java 21+ / Bedrock</span>
                 </div>
             </div>
@@ -131,5 +131,6 @@ cp build/libs/Kalo-*.jar /path/to/server/plugins/</code></pre>
         </div>
     </main>
     <script src="assets/js/mobile-nav.js" defer></script>
+    <script src="../assets/js/release-version.js" defer></script>
 </body>
 </html>
