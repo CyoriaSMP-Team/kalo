@@ -1,5 +1,7 @@
 <div align="center">
 
+<p><img src="docs-site/docs/assets/images/kalo-logo.png" alt="kalo logo" width="136" /></p>
+
 # 🐈 Kalo
 
 **Open Custom Content Engine for Minecraft**
@@ -551,3 +553,19 @@ tests themselves. Treat the rest of this page accordingly.
 
 MIT. Kalo is derived from [Neko](https://github.com/bindglam/Neko) by Woobeen Jeon, whose
 copyright notice is retained in [LICENSE](LICENSE) as that license requires.
+
+---
+
+<!-- CYTECH_STAR_HISTORY:START -->
+
+## Star History
+
+<a href="https://star-history.dera.page/#CyoriaSMP-Team/kalo&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left" />
+    <img alt="GitHub star history for CyoriaSMP-Team/kalo" src="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left" width="800" />
+  </picture>
+</a>
+
+<!-- CYTECH_STAR_HISTORY:END -->
