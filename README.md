@@ -13,6 +13,15 @@
 
 </div>
 
+<!-- CYTECH_README_REFRESH:START -->
+<p align="center"><img alt="Open custom-content engine section accent" width="100%" height="10" src="https://capsule-render.vercel.app/api?type=rect&color=0:0F172A,100:22C55E&height=10&section=header"></p>
+
+<p align="center"><sub>Open custom-content engine</sub></p>
+
+<p align="center"><a href="#four-pillars">Four pillars</a> &nbsp;·&nbsp; <a href="#content-packs">Content packs</a> &nbsp;·&nbsp; <a href="#commands">Commands</a> &nbsp;·&nbsp; <a href="#asset-validation">Asset validation</a> &nbsp;·&nbsp; <a href="https://github.com/CyoriaSMP-Team/kalo/issues">Issues</a> &nbsp;·&nbsp; <a href="https://github.com/CyoriaSMP-Team/kalo/releases">Releases</a></p>
+
+<!-- CYTECH_README_REFRESH:END -->
+
 Kalo is a free and open-source engine for building custom items, blocks, furniture and
 armor on Paper and Folia servers — no client mods, no player limits, no feature paywalls.
 
