@@ -23,6 +23,9 @@ jobs:
     env:
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
       HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
+      MCMALL_KEY: ${{ secrets.MCMALL_API_KEY }}
+      MCMALL_PRODUCT_ID: ${{ vars.MCMALL_PRODUCT_ID }}
+      MCMALL_API: https://mcmall.in.th/api/v1
     steps:
       - uses: actions/checkout@v6
 
@@ -103,9 +106,8 @@ jobs:
             --target "${{ github.sha }}" \
             build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar
 
-      # Modrinth and Hangar are skipped rather than failed when their secret is absent, so
-      # the workflow is useful before either account exists. SpigotMC has no upload API and
-      # stays manual; see docs/RELEASING.md.
+      # Modrinth, Hangar, and MCMall are skipped rather than failed when their credentials
+      # are absent, so the release workflow remains usable before every channel is configured.
       - name: Publish to Modrinth
         if: ${{ env.MODRINTH_TOKEN != '' }}
         env:
@@ -154,3 +156,49 @@ jobs:
             -H "Authorization: $jwt" \
             -F "versionUpload=$upload;type=application/json" \
             -F "files=@build/libs/Kalo-$VERSION.jar"
+
+      - name: Publish to MCMall
+        if: ${{ env.MCMALL_KEY != '' && env.MCMALL_PRODUCT_ID != '' }}
+        env:
+          VERSION: ${{ steps.version.outputs.plugin_version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          jar="build/libs/Kalo-$VERSION.jar"
+
+          # Fail early if the secret is invalid/revoked or belongs to the wrong shop.
+          curl --fail-with-body -sS "$MCMALL_API/me" \
+            -H "Authorization: Bearer $MCMALL_KEY" > /dev/null
+
+          # Keep the MCMall product description in sync with the repository README.
+          jq -Rs '{description_md: .}' README.md > mcmall-product.json
+          curl --fail-with-body -sS -X PATCH \
+            "$MCMALL_API/products/$MCMALL_PRODUCT_ID" \
+            -H "Authorization: Bearer $MCMALL_KEY" \
+            -H 'content-type: application/json' \
+            --data @mcmall-product.json > /dev/null
+
+          # Kalo ships one buyer-facing artifact. Replace the current first file when one
+          # exists; on a new product this simply creates the first downloadable file.
+          old_file=$(curl --fail-with-body -sS \
+            "$MCMALL_API/products/$MCMALL_PRODUCT_ID/files" \
+            -H "Authorization: Bearer $MCMALL_KEY" \
+            | jq -r '.items[0].id // empty')
+
+          upload_args=(
+            -F "file=@$jar"
+            -F "label=Kalo $TAG"
+            -F "version=$TAG"
+          )
+          if [ -n "$old_file" ]; then
+            upload_args+=(-F "replace=$old_file")
+          fi
+
+          curl --fail-with-body -sS -X POST \
+            "$MCMALL_API/products/$MCMALL_PRODUCT_ID/files" \
+            -H "Authorization: Bearer $MCMALL_KEY" \
+            "${upload_args[@]}" > /dev/null
+
+          # Every updated product must pass MCMall review before it becomes sellable.
+          curl --fail-with-body -sS -X POST \
+            "$MCMALL_API/products/$MCMALL_PRODUCT_ID/submit" \
+            -H "Authorization: Bearer $MCMALL_KEY" > /dev/null
