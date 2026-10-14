@@ -8,6 +8,7 @@
 
 *Build once. Play everywhere.*
 
+[![Status](https://img.shields.io/badge/Status-Pre--alpha-orange?style=flat-square)](docs/RELEASING.md)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange?style=flat-square&logo=openjdk)](https://openjdk.org/)
 [![Paper](https://img.shields.io/badge/Paper-1.21.4%20%E2%86%92%2026.2-green?style=flat-square&logo=papermc)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-supported-success?style=flat-square)](https://papermc.io/software/folia)
