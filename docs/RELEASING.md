@@ -12,6 +12,23 @@ upload.
    `v<plugin_version>`; the workflow refuses a mismatch rather than shipping a jar whose
    name contradicts its release.
 
+## Release maturity (Pre-alpha until verified)
+
+Kalo is currently **Pre-alpha**. Build success alone does not mean
+production stability. Tags such as `v0.2.1-prealpha.1` require the matching
+`plugin_version=0.2.1-prealpha.1` and the same version heading in
+`CHANGELOG.md`.
+
+| Tag suffix | GitHub | Modrinth | Hangar | Featured |
+|---|---|---|---|---|
+| `-prealpha`, `-alpha` | Pre-release | alpha | Alpha | No |
+| `-beta`, `-rc` | Pre-release | beta | Beta | No |
+| No suffix | Normal | release | Release | Yes |
+
+The existing `v0.2.0` GitHub release was not marked Pre-release. This
+workflow change applies to *future* tags, not historical releases. Do not
+ship unmerged draft-PR features or describe unverified crossplay as complete.
+
 ## Tagging
 
 ```bash
