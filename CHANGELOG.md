@@ -6,6 +6,20 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- Optional standalone Geyser local-filesystem synchronization. Copies a
+  generated pack and item/block mapping files to a verified Geyser root,
+  preserving unrelated files and refusing symlink targets.
+- Regression tests for changed/unchanged output, missing inputs and symlinks.
+
+### Limitations
+
+- This is not cross-process hot reload; standalone Geyser must load
+  its updated mappings and resource packs.
+
 ## 0.2.1-prealpha.1
 
 ### Changes from v0.2.0
