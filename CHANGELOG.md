@@ -6,6 +6,25 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- Provider-neutral Mohist content inventory with read-only Forge runtime
+  registry probing and generic Java pack/Forge mod asset classification.
+- Trusted ContentProvider SPI, versioned bridge handoff and content index
+  with provenance and failure-safe output writes; optional auto-catalog.
+- Conservative Bedrock static cuboid/attachable conversion for single-sheet
+  legacy Java item models, reusing Kalo's proven geometry translation rules.
+- Unit tests for mixed asset sources, Forge registry metadata, 3D model
+  conversion, fallback behavior and bridge contract semantics.
+
+### Limitations
+
+- Forge network packets, custom mod behaviors, animated/multi-sheet 3D models,
+  Bedrock login and live Bridge installation remain unsupported. No production
+  deployment or real Bedrock client verification has been performed.
+
 ## 0.2.1-prealpha.6
 
 ### Added

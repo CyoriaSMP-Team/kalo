@@ -88,16 +88,36 @@ public final class LegacyBedrockExporter {
                     }
                     String modelPath = assetPath(target, "models/", ".json");
                     JsonObject model = json(open, modelPath);
-                    if (model == null || !isFlat(model)) {
-                        skipped.add(item.key()+" CMD "+item.customModelData()+": unsupported model geometry");
+                    if (model == null) {
+                        skipped.add(item.key()+" CMD "+item.customModelData()+": missing model");
                         continue;
                     }
-                    String layer = layer0(model);
+                    String suffix = item.material()+"_"+item.customModelData();
+                    String icon = "kalo_mohist_"+suffix;
+                    String bedrockId = "kalo_mohist:"+suffix;
+                    boolean hasCubes = model.has("elements") && model.get("elements").isJsonArray()
+                            && !model.getAsJsonArray("elements").isEmpty();
+                    io.kalo.mohist.content.StaticItemAdapter.Output cuboid = hasCubes
+                            ? io.kalo.mohist.content.StaticItemAdapter.adapt(model, bedrockId,icon) : null;
+                    if ((hasCubes && cuboid == null) || (!hasCubes && !isFlat(model))) {
+                        skipped.add(item.key()+" CMD "+item.customModelData()+": unsupported 3D model");
+                        continue;
+                    }
+                    String layer = cuboid != null ? cuboid.texture() : layer0(model);
+                    if(layer!=null && !layer.contains(":") && target.contains(":")) {
+                        layer=target.substring(0,target.indexOf(":"))+":"+layer;
+                    }
                     if (layer == null) {
                         skipped.add(item.key()+" CMD "+item.customModelData()+": unresolved texture layer0");
                         continue;
                     }
                     String texturePath = assetPath(layer, "textures/", ".png");
+                    // A spritesheet animation without its Bedrock flipbook would
+                    // display incorrectly. Defer animation conversion explicitly.
+                    if (asset(open, texturePath+".mcmeta",MAX_MODEL_JSON) != null) {
+                        skipped.add(item.key()+" CMD "+item.customModelData()+": animated texture not converted");
+                        continue;
+                    }
                     byte[] image = asset(open, texturePath, MAX_TEXTURE);
                     if (image == null || !isPng(image)) {
                         skipped.add(item.key()+" CMD "+item.customModelData()+": missing or invalid PNG");
@@ -107,10 +127,11 @@ public final class LegacyBedrockExporter {
                         skipped.add(item.key()+" CMD "+item.customModelData()+": total texture limit");
                         continue;
                     }
-                    String suffix = item.material()+"_"+item.customModelData();
-                    String icon = "kalo_mohist_"+suffix;
-                    String bedrockId = "kalo_mohist:"+suffix;
                     String path = "textures/items/"+icon+".png";
+                    if(cuboid != null) {
+                        files.put("models/entity/"+icon+".geo.json", jsonBytes(cuboid.geometry()));
+                        files.put("attachables/"+icon+".json", jsonBytes(cuboid.attachable()));
+                    }
                     files.put(path, image);
                     totalTextures += image.length;
 

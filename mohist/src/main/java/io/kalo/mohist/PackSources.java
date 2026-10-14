@@ -99,7 +99,7 @@ public final class PackSources {
             throw new IOException("Symlink/escaped path");
         long compressed = Files.size(file);
         if (compressed < 80 || compressed > MAX_ARCHIVE_BYTES) throw new IOException("Archive size limit");
-        int models = 0, textures = 0, entries = 0;
+        int models = 0, textures = 0, entries = 0, otherAssets = 0;
         boolean packMeta = false;
         long expanded = 0;
         try (ZipFile zip = new ZipFile(file.toFile())) {
@@ -130,12 +130,13 @@ public final class PackSources {
                         throw new IOException("Malformed pack.mcmeta", bad);
                     }
                 }
+                if (name.startsWith("assets/") && name.indexOf('/', 7)>7) otherAssets++;
                 if (name.startsWith("assets/") && name.contains("/models/") && name.endsWith(".json")) models++;
                 if (name.startsWith("assets/") && name.contains("/textures/") && name.endsWith(".png")) textures++;
             }
         }
         if (kind == Kind.RESOURCE_PACK && !packMeta) return null;
-        if (models == 0 && textures == 0) return null;
+        if (models == 0 && textures == 0 && otherAssets == 0) return null;
         return new Source(file, kind, models, textures);
     }
 }

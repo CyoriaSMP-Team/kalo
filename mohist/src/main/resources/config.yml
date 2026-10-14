@@ -3,3 +3,8 @@
 # Java Runtime on DeadZone is 21; this plugin intentionally compiles to Java 17
 # bytecode for the Minecraft 1.20.1 baseline and runs normally on Java 21.
 auto-learn: true
+
+# Read-only indexing of installed plugin packs, Forge mod assets and runtime
+# Forge identifiers. Writes a versioned handoff to KaloMohist/exports.
+# Does not install or change the current ViaProxy/Geyser bridge.
+auto-catalog: true
