@@ -81,6 +81,58 @@ public final class BedrockAttachable {
     }
 
     /**
+     * A static 3D item, not armor: bind its geometry to the holder's item slot.
+     * The geometry's single bone contains the Bedrock item-slot binding.
+     */
+    static @NotNull JsonObject heldItem(@NotNull Key item, @NotNull String geometryId,
+                                        @NotNull String texturePath) {
+        JsonObject materials = new JsonObject();
+        materials.addProperty("default", "entity_alphatest");
+        materials.addProperty("enchanted", "entity_alphatest_glint");
+
+        JsonObject textures = new JsonObject();
+        textures.addProperty("default", texturePath);
+        textures.addProperty("enchanted", "textures/misc/enchanted_item_glint");
+
+        JsonObject geometry = new JsonObject();
+        geometry.addProperty("default", geometryId);
+
+        // Vanilla first/third-person hold offsets: without these an item can
+        // render in Bedrock but float at the wrong orientation in the player's hand.
+        JsonObject animations = new JsonObject();
+        animations.addProperty("hold_first_person", "animation.steve_head.hold_first_person");
+        animations.addProperty("hold_third_person", "animation.steve_head.hold_third_person");
+        JsonObject firstPerson = new JsonObject();
+        firstPerson.addProperty("hold_first_person", "context.is_first_person == 1.0");
+        JsonObject thirdPerson = new JsonObject();
+        thirdPerson.addProperty("hold_third_person", "context.is_first_person == 0.0");
+        JsonArray animate = new JsonArray();
+        animate.add(firstPerson);
+        animate.add(thirdPerson);
+        JsonObject scripts = new JsonObject();
+        scripts.add("animate", animate);
+
+        JsonArray controllers = new JsonArray();
+        controllers.add("controller.render.item_default");
+
+        JsonObject description = new JsonObject();
+        description.addProperty("identifier", item.asString());
+        description.add("materials", materials);
+        description.add("textures", textures);
+        description.add("geometry", geometry);
+        description.add("animations", animations);
+        description.add("scripts", scripts);
+        description.add("render_controllers", controllers);
+
+        JsonObject attachable = new JsonObject();
+        attachable.add("description", description);
+        JsonObject root = new JsonObject();
+        root.addProperty("format_version", "1.10.0");
+        root.add("minecraft:attachable", attachable);
+        return root;
+    }
+
+    /**
      * Builds the attachable for one armor piece.
      *
      * @param textureName the shared armor sheet name, without the layer suffix

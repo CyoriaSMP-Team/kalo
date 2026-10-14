@@ -139,6 +139,9 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         Kalo.unregisterPlugin();
     }
 
+    /** Accessed by the command route after listeners have been initialized. */
+    public GuiListener guiListener() { return guiListener; }
+
     public int indexedVirtualBlockCount() {
         JavaBlockListener listener = blockListener;
         return listener != null ? listener.indexedVirtualBlockCount() : virtualBlockStore.size();

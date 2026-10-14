@@ -8,6 +8,25 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 ## Unreleased
 
+### Added
+
+- Experimental static 3D custom item compilation for Bedrock: geometry,
+  held-item attachables, provisional texture icon and Geyser v2 mappings.
+  Single- and multi-sheet static items can resolve model and authored texture
+  aliases; multi-sheet cuboids use a deterministic UV atlas. Parent model
+  geometry/texture overrides and standard held-item view animations are supported.
+- Tests for output, mappings, aliases, and unsupported texture combinations.
+- GUI references to Kalo content keys, usable with
+  `/kalo gui open <player> <gui>`. Repaired InventoryHolder registration.
+- `/kalo export kalopack <pack>`: deterministic ZIP with safe output
+  handling, no overwrites, and a test suite.
+- Validated CustomModelData frame sequences using entity-region scheduling
+  instead of silently applying only the first frame.
+- Optional standalone Geyser local-filesystem synchronization. Copies a
+  generated pack and item/block mapping files to a verified Geyser root,
+  preserving unrelated files and refusing symlink targets.
+- Regression tests for changed/unchanged output, missing inputs and symlinks.
+
 ### Fixed
 
 - Folia-safe mana regeneration: a single global coordinator runs every second
@@ -21,6 +40,18 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 - Live Folia/Paper multi-player validation and broader feature-scheduler audit.
   Mana remains a shared player pool, not one independent pool per item.
+
+### Limitations
+
+- Live Bedrock client rendering remains unverified. Full Java display transforms,
+  rigged/animated models, mixed-size texture sheets and 3D inventory previews
+  are still unsupported or incomplete.
+- This does not solve Forge login or mod-specific gameplay protocols.
+- Client models and Bedrock animation controllers remain unfinished.
+- Third-party exporters remain lossy and have no public CLI command.
+- Live Bedrock verification of new behavior is still required.
+- This is not cross-process hot reload; standalone Geyser must load
+  its updated mappings and resource packs.
 
 ## 0.2.1-prealpha.1
 
