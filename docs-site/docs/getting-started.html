@@ -11,7 +11,9 @@
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
-    <aside class="sidebar">
+    <button class="docs-nav-toggle" type="button" aria-controls="docs-sidebar" aria-expanded="false" aria-label="Open documentation menu">☰ <span>Menu</span></button>
+    <div class="docs-nav-backdrop" aria-hidden="true"></div>
+    <aside class="sidebar" id="docs-sidebar">
         <div class="sidebar-header">
             <a href="index.html" class="sidebar-logo">
                 <div class="sidebar-logo-icon"><img src="assets/images/kalo-logo.png" alt="Kalo"></div>
@@ -77,7 +79,7 @@
             </div>
         </nav>
         <div class="sidebar-footer">
-            <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank">
+            <a href="https://github.com/CyoriaSMP-Team/kalo" target="_blank" rel="noopener noreferrer">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
                 GitHub
             </a>
@@ -93,9 +95,10 @@
                 <li>Paper or Folia server</li>
             </ul>
             <h2>Installation</h2>
+            <p>For production installs, <a href="https://github.com/CyoriaSMP-Team/kalo/releases/latest">download the latest release JAR</a>. Build from source only when needed.</p>
             <pre><code># 1. Build Kalo
 git clone https://github.com/CyoriaSMP-Team/kalo.git
-cd kalo/main
+cd kalo
 ./gradlew build
 
 # 2. Install plugin
@@ -103,7 +106,12 @@ cp build/libs/Kalo-*.jar /path/to/server/plugins/
 
 # 3. Create content pack
 mkdir -p plugins/Kalo/packs/myitem/configs
-mkdir -p plugins/Kalo/packs/myitem/assets/myitem/textures/item</code></pre>
+mkdir -p plugins/Kalo/packs/myitem/assets/textures/item</code></pre>
+            <p>Run the pack creation commands from your <strong>server root</strong> after installing Kalo. Add a texture image to <code>assets/textures/item/ruby_sword.png</code> in your pack.</p>
+            <pre><code># plugins/Kalo/packs/myitem/pack.yml
+id: myitem
+version: 1.0.0
+author: YourName</code></pre>
             <h2>First Item</h2>
             <pre><code># plugins/Kalo/packs/myitem/configs/items.yml
 ruby_sword:
@@ -114,18 +122,19 @@ ruby_sword:
       - "&lt;gray&gt;A powerful sword&lt;/gray&gt;"
   model:
     sprite: "item/ruby_sword"
-  item:
-    material: DIAMOND_SWORD
+  behaviour:
     durability: 1561
-    damage: 7</code></pre>
+  java:
+    base_material: DIAMOND_SWORD</code></pre>
             <h2>Commands</h2>
             <table>
                 <tr><th>Command</th><th>Description</th></tr>
                 <tr><td><code>/kalo reload</code></td><td>Reload all content packs</td></tr>
                 <tr><td><code>/kalo give &lt;player&gt; &lt;item&gt;</code></td><td>Give a Kalo item</td></tr>
-                <tr><td><code>/kalo migrate &lt;plugin&gt;</code></td><td>Migrate from other plugins</td></tr>
+                <tr><td><code>/kalo import &lt;plugin&gt;</code></td><td>Migrate from other plugins</td></tr>
             </table>
         </div>
     </main>
+    <script src="assets/js/mobile-nav.js" defer></script>
 </body>
 </html>

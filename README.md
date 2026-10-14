@@ -1,17 +1,29 @@
 <div align="center">
 
+<p><img src="docs-site/docs/assets/images/kalo-logo.png" alt="kalo logo" width="136" /></p>
+
 # 🐈 Kalo
 
 **Open Custom Content Engine for Minecraft**
 
 *Build once. Play everywhere.*
 
+[![Status](https://img.shields.io/badge/Status-Pre--alpha-orange?style=flat-square)](docs/RELEASING.md)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange?style=flat-square&logo=openjdk)](https://openjdk.org/)
 [![Paper](https://img.shields.io/badge/Paper-1.21.4%20%E2%86%92%2026.2-green?style=flat-square&logo=papermc)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-supported-success?style=flat-square)](https://papermc.io/software/folia)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 </div>
+
+<!-- CYTECH_README_REFRESH:START -->
+<p align="center"><img alt="Open custom-content engine section accent" width="100%" height="10" src="https://capsule-render.vercel.app/api?type=rect&color=0:0F172A,100:22C55E&height=10&section=header"></p>
+
+<p align="center"><sub>Open custom-content engine</sub></p>
+
+<p align="center"><a href="#four-pillars">Four pillars</a> &nbsp;·&nbsp; <a href="#content-packs">Content packs</a> &nbsp;·&nbsp; <a href="#commands">Commands</a> &nbsp;·&nbsp; <a href="#asset-validation">Asset validation</a> &nbsp;·&nbsp; <a href="https://github.com/CyoriaSMP-Team/kalo/issues">Issues</a> &nbsp;·&nbsp; <a href="https://github.com/CyoriaSMP-Team/kalo/releases">Releases</a></p>
+
+<!-- CYTECH_README_REFRESH:END -->
 
 Kalo is a free and open-source engine for building custom items, blocks, furniture and
 armor on Paper and Folia servers — no client mods, no player limits, no feature paywalls.
@@ -24,6 +36,8 @@ translation. That is the thing Kalo exists to do.
 > furnace/blast/smoker/campfire/stonecutting/smithing), sounds and glyphs work on Java,
 > verified on Paper 26.2 + Folia. Virtual blocks have a persistent index, chunk
 > load/unload, explosion handling and a `/kalo migrate-world` dry-run.
+>
+> **Experimental Bedrock 3D:** Static Java cuboid models now have generated Bedrock geometry and held-item attachables. Real Bedrock-client validation of 3D rendering is still pending.
 >
 > **Bedrock is verified by a Bedrock player**, on a live server running Geyser and
 > Floodgate: custom item icons, native blocks placed and mined, and worn armor all render.
@@ -244,6 +258,18 @@ model:
 | `/kalo import file <path>` | `kalo.command.import` |
 | `/kalo doctor` | `kalo.command.doctor` |
 | `/kalo migrate-world` | `kalo.command.migrate` |
+| `/kalo gui open <player> <namespace:gui>` | `kalo.command.gui` |
+| `/kalo export kalopack <pack>` | `kalo.command.export` |
+
+## Portable KaloPack export
+
+`/kalo export kalopack <pack>` writes an actual, deterministic ZIP archive in
+`plugins/Kalo/exports/<pack>.zip`. It contains `pack.yml`, configs and assets;
+exports run asynchronously and never overwrite a previous export. Only
+lowercase pack names are accepted.
+
+Oraxen, ItemsAdder and Nexo export adapters remain partial/lossy. They are
+not available as complete server commands; review API conversion reports.
 
 ## Asset validation
 
@@ -542,3 +568,19 @@ tests themselves. Treat the rest of this page accordingly.
 
 MIT. Kalo is derived from [Neko](https://github.com/bindglam/Neko) by Woobeen Jeon, whose
 copyright notice is retained in [LICENSE](LICENSE) as that license requires.
+
+---
+
+<!-- CYTECH_STAR_HISTORY:START -->
+
+## Star History
+
+<a href="https://star-history.dera.page/#CyoriaSMP-Team/kalo&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left" />
+    <img alt="GitHub star history for CyoriaSMP-Team/kalo" src="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left" width="800" />
+  </picture>
+</a>
+
+<!-- CYTECH_STAR_HISTORY:END -->

@@ -96,9 +96,27 @@ Use any PlaceholderAPI placeholder in commands and messages:
 - `%server_time%` — Server time
 - Custom placeholders from other plugins
 
+## Custom Kalo Items and Commands
+
+The GUI material field accepts explicit content keys such as `mypack:ruby_sword`.
+Kalo resolves items, blocks, furniture and armor from its registry, preserving
+the original ItemStack and its Bedrock mappings. A missing key leaves the slot
+empty and writes a warning, not a fake PAPER icon.
+
+~~~yaml
+items:
+  4:
+    material: mypack:ruby_sword
+    amount: 1
+~~~
+
+Open the GUI with `/kalo gui open <player> <namespace:gui>`.
+Requires `kalo.command.gui`. Normal inventory GUIs are translated by Geyser;
+native Bedrock forms and HUDs are not yet provided.
+
 ## Bedrock Support
 
-Custom GUIs work on Bedrock through Geyser's inventory translation. No extra configuration needed.
+Inventory GUIs can be translated by Geyser; verify custom item visuals with a Bedrock client.
 
 ---
 

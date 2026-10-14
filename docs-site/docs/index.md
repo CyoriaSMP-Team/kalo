@@ -11,6 +11,8 @@ permalink: /
 
 Build once. Play everywhere. No paywalls. No player caps.
 
+**Development status: Pre-alpha.** Selected features have been verified with real Java/Bedrock clients; other conversions remain incomplete, unverified or experimental. This is not a production stability guarantee.
+
 ---
 
 ## Quick Links

@@ -281,11 +281,15 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                 ? plugin.getConfig().getString("bedrock", "auto")
                 : "auto";
 
+        String standaloneDirectory = Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin configured
+                ? configured.getConfig().getString("bedrock-standalone.directory", "")
+                : "";
         return switch (mode == null ? "auto" : mode.toLowerCase(java.util.Locale.ROOT)) {
             case "always", "true" -> true;
             case "never", "false" -> false;
             // "auto": build it when Geyser is here to consume it.
-            default -> io.kalo.integration.GeyserIntegration.present();
+            default -> io.kalo.integration.GeyserIntegration.present()
+                    || (standaloneDirectory != null && !standaloneDirectory.isBlank());
         };
     }
 
@@ -354,6 +358,26 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
             // output that is never coming.
             BedrockRegistrationSnapshot.publishFailure(result.generation());
             return;
+        }
+
+        // Optional standalone Geyser export happens only after all Kalo output is
+        // written; failure must not block native Geyser users on the same server.
+        String standalonePath = io.kalo.utils.Plugins.plugin().getConfig()
+                .getString("bedrock-standalone.directory", "").trim();
+        if (!standalonePath.isEmpty()) {
+            try {
+                var sync = io.kalo.platform.bedrock.GeyserStandaloneSync.sync(
+                        java.nio.file.Path.of(standalonePath), Constants.dataFolder().toPath());
+                if (sync.changed()) {
+                    LOGGER.warning("Synchronized " + sync.updated().size()
+                            + " Kalo-owned file(s) to standalone Geyser at " + standalonePath
+                            + "; restart standalone Geyser to load new item/block mappings");
+                }
+            } catch (Exception syncError) {
+                LOGGER.log(Level.WARNING,
+                        "Standalone Geyser synchronization failed; locally generated Bedrock pack"
+                                + " remains available under plugins/Kalo/", syncError);
+            }
         }
 
         // The output is durable, so the native Geyser bridge may now register against it.

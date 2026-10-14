@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     paths:
       - "docs-site/**"
+      - "tests/site-release-version.test.cjs"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -23,6 +24,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Test release badge update and fallback
+        run: node --test tests/site-release-version.test.cjs
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
