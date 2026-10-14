@@ -16,6 +16,10 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   aliases; multi-sheet cuboids use a deterministic UV atlas. Parent model
   geometry/texture overrides and standard held-item view animations are supported.
 - Tests for output, mappings, aliases, and unsupported texture combinations.
+- Optional standalone Geyser local-filesystem synchronization. Copies a
+  generated pack and item/block mapping files to a verified Geyser root,
+  preserving unrelated files and refusing symlink targets.
+- Regression tests for changed/unchanged output, missing inputs and symlinks.
 
 ### Known limitations
 
@@ -23,6 +27,8 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   rigged/animated models, mixed-size texture sheets and 3D inventory previews
   are still unsupported or incomplete.
 - This does not solve Forge login or mod-specific gameplay protocols.
+- This is not cross-process hot reload; standalone Geyser must load
+  its updated mappings and resource packs.
 
 ## 0.2.1-prealpha.1
 
