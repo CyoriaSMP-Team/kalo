@@ -99,6 +99,14 @@ public final class JavaResourcePackScanner {
                     continue;
                 }
 
+                // sounds.json sits immediately below assets/<namespace>/, not in a subdirectory.
+                String[] rootParts = path.split("/", 3);
+                if (rootParts.length == 3 && validNamespace(rootParts[1])
+                        && rootParts[2].equals("sounds.json")) {
+                    sounds.add(path);
+                    continue;
+                }
+
                 String[] parts = path.split("/", 4);
                 if (parts.length < 4 || !validNamespace(parts[1])) {
                     warnings.add("Ignoring malformed asset path: " + path);
@@ -130,11 +138,6 @@ public final class JavaResourcePackScanner {
                     textures.add(path);
                 } else if (section.equals("lang") && name.endsWith(".json")) {
                     languages.add(path);
-                } else if (section.equals("sounds.json") && name.isEmpty()) {
-                    // Reserved for unusual paths; regular sounds.json is handled below.
-                    sounds.add(path);
-                } else if (path.equals("assets/" + namespace + "/sounds.json")) {
-                    sounds.add(path);
                 }
             }
         }
