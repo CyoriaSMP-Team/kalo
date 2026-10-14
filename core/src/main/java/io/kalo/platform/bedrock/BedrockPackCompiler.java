@@ -90,7 +90,7 @@ public final class BedrockPackCompiler {
                     if (!addCustomItem(definition, custom)) {
                         skipped++;
                         LOGGER.warning("Skipped Bedrock 3D item " + definition.key()
-                                + ": missing geometry/texture or multi-texture model (not supported yet)");
+                                + ": missing geometry/texture or unsupported texture layout");
                     }
                 }
                 case ModelDefinition.Vanilla ignored -> { /* already handled above */ }
@@ -158,13 +158,13 @@ public final class BedrockPackCompiler {
     }
 
     /**
-     * Static, single-sheet 3D items share the existing Java -> Bedrock cuboid converter.
+     * Static cuboid 3D items share the existing Java -> Bedrock cuboid converter.
      * Unlike blocks, held items need a Bedrock attachable bound to the equipped item slot.
      * This does not pretend to port mod-specific animation or logic.
      *
      * <p>Reject unsupported models <em>before</em> publishing mappings or writing pack
-     * entries. In particular, rendering multiple Java texture sheets as one Bedrock
-     * attachable would silently use the wrong UVs without an atlas transformation.</p>
+     * entries. For multiple texture sheets, the atlas builder places every face's
+     * resolved source in a deterministic sheet and adjusts its UV origin.</p>
      */
     private boolean addCustomItem(@NotNull ItemDefinition definition,
                                   @NotNull ModelDefinition.Custom custom) {
@@ -175,23 +175,21 @@ public final class BedrockPackCompiler {
             return false;
         }
         try {
-            JsonObject javaModel = com.google.gson.JsonParser.parseString(
-                    new String(source.toByteArray(), StandardCharsets.UTF_8)).getAsJsonObject();
-            Key texture = singleSheet(custom, javaModel);
-            if (texture == null) {
-                return false;
-            }
-            if (javaSource.file("assets/" + texture.namespace()
-                    + "/textures/" + texture.value() + ".png") == null) {
-                return false;
-            }
-
+            JsonObject javaModel = BedrockItemModelResolver.resolve(javaSource, model);
+            if (javaModel == null) return false;
             Key key = definition.key();
             String geometryId = BedrockGeometry.identifierFor(key.namespace(), key.value());
             JsonObject geometry = BedrockGeometry.convert(geometryId, javaModel);
-            if (geometry == null) {
-                return false;
+            if (geometry == null) return false;
+            Key texture = singleSheet(custom, javaModel);
+            BedrockItemAtlas.Result atlas = null;
+            if (texture == null) {
+                atlas = BedrockItemAtlas.build(custom, javaModel, geometry, javaSource);
+                if (atlas == null) return false;
+                texture = atlas.iconSource();
             }
+            if (javaSource.file("assets/" + texture.namespace()
+                    + "/textures/" + texture.value() + ".png") == null) return false;
 
             // Items bind to the holder's equipped slot; blocks do not.
             JsonObject bone = geometry.getAsJsonArray("minecraft:geometry").get(0)
@@ -211,10 +209,14 @@ public final class BedrockPackCompiler {
             String icon = definition.bedrock().iconOverride() != null
                     ? definition.bedrock().iconOverride() : shorthand;
 
+            String modelTexture = "textures/items/" + icon;
+            if (atlas != null) {
+                modelTexture = "textures/models/items/" + shorthand;
+                pack.file(modelTexture + ".png", Writable.bytes(atlas.image()));
+            }
             pack.file("models/entity/" + shorthand + ".geo.json", Json.writable(geometry));
             pack.file("attachables/" + shorthand + ".json",
-                    Json.writable(BedrockAttachable.heldItem(key, geometryId,
-                            "textures/items/" + icon)));
+                    Json.writable(BedrockAttachable.heldItem(key, geometryId, modelTexture)));
             registerItemTexture(icon, texture);
             registerItem(definition, icon);
             // armorCount is the number of wearable armor pieces, not all attachables.

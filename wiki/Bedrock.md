@@ -51,7 +51,9 @@ bedrock: auto  # Options: auto, always, never
 | Content | Bedrock Status |
 |---------|----------------|
 | Items (2D sprites) | ✅ Works |
-| Items (3D models, one texture sheet) | Experimental static geometry + held-item attachables |\n| Items (3D models, multiple texture sheets) | Not yet supported — skipped with warning |\n| Item animations and Java display transforms | Not yet supported |
+| Items (3D models, one texture sheet) | Experimental static geometry + held-item attachables |
+| Items (3D models, multiple texture sheets) | Experimental UV atlas (same-size sheets, 16 max) |
+| Item animations and Java display transforms | Not yet supported |
 | Custom Blocks (native) | ✅ Works |
 | Custom Blocks (virtual) | ❌ Not supported |
 | Furniture (native) | ✅ Works |
@@ -93,9 +95,14 @@ Generated output:
 - textures/items/<namespace>_wrench.png and its atlas entry — provisional icon
 - Geyser v2 item mapping matching the Java item model key
 
-**Current limitations:** static, single-sheet support only. Multi-sheet UV
-atlases, models whose geometry is inherited only, complex display transforms,
-and animations need additional conversion. The source texture sheet is the
+Parent model inheritance for geometry and texture overrides is resolved up to
+16 levels with cycle detection. Generated attachables include the standard
+Bedrock first-person and third-person hold animations.
+
+**Current limitations:** static cuboid models only. For multi-sheet items,
+Kalo combines up to 16 same-size PNGs into a deterministic horizontal UV atlas
+(maximum width 4096 px) and rewrites the cuboid face UV origins. Mixed sheet
+dimensions, parent-only geometry, transforms and animations remain unsupported. The source texture sheet is the
 current inventory icon; rendering a dedicated 3D icon is future work.
 Live Bedrock player testing is still required before production deployment.
 

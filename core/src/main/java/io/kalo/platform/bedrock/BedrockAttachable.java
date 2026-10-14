@@ -97,6 +97,21 @@ public final class BedrockAttachable {
         JsonObject geometry = new JsonObject();
         geometry.addProperty("default", geometryId);
 
+        // Vanilla first/third-person hold offsets: without these an item can
+        // render in Bedrock but float at the wrong orientation in the player's hand.
+        JsonObject animations = new JsonObject();
+        animations.addProperty("hold_first_person", "animation.steve_head.hold_first_person");
+        animations.addProperty("hold_third_person", "animation.steve_head.hold_third_person");
+        JsonObject firstPerson = new JsonObject();
+        firstPerson.addProperty("hold_first_person", "context.is_first_person == 1.0");
+        JsonObject thirdPerson = new JsonObject();
+        thirdPerson.addProperty("hold_third_person", "context.is_first_person == 0.0");
+        JsonArray animate = new JsonArray();
+        animate.add(firstPerson);
+        animate.add(thirdPerson);
+        JsonObject scripts = new JsonObject();
+        scripts.add("animate", animate);
+
         JsonArray controllers = new JsonArray();
         controllers.add("controller.render.item_default");
 
@@ -105,6 +120,8 @@ public final class BedrockAttachable {
         description.add("materials", materials);
         description.add("textures", textures);
         description.add("geometry", geometry);
+        description.add("animations", animations);
+        description.add("scripts", scripts);
         description.add("render_controllers", controllers);
 
         JsonObject attachable = new JsonObject();

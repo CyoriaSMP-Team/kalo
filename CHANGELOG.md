@@ -12,7 +12,9 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 - Experimental static 3D custom item compilation for Bedrock: geometry,
   held-item attachables, provisional texture icon and Geyser v2 mappings.
-  Single-sheet items can resolve model and authored texture aliases.
+  Single- and multi-sheet static items can resolve model and authored texture
+  aliases; multi-sheet cuboids use a deterministic UV atlas. Parent model
+  geometry/texture overrides and standard held-item view animations are supported.
 - Tests for output, mappings, aliases, and unsupported texture combinations.
 
 ### Known limitations
