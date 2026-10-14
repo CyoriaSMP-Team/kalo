@@ -25,9 +25,14 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -233,6 +238,259 @@ class BedrockPackCompilerTest {
 
         assertEquals(0, result.itemCount());
         assertEquals(1, result.skippedCount());
+    }
+
+    @Test
+    void customThreeDimensionalItemGeneratesGeometryAttachableIconAndGeyserMapping()
+            throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/wrench.png");
+        java.file("assets/testpack/models/item/wrench.json", Writable.string("""
+                {
+                  "textures":{"0":"testpack:item/wrench"},
+                  "elements":[{
+                    "from":[4,0,4],"to":[12,12,12],
+                    "faces":{"north":{"texture":"#0","uv":[0,0,8,8]}}
+                  }]
+                }
+                """));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "wrench"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/wrench"), Map.of()))
+                .build();
+
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+
+        assertEquals(1, result.itemCount());
+        assertEquals(0, result.skippedCount());
+        assertEquals(0, result.armorCount(), "held custom items must not count as armor");
+        assertNotNull(result.pack().file("models/entity/testpack_wrench.geo.json"));
+        assertNotNull(result.pack().file("attachables/testpack_wrench.json"));
+        assertNotNull(result.pack().file("textures/items/testpack_wrench.png"));
+
+        JsonObject geo = json(result.pack().file("models/entity/testpack_wrench.geo.json"));
+        JsonObject bone = geo.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject();
+        assertEquals("q.item_slot_to_bone_name(context.item_slot)",
+                bone.get("binding").getAsString());
+        assertEquals("default", bone.getAsJsonArray("cubes").get(0).getAsJsonObject()
+                .getAsJsonObject("uv").getAsJsonObject("north")
+                .get("material_instance").getAsString());
+
+        JsonObject attachable = json(result.pack().file("attachables/testpack_wrench.json"))
+                .getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+        assertEquals("testpack:wrench", attachable.get("identifier").getAsString());
+        assertEquals("geometry.kalo.testpack_wrench",
+                attachable.getAsJsonObject("geometry").get("default").getAsString());
+        assertEquals("textures/items/testpack_wrench",
+                attachable.getAsJsonObject("textures").get("default").getAsString());
+
+        JsonObject mapping = json(result.itemMappings())
+                .getAsJsonObject("items").getAsJsonArray("minecraft:paper")
+                .get(0).getAsJsonObject();
+        assertEquals("testpack:wrench", mapping.get("bedrock_identifier").getAsString());
+        assertEquals("testpack_wrench",
+                mapping.getAsJsonObject("bedrock_options").get("icon").getAsString());
+        assertEquals(1, result.itemRegistrations().size());
+    }
+
+    @Test
+    void customThreeDimensionalItemHonorsTextureOverridesAndAliases() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/hammer.png");
+        java.file("assets/testpack/models/item/hammer.json", Writable.string("""
+                {"textures":{"main":"#alias"},
+                 "elements":[{"from":[2,0,2],"to":[14,14,14],
+                              "faces":{"north":{"texture":"#main"}}}]}
+                """));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "hammer"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/hammer"),
+                        Map.of("alias", Key.key("testpack", "item/hammer"))))
+                .build();
+
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+
+        assertEquals(1, result.itemCount());
+        assertNotNull(result.pack().file("textures/items/testpack_hammer.png"));
+    }
+
+    private static byte[] solidPng(int width, int height, int argb) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) image.setRGB(x, y, argb);
+        }
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", stream);
+        return stream.toByteArray();
+    }
+
+    @Test
+    void multiSheetItemCreatesDeterministicAtlasAndRewritesFaceUvs() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
+        java.file("assets/testpack/textures/item/red.png", Writable.bytes(solidPng(16,16,0xFFFF0000)));
+        java.file("assets/testpack/textures/item/blue.png", Writable.bytes(solidPng(16,16,0xFF0000FF)));
+        java.file("assets/testpack/models/item/multi.json", Writable.string("""
+                {"textures":{"red":"testpack:item/red","alias":"#blue","blue":"testpack:item/blue"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#red","uv":[1,2,5,6]},
+                                       "south":{"texture":"#alias","uv":[0,0,16,16]}}}]}
+                """));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "multi"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/multi"), Map.of()))
+                .build();
+
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+        assertEquals(1, result.itemCount());
+        assertEquals(0, result.skippedCount());
+
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(
+                result.pack().file("textures/models/items/testpack_multi.png").toByteArray()));
+        assertEquals(32, atlas.getWidth());
+        assertEquals(16, atlas.getHeight());
+        assertEquals(0xFFFF0000, atlas.getRGB(0,0));
+        assertEquals(0xFF0000FF, atlas.getRGB(16,0));
+
+        JsonObject geometry = json(result.pack().file("models/entity/testpack_multi.geo.json"))
+                .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals(32, geometry.getAsJsonObject("description").get("texture_width").getAsInt());
+        JsonObject faces = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject().getAsJsonObject("uv");
+        assertEquals(1, faces.getAsJsonObject("north").getAsJsonArray("uv").get(0).getAsInt());
+        assertEquals(16, faces.getAsJsonObject("south").getAsJsonArray("uv").get(0).getAsInt());
+        assertEquals("default", faces.getAsJsonObject("south").get("material_instance").getAsString());
+
+        JsonObject held = json(result.pack().file("attachables/testpack_multi.json"))
+                .getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+        assertEquals("textures/models/items/testpack_multi",
+                held.getAsJsonObject("textures").get("default").getAsString());
+
+        BedrockPackCompiler.Result rerun = compile(java, List.of(new StubItem(definition)));
+        assertTrue(Arrays.equals(
+                result.pack().file("textures/models/items/testpack_multi.png").toByteArray(),
+                rerun.pack().file("textures/models/items/testpack_multi.png").toByteArray()));
+    }
+
+    @Test
+    void multiSheetAtlasRejectsIncompatibleImageDimensionsWithoutMappings() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
+        java.file("assets/testpack/textures/item/red.png", Writable.bytes(solidPng(16,16,0xFFFF0000)));
+        java.file("assets/testpack/textures/item/blue.png", Writable.bytes(solidPng(32,16,0xFF0000FF)));
+        java.file("assets/testpack/models/item/multi.json", Writable.string("""
+                {"textures":{"red":"testpack:item/red","blue":"testpack:item/blue"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#red"},"south":{"texture":"#blue"}}}]}
+                """));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "multi"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/multi"), Map.of()))
+                .build();
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+        assertEquals(1, result.skippedCount());
+        assertEquals(0, result.itemCount());
+        assertNull(result.pack().file("textures/models/items/testpack_multi.png"));
+        assertTrue(result.itemRegistrations().isEmpty());
+    }
+
+    @Test
+    void parentInheritedGeometryAndChildTextureOverridesWorkInBedrock() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
+        java.file("assets/testpack/textures/item/blue.png", Writable.bytes(solidPng(16,16,0xFF0000FF)));
+        java.file("assets/testpack/textures/item/red.png", Writable.bytes(solidPng(16,16,0xFFFF0000)));
+        java.file("assets/testpack/models/item/parent.json", Writable.string("""
+                {"textures":{"main":"testpack:item/red"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#main","uv":[0,0,16,16]}}}]}
+                """));
+        java.file("assets/testpack/models/item/child.json", Writable.string("""
+                {"parent":"testpack:item/parent",
+                 "textures":{"main":"testpack:item/blue"}}
+                """));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "child"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/child"), Map.of()))
+                .build();
+
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+        assertEquals(1, result.itemCount());
+        assertEquals(0, result.skippedCount());
+        JsonObject root = json(result.pack().file("models/entity/testpack_child.geo.json"));
+        assertNotNull(root.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes"));
+        // Single-sheet models keep the source texture bytes, even with inherited geometry.
+        assertTrue(Arrays.equals(
+                solidPng(16,16,0xFF0000FF),
+                result.pack().file("textures/items/testpack_child.png").toByteArray()));
+    }
+
+    @Test
+    void parentCycleFailsWithoutLeakingMappings() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
+        java.file("assets/testpack/models/item/a.json",
+                Writable.string("{\"parent\":\"testpack:item/b\"}"));
+        java.file("assets/testpack/models/item/b.json",
+                Writable.string("{\"parent\":\"testpack:item/a\"}"));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "cycle"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/a"), Map.of()))
+                .build();
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+        assertEquals(1, result.skippedCount());
+        assertEquals(0, result.itemCount());
+        assertTrue(result.itemRegistrations().isEmpty());
+        assertNull(result.pack().file("attachables/testpack_cycle.json"));
+    }
+
+    @Test
+    void heldItemAttachableHasFirstAndThirdPersonHoldAnimations() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/wrench.png");
+        java.file("assets/testpack/models/item/wrench.json", Writable.string("""
+                {"textures":{"0":"testpack:item/wrench"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#0"}}}]}
+                """));
+        ItemDefinition item = ItemDefinition.builder(Key.key("testpack", "wrench"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/wrench"), Map.of())).build();
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(item)));
+        JsonObject description = json(result.pack().file("attachables/testpack_wrench.json"))
+                .getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+        assertEquals("animation.steve_head.hold_first_person",
+                description.getAsJsonObject("animations").get("hold_first_person").getAsString());
+        assertEquals("animation.steve_head.hold_third_person",
+                description.getAsJsonObject("animations").get("hold_third_person").getAsString());
+        assertEquals(2, description.getAsJsonObject("scripts").getAsJsonArray("animate").size());
+    }
+
+    @Test
+    void multiTextureCustomItemDoesNotGenerateIncorrectSingleSheetModel() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/red.png");
+        java.file("assets/testpack/textures/item/blue.png", Writable.bytes(new byte[]{4}));
+        java.file("assets/testpack/models/item/multi.json", Writable.string("""
+                {"textures":{"red":"testpack:item/red","blue":"testpack:item/blue"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#red"},"south":{"texture":"#blue"}}}]}
+                """));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "multi"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/multi"), Map.of()))
+                .build();
+
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+
+        assertEquals(1, result.skippedCount());
+        assertEquals(0, result.itemCount());
+        assertNull(result.pack().file("attachables/testpack_multi.json"));
+        assertNull(result.pack().file("models/entity/testpack_multi.geo.json"));
+        assertTrue(result.itemRegistrations().isEmpty());
+    }
+
+    @Test
+    void missingThreeDimensionalItemTextureDoesNotPublishMapping() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
+        java.file("assets/testpack/models/item/missing.json", Writable.string("""
+                {"textures":{"0":"testpack:item/does_not_exist"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#0"}}}]}
+                """));
+        ItemDefinition definition = ItemDefinition.builder(Key.key("testpack", "missing"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/missing"), Map.of()))
+                .build();
+
+        BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
+        assertEquals(1, result.skippedCount());
+        assertEquals(0, result.itemCount());
     }
 
     @Test
