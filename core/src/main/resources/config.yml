@@ -47,6 +47,11 @@ external-content:
   # New identities are saved and become active only after the next restart.
   # Off by default: scanning inventories of all players is an operator decision.
   auto-learn: false
+  # Locate an existing Java Resource Pack ZIP in installed plugin data folders
+  # automatically when base-pack is empty or "auto". If multiple packs are found,
+  # Kalo will not guess or replace their contents. /kalo discover-packs lists
+  # all valid candidates for explicit selection. No network downloads.
+  auto-discover-packs: true
 
 # Runtime performance controller.
 #

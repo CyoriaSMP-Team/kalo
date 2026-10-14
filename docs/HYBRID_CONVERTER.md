@@ -85,6 +85,27 @@ continues to own all gameplay behaviour. Everything is off by default.
 - Integration has compiler/unit tests, not yet real Bedrock client verification.
   No full Rainbow parity is claimed.
 
+## Automatic local pack discovery (implemented, opt-in with external content)
+
+- When external-content.enabled: true and base-pack is empty or "auto",
+  auto-discover-packs: true searches under the plugins directory, no other
+  arbitrary server paths. It accepts local Java pack ZIP archives with a
+  validated pack.mcmeta plus at least one assets/ file, with bounded ZIP
+  metadata and symlink/path traversal checks.
+- The selected source is merged through the existing PackMerger. If exactly
+  one candidate exists, it is used without a manual base-pack setting. If
+  there are multiple candidates, **none is selected automatically**, because
+  archives from older plugin builds might contain conflicting Java models.
+- /kalo discover-packs prints the detected candidate paths and warnings
+  asynchronously without touching files, world state or Geyser mappings.
+- An explicit base-pack always takes priority; when external-content.enabled
+  is false, auto discovery has no effect on native Kalo output.
+- No remote URL fetching, network crawling, special access to client-only
+  resource packs or automatic compatibility with Forge mod assets is promised.
+- For hands-free observation of server-side item-model/CMD identities,
+  explicitly enable external-content.auto-learn: true as well. New Geyser
+  palette entries still require the next server/Geyser startup.
+
 ## Phase 3: rendering and predicates
 
 - Reuse the merged static 3D geometry path for experimental conversion, parent models and

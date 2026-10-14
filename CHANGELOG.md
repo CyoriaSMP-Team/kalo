@@ -6,6 +6,25 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- Opt-in automatic Java Resource Pack discovery from installed plugin data
+  folders when base-pack is empty or "auto". A single bounded and validated
+  archive is merged automatically; multiple candidates are never guessed.
+- /kalo discover-packs: asynchronous, read-only report of detected Java pack
+  ZIPs and rejected inputs. Explicit base-pack remains authoritative.
+- Regression tests for detection, ambiguous packs, malformed archives,
+  traversal paths, backups and symbolic links.
+
+### Limitations
+
+- No download of remote server packs, client-only assets, or automatic merging
+  of ambiguous plugin pack generations. Unknown pack formats are rejected.
+- Auto-learn still requires an explicit opt-in; Geyser palette updates need
+  restart and external conversions require Bedrock-client verification.
+
 ## 0.2.1-prealpha.4
 
 ### Added

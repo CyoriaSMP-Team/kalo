@@ -262,6 +262,7 @@ model:
 | `/kalo export kalopack <pack>` | `kalo.command.export` |
 | `/kalo inspect-pack <filename>` | `kalo.command.inspect-pack` |
 | `/kalo learn-held` | `kalo.command.learn-held` |
+| `/kalo discover-packs` | `kalo.command.discover-packs` |
 
 ## External Java resource packs (experimental)
 
@@ -270,15 +271,25 @@ and convert a matching plain model from an authored Java resource pack to a
 Bedrock Geyser v2 mapping. This is in addition to, not a replacement for,
 Kalo's own YAML item/block engine.
 
-1. Supply the Java ZIP in base-pack (relative to plugins/Kalo/), so Java
-   players get the same source assets.
-2. Set external-content.enabled: true in plugins/Kalo/config.yml.
-3. Hold an existing custom Java item and run /kalo learn-held. This saves its
-   observed material and item-model ID to plugins/Kalo/external-items.yml.
-   Alternatively enable external-content.auto-learn: true to inspect
-   server-visible inventories and GUI menus automatically.
-4. Restart the server/Geyser to register new mappings; /kalo reload alone
-   cannot change Geyser's frozen custom-item palette.
+1. Set external-content.enabled: true in plugins/Kalo/config.yml.
+   Leave base-pack empty or set it to "auto" and keep
+   external-content.auto-discover-packs: true (default). Kalo scans local
+   plugin-data directories for real Java Resource Pack ZIPs. If exactly one
+   validated candidate exists, it merges the pack automatically. No manual
+   ZIP lookup, external downloads or system-wide file scans are required.
+2. Set external-content.auto-learn: true to observe actual server-visible
+   items in inventories and GUIs automatically; or run /kalo learn-held while
+   holding a custom Java item. Observations go to external-items.yml or
+   legacy-items.yml.
+3. Restart the server/Geyser after new item observations: Geyser's custom-item
+   palette is frozen after initialization.
+
+If several different ZIP candidates exist, Kalo does not guess which is in
+use or merge incompatible packs. Run /kalo discover-packs for an exact
+read-only list and set base-pack to the intended ZIP if needed. An explicitly
+configured base-pack always wins and works as before. Files named as backups,
+Kalo's own generated.zip, symbolic links, malformed packs and oversized ZIPs
+are excluded. Discovery never modifies another plugin's files.
 
 Supported (experimental): plain, conditional (broken/damaged/custom-model-data
 flags/component/fishing-rod), range-dispatch (count/damage/custom-model-data/
