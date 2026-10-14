@@ -241,7 +241,33 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         String configured = Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin
                 ? plugin.getConfig().getString("base-pack", "")
                 : "";
-        if (configured == null || configured.isBlank()) {
+        if (configured == null || configured.isBlank() || configured.equalsIgnoreCase("auto")) {
+            if (Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin
+                    && plugin.getConfig().getBoolean("external-content.enabled", false)
+                    && plugin.getConfig().getBoolean("external-content.auto-discover-packs", true)) {
+                try {
+                    var report = io.kalo.converter.AutoPackDiscovery.discover(
+                            Constants.dataFolder().toPath());
+                    report.warnings().forEach(warning ->
+                            LOGGER.warning("Pack Auto Discovery: " + warning));
+                    var unique = report.unique();
+                    if (unique != null) {
+                        LOGGER.info("Automatically selected Java Resource Pack "
+                                + unique.path() + " (" + unique.assetCount() + " assets)");
+                        io.kalo.pack.PackMerger.merge(resourcePack, unique.path().toFile());
+                    } else if (report.candidates().isEmpty()) {
+                        LOGGER.warning("Pack Auto Discovery found no usable Java Resource Pack"
+                                + "; keep a local base-pack ZIP or install a supported pack generator");
+                    } else {
+                        LOGGER.warning("Pack Auto Discovery found " + report.candidates().size()
+                                + " different Java Resource Packs and will not guess which is active."
+                                + " Use /kalo discover-packs to see candidates, then set base-pack");
+                    }
+                } catch (java.io.IOException error) {
+                    LOGGER.log(Level.WARNING,
+                            "Automatic pack discovery failed; native Kalo pack is unchanged", error);
+                }
+            }
             return;
         }
 

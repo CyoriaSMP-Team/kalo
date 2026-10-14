@@ -107,6 +107,11 @@ public final class CommandManager implements Managerial {
 
         // Hybrid importer phase 1: safe, read-only scan; native content remains unchanged.
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("discover-packs")
+                .permission(Permission.of(PERMISSION_PREFIX + "discover-packs"))
+                .handler(ctx -> runDiscoverPacks(context, ctx.sender().getSender())));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("inspect-pack")
                 .permission(Permission.of(PERMISSION_PREFIX + "inspect-pack"))
                 .required("filename", StringParser.stringParser())
@@ -333,6 +338,56 @@ public final class CommandManager implements Managerial {
                         NamedTextColor.GREEN));
             }
         }, null, 1L));
+    }
+
+    /** Manual read-only visibility into the exact candidate archives auto mode sees. */
+    private static void runDiscoverPacks(@NotNull Context context, @NotNull CommandSender sender) {
+        sender.sendMessage(Component.text(
+                "Scanning installed plugin data for Java Resource Packs...", NamedTextColor.YELLOW));
+        java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                return io.kalo.converter.AutoPackDiscovery.discover(Constants.dataFolder().toPath());
+            } catch (java.io.IOException exception) {
+                throw new java.util.concurrent.CompletionException(exception);
+            }
+        }).whenComplete((report, failure) -> {
+            Runnable reply = () -> {
+                if (failure != null) {
+                    Plugins.logger().log(Level.WARNING, "Pack auto discovery failed", failure);
+                    sender.sendMessage(Component.text(
+                            "Could not scan packs: " + messageOf(failure), NamedTextColor.RED));
+                    return;
+                }
+                sender.sendMessage(Component.text(
+                        "Found " + report.candidates().size() + " Java Resource Pack candidate(s)",
+                        NamedTextColor.AQUA));
+                java.nio.file.Path plugins = Constants.dataFolder().toPath().toAbsolutePath()
+                        .normalize().getParent();
+                for (var candidate : report.candidates()) {
+                    sender.sendMessage(Component.text("  "
+                            + plugins.relativize(candidate.path().toAbsolutePath().normalize())
+                            + " (" + candidate.assetCount() + " assets)", NamedTextColor.GRAY));
+                }
+                if (report.unique() != null) {
+                    sender.sendMessage(Component.text(
+                            "One candidate found. Enable external-content.auto-discover-packs"
+                            + " and external-content.enabled to select automatically.",
+                            NamedTextColor.GREEN));
+                } else if (report.candidates().size() > 1) {
+                    sender.sendMessage(Component.text(
+                            "Multiple candidates: set base-pack to the correct ZIP to avoid"
+                            + " accidentally mixing incompatible resource packs.",
+                            NamedTextColor.YELLOW));
+                }
+                report.warnings().forEach(w -> sender.sendMessage(Component.text(
+                        "  Skipped: " + w, NamedTextColor.YELLOW)));
+            };
+            if (sender instanceof Player player) {
+                player.getScheduler().execute(context.plugin(), reply, () -> {}, 1L);
+            } else {
+                context.plugin().getServer().getGlobalRegionScheduler().execute(context.plugin(), reply);
+            }
+        });
     }
 
     private static void runInspectPack(@NotNull Context context,
