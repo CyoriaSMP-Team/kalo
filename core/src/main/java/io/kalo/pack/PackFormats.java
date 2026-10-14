@@ -27,6 +27,15 @@ public final class PackFormats {
      * 46 — the 1.21.4 number — because nothing between the two ends of the supported range
      * had ever been checked.</p>
      */
+    /** Verified against the official release client jars and Mojang SHA1 manifests. */
+    public static final int MC_1_21_5 = 55;
+    public static final int MC_1_21_6 = 63;
+    public static final int MC_1_21_7 = 64;
+    public static final int MC_1_21_8 = 64;
+    public static final int MC_1_21_9 = 69;
+    public static final int MC_1_21_10 = 69;
+    public static final int MC_26_1 = 84;
+
     public static final int MC_1_21_11 = 75;
 
     /**
@@ -41,45 +50,47 @@ public final class PackFormats {
     }
 
     /**
-     * Resolves pack_format for the running server version.
+     * Resource-pack major numbers verified from official client jar version.json.
      *
-     * <p>Only the two versions with a verified number are answered outright. Anything else
-     * gets the nearest number in its family plus a warning: guessing is the failure this
-     * class exists to prevent, so at least say so out loud. Newer is not the safe guess —
-     * a client refuses a pack_format above its own but loads one below it.</p>
-     *
-     * <p>An earlier version enumerated 1.21.5 through 1.21.11 and returned 46 for each with
-     * no warning, as if the number had been checked. It had not — those releases each moved
-     * {@code resource_major} — and the enumeration was unreachable anyway, because a
-     * trailing {@code "1.21"} prefix test already caught them. The behaviour for those
-     * versions is unchanged; what changed is that it now says it is guessing.</p>
+     * <p>Minecraft 1.21.5-1.21.8 used the older
+     * {@code pack_version.resource} JSON field; later versions use
+     * {@code pack_version.resource_major}. Both are checked against the
+     * official Mojang client SHA-1 metadata.</p>
      */
+    private static final java.util.Map<String, Integer> VERIFIED = java.util.Map.ofEntries(
+            java.util.Map.entry("1.21.4", MC_1_21_4),
+            java.util.Map.entry("1.21.5", MC_1_21_5),
+            java.util.Map.entry("1.21.6", MC_1_21_6),
+            java.util.Map.entry("1.21.7", MC_1_21_7),
+            java.util.Map.entry("1.21.8", MC_1_21_8),
+            java.util.Map.entry("1.21.9", MC_1_21_9),
+            java.util.Map.entry("1.21.10", MC_1_21_10),
+            java.util.Map.entry("1.21.11", MC_1_21_11),
+            java.util.Map.entry("26.1", MC_26_1),
+            java.util.Map.entry("26.2", MC_26_2)
+    );
+
     public static int resolve() {
         String version;
         try {
-            version = org.bukkit.Bukkit.getMinecraftVersion(); // e.g. "1.21.4" or "26.2"
+            version = org.bukkit.Bukkit.getMinecraftVersion();
         } catch (LinkageError | RuntimeException e) {
-            // No server around: compilers must stay runnable outside one.
-            return CURRENT;
+            return CURRENT; // Compiler tests without a running Paper server.
         }
-        if (version == null) {
-            return CURRENT;
-        }
+        return version == null ? CURRENT : resolveForVersion(version);
+    }
 
-        version = version.trim();
-        if (version.equals("1.21.4") || version.startsWith("1.21.4-")) {
-            return MC_1_21_4;
-        }
-        if (version.equals("1.21.11") || version.startsWith("1.21.11-")) {
-            return MC_1_21_11;
-        }
-        if (version.equals("26.2") || version.startsWith("26.2.") || version.startsWith("26.2-")) {
-            return MC_26_2;
-        }
+    /** Package-private: test without a running Bukkit registry or server. */
+    static int resolveForVersion(@org.jetbrains.annotations.NotNull String serverVersion) {
+        String version = serverVersion.trim();
+        // Paper may report a suffix such as -R0.1; only the release prefix
+        // is part of the Minecraft version's pack-format identity.
+        String baseVersion = version.split("-", 2)[0];
+        Integer exact = VERIFIED.get(baseVersion);
+        if (exact != null) return exact;
 
-        // Neither number is verified for this version. Answer with the nearest one in the
-        // same family rather than the newest: a client rejects a pack_format newer than
-        // itself outright, while an older one loads with a warning.
+        // Never claim an unsupported/untested release is verified. An older
+        // pack format may load in some clients but will be missing new features.
         if (version.startsWith("1.21")) {
             warnUnverified(version, MC_1_21_4);
             return MC_1_21_4;
