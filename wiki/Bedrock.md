@@ -33,6 +33,28 @@ If Geyser runs separately:
 2. Copy `plugins/Kalo/geyser/kalo-blocks.json` to Geyser's `custom_mappings/`
 3. Copy `plugins/Kalo/generated.mcpack` to Geyser's `packs/`
 
+## Standalone Geyser auto-sync (opt-in)
+
+When Geyser runs separately on the same machine or shared filesystem,
+Kalo can copy its generated Bedrock pack and both mapping files there.
+This is **off by default**; it never restarts Geyser.
+
+Configure the existing Geyser root, with `config.yml` and `packs/`:
+
+~~~yaml
+bedrock: always
+bedrock-standalone:
+  directory: "/srv/geyser"
+~~~
+
+Kalo updates only `packs/kalo-generated.mcpack` and
+`custom_mappings/kalo-items.json` / `kalo-blocks.json`. Other mappings
+and packs are untouched. Staged writes replace individual files atomically
+where the filesystem permits. Existing symlink targets are rejected.
+
+**Restart standalone Geyser** after modifying mappings or packs.
+This is not a Geyser cross-process hot-reload API.
+
 ## Configuration
 
 ```yaml
