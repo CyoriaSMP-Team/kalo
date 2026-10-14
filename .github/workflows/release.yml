@@ -48,6 +48,33 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "plugin_version=$plugin_version" >> "$GITHUB_OUTPUT"
 
+      # Use the tagged version to select a publishing channel, never promote experimental code to stable.
+      - name: Classify release channel
+        id: channel
+        env:
+          VERSION: ${{ steps.version.outputs.plugin_version }}
+        run: |
+          case "$VERSION" in
+            *-prealpha*|*-alpha*)
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "modrinth=alpha" >> "$GITHUB_OUTPUT"
+              echo "hangar=Alpha" >> "$GITHUB_OUTPUT"
+              echo "featured=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *-beta*|*-rc*)
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "modrinth=beta" >> "$GITHUB_OUTPUT"
+              echo "hangar=Beta" >> "$GITHUB_OUTPUT"
+              echo "featured=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "prerelease=false" >> "$GITHUB_OUTPUT"
+              echo "modrinth=release" >> "$GITHUB_OUTPUT"
+              echo "hangar=Release" >> "$GITHUB_OUTPUT"
+              echo "featured=true" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
       - name: Build and test
         run: ./gradlew build --stacktrace
 
@@ -96,7 +123,11 @@ jobs:
           CHANGELOG: ${{ steps.changelog.outputs.body }}
         run: |
           printf '%s\n' "$CHANGELOG" > release-notes.md
-          gh release create "$TAG" \
+          prerelease_args=()
+          if [ "${{ steps.channel.outputs.prerelease }}" = "true" ]; then
+            prerelease_args+=(--prerelease)
+          fi
+          gh release create "$TAG" "${prerelease_args[@]}" \
             --title "$TAG" \
             --notes-file release-notes.md \
             --generate-notes \
@@ -118,13 +149,15 @@ jobs:
           jar="build/libs/Kalo-$VERSION.jar"
           data=$(jq -nc \
             --arg name "$TAG" \
+            --arg release_type "${{ steps.channel.outputs.modrinth }}" \
+            --argjson featured "${{ steps.channel.outputs.featured }}" \
             --arg number "$VERSION" \
             --arg changelog "$CHANGELOG" \
             --arg project "$MODRINTH_PROJECT" \
             --argjson versions "$GAME_VERSIONS" \
             '{name: $name, version_number: $number, changelog: $changelog,
-              dependencies: [], game_versions: $versions, version_type: "release",
-              loaders: ["paper", "folia"], featured: true, project_id: $project,
+              dependencies: [], game_versions: $versions, version_type: $release_type,
+              loaders: ["paper", "folia"], featured: $featured, project_id: $project,
               file_parts: ["file"], primary_file: "file"}')
           curl --fail-with-body -sS -X POST https://api.modrinth.com/v2/version \
             -H "Authorization: $MODRINTH_TOKEN" \
@@ -144,9 +177,10 @@ jobs:
             | jq -r .token)
           upload=$(jq -nc \
             --arg version "$VERSION" \
+            --arg channel "${{ steps.channel.outputs.hangar }}" \
             --arg changelog "$CHANGELOG" \
             --argjson versions "$GAME_VERSIONS" \
-            '{version: $version, description: $changelog, channel: "Release",
+            '{version: $version, description: $changelog, channel: $channel,
               files: [{platforms: ["PAPER"]}],
               platformDependencies: {PAPER: $versions}, pluginDependencies: {}}')
           curl --fail-with-body -sS -X POST \
