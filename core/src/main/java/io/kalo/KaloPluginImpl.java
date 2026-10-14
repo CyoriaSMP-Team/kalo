@@ -38,6 +38,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
     private JavaBlockListener blockListener;
     private FurnitureListener furnitureListener;
     private GuiListener guiListener;
+    private io.kalo.converter.ExternalItemObserver externalItemObserver;
 
     private final List<Managerial> managers = List.of(
             registryManager,
@@ -76,6 +77,18 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         getServer().getPluginManager().registerEvents(furnitureListener, this);
         getServer().getPluginManager().registerEvents(guiListener, this);
         getServer().getPluginManager().registerEvents(new JavaRecipeListener(), this);
+
+        if (getConfig().getBoolean("external-content.enabled", false)
+                && getConfig().getBoolean("external-content.auto-learn", false)) {
+            try {
+                externalItemObserver = new io.kalo.converter.ExternalItemObserver(this);
+                getServer().getPluginManager().registerEvents(externalItemObserver, this);
+            } catch (IOException invalid) {
+                getLogger().log(Level.SEVERE,
+                        "Could not initialize external item observation; native content is unaffected",
+                        invalid);
+            }
+        }
 
         // Content loads here rather than on ServerLoadEvent, which is what Neko did.
         // Geyser asks for custom blocks partway through its own enable — before
@@ -117,6 +130,10 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         }
         resourcePackManager.shutdown();
 
+        if (externalItemObserver != null) {
+            externalItemObserver.close();
+            externalItemObserver = null;
+        }
         if (blockListener != null) {
             HandlerList.unregisterAll(blockListener);
             blockListener = null;

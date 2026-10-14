@@ -98,6 +98,31 @@ public final class BedrockPackCompiler {
         }
     }
 
+    /**
+     * Compile a model observed on an existing server ItemStack, without creating
+     * or giving a Kalo gameplay item. Geyser uses the observed Java material and
+     * item_model component for matching. Native Kalo item identifiers win collisions.
+     */
+    public boolean addExternalItem(@NotNull ItemDefinition definition) {
+        if (!definition.bedrock().enabled()
+                || itemRegistrations.stream().anyMatch(item ->
+                        item.model().equals(definition.key().asString())
+                        || item.bedrockIdentifier().equals(definition.key().asString()))) {
+            return false;
+        }
+        return switch (definition.model()) {
+            case ModelDefinition.Sprite sprite -> {
+                String path = "assets/" + sprite.texture().namespace()
+                        + "/textures/" + sprite.texture().value() + ".png";
+                if (javaSource.file(path) == null) yield false;
+                addSpriteItem(definition, sprite);
+                yield true;
+            }
+            case ModelDefinition.Custom custom -> addCustomItem(definition, custom);
+            case ModelDefinition.Vanilla ignored -> false;
+        };
+    }
+
     private void addSpriteItem(@NotNull ItemDefinition definition, @NotNull ModelDefinition.Sprite sprite) {
         Key key = definition.key();
         String icon = definition.bedrock().iconOverride() != null

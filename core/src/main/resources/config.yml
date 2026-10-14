@@ -31,6 +31,22 @@ bedrock: auto
 bedrock-standalone:
   directory: ""
 
+# Optional Rainbow-style bridge for EXISTING Java resource-pack items.
+#
+# First set base-pack to the Java resource-pack ZIP used by your server.
+# Hold an actual custom item and run /kalo learn-held (permission
+# kalo.command.learn-held), then restart the server so Geyser registers it
+# during startup. Only plain 2D or supported static cuboid 3D item models
+# are currently mapped; predicates, animated items and custom blocks are not.
+# Stored observations live in plugins/Kalo/external-items.yml.
+# With this disabled, Kalo's native output is unchanged.
+external-content:
+  enabled: false
+  # Observe player inventories on join, item switching and inventory close.
+  # New identities are saved and become active only after the next restart.
+  # Off by default: scanning inventories of all players is an operator decision.
+  auto-learn: false
+
 # Runtime performance controller.
 #
 # Kalo has no artificial item/block/furniture count caps. Instead it watches actual server

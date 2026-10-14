@@ -317,6 +317,7 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         // Armor needs an attachable on top of its icon, or Bedrock draws the base
         // material's armor instead of the custom one.
         compiler.addArmor(registries.armor());
+
         // Skips whatever the Java compiler could not place, so the two platforms cannot
         // drift apart on which blocks exist.
         java.util.Set<String> blockSkip = java.util.Set.of();
@@ -336,6 +337,45 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
         compiler.addBlocks(registries.block(), blockStates::get, blockSkip);
         compiler.addBlocks(registries.furniture(), blockStates::get, furnitureSkip);
+
+        // External Java pack models reuse this same compiler and snapshot. An operator
+        // first captures the model/material pair from an actual held ItemStack. Because
+        // Geyser freezes its palette at startup, new captures apply on the next restart.
+        if (io.kalo.utils.Plugins.plugin().getConfig().getBoolean("external-content.enabled", false)) {
+            java.nio.file.Path bindingsFile = Constants.dataFolder().toPath()
+                    .resolve("external-items.yml");
+            try {
+                int mapped = 0;
+                for (var binding : io.kalo.converter.ExternalItemBindings.load(bindingsFile)) {
+                    var key = binding.itemModel();
+                    if (registries.item().get(key).isPresent()
+                            || registries.armor().get(key).isPresent()
+                            || registries.block().get(key).isPresent()
+                            || registries.furniture().get(key).isPresent()) {
+                        LOGGER.warning("Skipping observed external model " + key
+                                + ": the content identifier belongs to native Kalo");
+                        continue;
+                    }
+                    var definition = io.kalo.converter.ExternalItemModelResolver.resolve(javaPack, binding);
+                    if (definition == null) {
+                        LOGGER.warning("External model " + binding.itemModel()
+                                + " is missing, unsupported or has unresolved Java assets");
+                    } else if (compiler.addExternalItem(definition)) {
+                        mapped++;
+                    } else {
+                        LOGGER.warning("External model " + binding.itemModel()
+                                + " could not compile to Bedrock or collides with native content");
+                    }
+                }
+                if (mapped > 0) {
+                    LOGGER.info("Compiled " + mapped
+                            + " externally observed Java item model(s) for Bedrock");
+                }
+            } catch (java.io.IOException invalid) {
+                LOGGER.log(Level.SEVERE, "External model bindings are invalid; skipping"
+                        + " external items without affecting native Kalo content", invalid);
+            }
+        }
 
         BedrockPackCompiler.Result result = compiler.finish();
 
@@ -396,8 +436,9 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         if (result.skippedCount() > 0) {
             // Said out loud rather than silently dropped: a pack author who sees their
             // item on Java but not on Bedrock deserves to know why.
-            LOGGER.warning(result.skippedCount() + " item(s) were left out of the Bedrock pack because they use a "
-                    + "custom model; Bedrock geometry conversion is not implemented yet");
+            LOGGER.warning(result.skippedCount()
+                    + " custom content entry/entries could not compile for Bedrock"
+                    + " (unsupported model, missing assets or Java block state); inspect earlier warnings");
         }
     }
 
