@@ -51,7 +51,7 @@ bedrock: auto  # Options: auto, always, never
 | Content | Bedrock Status |
 |---------|----------------|
 | Items (2D sprites) | ✅ Works |
-| Items (3D models) | ⚠️ Geometry conversion |
+| Items (3D models, one texture sheet) | Experimental static geometry + held-item attachables |\n| Items (3D models, multiple texture sheets) | Not yet supported — skipped with warning |\n| Item animations and Java display transforms | Not yet supported |
 | Custom Blocks (native) | ✅ Works |
 | Custom Blocks (virtual) | ❌ Not supported |
 | Furniture (native) | ✅ Works |
@@ -60,6 +60,47 @@ bedrock: auto  # Options: auto, always, never
 | Music Discs | ⚠️ Basic support |
 | GUIs | ❌ Server-side only |
 | Glyphs | ✅ Works |
+
+## Static custom 3D items (experimental)
+
+Kalo now compiles hand-authored cuboid Java item models (for example those built
+in Blockbench) into a Bedrock geometry file, a held-item attachable, an inventory
+icon and a Geyser v2 mapping. The model must contain its own elements rather
+than only inheriting its parent, and all textured faces must resolve to **one
+texture sheet**. Texture aliases from both the model JSON and Kalo YAML resolve.
+
+Example YAML definition (under configs/items.yml):
+
+~~~yaml
+wrench:
+  type: item
+  display:
+    name: Wrench
+  model:
+    custom: item/wrench
+    textures:
+      "0": item/wrench
+  java:
+    base_material: PAPER
+~~~
+
+Place the source JSON model at assets/<namespace>/models/item/wrench.json and
+its PNG at assets/<namespace>/textures/item/wrench.png.
+
+Generated output:
+- models/entity/<namespace>_wrench.geo.json — Bedrock geometry
+- attachables/<namespace>_wrench.json — bound to the held item slot
+- textures/items/<namespace>_wrench.png and its atlas entry — provisional icon
+- Geyser v2 item mapping matching the Java item model key
+
+**Current limitations:** static, single-sheet support only. Multi-sheet UV
+atlases, models whose geometry is inherited only, complex display transforms,
+and animations need additional conversion. The source texture sheet is the
+current inventory icon; rendering a dedicated 3D icon is future work.
+Live Bedrock player testing is still required before production deployment.
+
+This is content rendering, not a Forge login or client-side mod compatibility
+bridge. Mod-specific gameplay needs separate integration.
 
 ## Virtual Blocks on Bedrock
 

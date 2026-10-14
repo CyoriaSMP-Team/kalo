@@ -81,6 +81,41 @@ public final class BedrockAttachable {
     }
 
     /**
+     * A static 3D item, not armor: bind its geometry to the holder's item slot.
+     * The geometry's single bone contains the Bedrock item-slot binding.
+     */
+    static @NotNull JsonObject heldItem(@NotNull Key item, @NotNull String geometryId,
+                                        @NotNull String texturePath) {
+        JsonObject materials = new JsonObject();
+        materials.addProperty("default", "entity_alphatest");
+        materials.addProperty("enchanted", "entity_alphatest_glint");
+
+        JsonObject textures = new JsonObject();
+        textures.addProperty("default", texturePath);
+        textures.addProperty("enchanted", "textures/misc/enchanted_item_glint");
+
+        JsonObject geometry = new JsonObject();
+        geometry.addProperty("default", geometryId);
+
+        JsonArray controllers = new JsonArray();
+        controllers.add("controller.render.item_default");
+
+        JsonObject description = new JsonObject();
+        description.addProperty("identifier", item.asString());
+        description.add("materials", materials);
+        description.add("textures", textures);
+        description.add("geometry", geometry);
+        description.add("render_controllers", controllers);
+
+        JsonObject attachable = new JsonObject();
+        attachable.add("description", description);
+        JsonObject root = new JsonObject();
+        root.addProperty("format_version", "1.10.0");
+        root.add("minecraft:attachable", attachable);
+        return root;
+    }
+
+    /**
      * Builds the attachable for one armor piece.
      *
      * @param textureName the shared armor sheet name, without the layer suffix

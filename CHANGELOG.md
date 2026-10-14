@@ -6,6 +6,21 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- Experimental static 3D custom item compilation for Bedrock: geometry,
+  held-item attachables, provisional texture icon and Geyser v2 mappings.
+  Single-sheet items can resolve model and authored texture aliases.
+- Tests for output, mappings, aliases, and unsupported texture combinations.
+
+### Known limitations
+
+- Live Bedrock client rendering, first-person/display transforms, proper GUI
+  icon previews, animations and multi-sheet models remain to be implemented.
+- This does not solve Forge login or mod-specific gameplay protocols.
+
 ## 0.2.0
 
 ### Added

@@ -36,7 +36,7 @@ translation. That is the thing Kalo exists to do.
 > verified on Paper 26.2 + Folia. Virtual blocks have a persistent index, chunk
 > load/unload, explosion handling and a `/kalo migrate-world` dry-run.
 >
-> **Bedrock is verified by a Bedrock player**, on a live server running Geyser and
+> **Static custom 3D items (one texture sheet)** now have experimental Bedrock geometry and held-item attachable output. Live-client 3D rendering has not yet been verified; see the Bedrock wiki for limits.\n\n**Bedrock is verified by a Bedrock player**, on a live server running Geyser and
 > Floodgate: custom item icons, native blocks placed and mined, and worn armor all render.
 > One thing does not, and cannot — see [the roadmap](#roadmap) for that and for everything
 > else this is still too young for.

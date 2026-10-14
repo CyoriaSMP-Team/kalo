@@ -21,6 +21,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.logging.Logger;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,6 +45,7 @@ import java.util.UUID;
  * compile erased every earlier type's mappings.</p>
  */
 public final class BedrockPackCompiler {
+    private static final Logger LOGGER = Logger.getLogger(BedrockPackCompiler.class.getName());
 
     private final ResourcePack javaSource;
     private final ResourcePack pack;
@@ -80,25 +84,34 @@ public final class BedrockPackCompiler {
                 // correctly with no custom item at all.
                 continue;
             }
-            if (!(definition.model() instanceof ModelDefinition.Sprite sprite)) {
-                // Bedrock needs a geometry for anything that is not a flat sprite, and
-                // converting a Java model to Bedrock geometry is not implemented.
-                skipped++;
-                continue;
+            switch (definition.model()) {
+                case ModelDefinition.Sprite sprite -> addSpriteItem(definition, sprite);
+                case ModelDefinition.Custom custom -> {
+                    if (!addCustomItem(definition, custom)) {
+                        skipped++;
+                        LOGGER.warning("Skipped Bedrock 3D item " + definition.key()
+                                + ": missing geometry/texture or multi-texture model (not supported yet)");
+                    }
+                }
+                case ModelDefinition.Vanilla ignored -> { /* already handled above */ }
             }
-
-            addSpriteItem(definition, sprite);
         }
     }
 
     private void addSpriteItem(@NotNull ItemDefinition definition, @NotNull ModelDefinition.Sprite sprite) {
         Key key = definition.key();
-        String bedrockId = key.namespace() + ":" + key.value();
-        String javaItem = "minecraft:" + definition.java().baseMaterial().name().toLowerCase(Locale.ROOT);
         String icon = definition.bedrock().iconOverride() != null
                 ? definition.bedrock().iconOverride()
                 : key.namespace() + "_" + key.value();
+        registerItem(definition, icon);
+        registerItemTexture(icon, sprite.texture());
+    }
 
+    /** Common item mapping path: sprites and 3D items must use identical Geyser definitions. */
+    private void registerItem(@NotNull ItemDefinition definition, @NotNull String icon) {
+        Key key = definition.key();
+        String bedrockId = key.namespace() + ":" + key.value();
+        String javaItem = "minecraft:" + definition.java().baseMaterial().name().toLowerCase(Locale.ROOT);
         JsonObject mapping = new JsonObject();
         mapping.addProperty("type", "definition");
         mapping.addProperty("model", key.asString());
@@ -142,8 +155,142 @@ public final class BedrockPackCompiler {
                 javaItem, bedrockId, key.asString(), icon, displayName,
                 definition.behaviour().maxStackSize(), definition.behaviour().maxDurability(),
                 definition.display().enchantmentGlint()));
+    }
 
-        registerItemTexture(icon, sprite.texture());
+    /**
+     * Static, single-sheet 3D items share the existing Java -> Bedrock cuboid converter.
+     * Unlike blocks, held items need a Bedrock attachable bound to the equipped item slot.
+     * This does not pretend to port mod-specific animation or logic.
+     *
+     * <p>Reject unsupported models <em>before</em> publishing mappings or writing pack
+     * entries. In particular, rendering multiple Java texture sheets as one Bedrock
+     * attachable would silently use the wrong UVs without an atlas transformation.</p>
+     */
+    private boolean addCustomItem(@NotNull ItemDefinition definition,
+                                  @NotNull ModelDefinition.Custom custom) {
+        Key model = custom.model();
+        Writable source = javaSource.file("assets/" + model.namespace()
+                + "/models/" + model.value() + ".json");
+        if (source == null) {
+            return false;
+        }
+        try {
+            JsonObject javaModel = com.google.gson.JsonParser.parseString(
+                    new String(source.toByteArray(), StandardCharsets.UTF_8)).getAsJsonObject();
+            Key texture = singleSheet(custom, javaModel);
+            if (texture == null) {
+                return false;
+            }
+            if (javaSource.file("assets/" + texture.namespace()
+                    + "/textures/" + texture.value() + ".png") == null) {
+                return false;
+            }
+
+            Key key = definition.key();
+            String geometryId = BedrockGeometry.identifierFor(key.namespace(), key.value());
+            JsonObject geometry = BedrockGeometry.convert(geometryId, javaModel);
+            if (geometry == null) {
+                return false;
+            }
+
+            // Items bind to the holder's equipped slot; blocks do not.
+            JsonObject bone = geometry.getAsJsonArray("minecraft:geometry").get(0)
+                    .getAsJsonObject().getAsJsonArray("bones").get(0).getAsJsonObject();
+            bone.addProperty("binding", "q.item_slot_to_bone_name(context.item_slot)");
+            // Block geometry can name each Java texture slot separately. A held
+            // single-sheet attachable instead has one Material.default, so normalize
+            // all of its converted face material slots to that Bedrock material.
+            for (JsonElement cubeElement : bone.getAsJsonArray("cubes")) {
+                JsonObject faces = cubeElement.getAsJsonObject().getAsJsonObject("uv");
+                if (faces == null) continue;
+                for (var face : faces.entrySet()) {
+                    face.getValue().getAsJsonObject().addProperty("material_instance", "default");
+                }
+            }
+            String shorthand = key.namespace() + "_" + key.value();
+            String icon = definition.bedrock().iconOverride() != null
+                    ? definition.bedrock().iconOverride() : shorthand;
+
+            pack.file("models/entity/" + shorthand + ".geo.json", Json.writable(geometry));
+            pack.file("attachables/" + shorthand + ".json",
+                    Json.writable(BedrockAttachable.heldItem(key, geometryId,
+                            "textures/items/" + icon)));
+            registerItemTexture(icon, texture);
+            registerItem(definition, icon);
+            attachables++;
+            return true;
+        } catch (Exception e) {
+            LOGGER.warning("Cannot convert Bedrock 3D item " + definition.key()
+                    + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Resolve texture aliases from a Java model and Kalo's authored texture overrides.
+     * Only one actual texture sheet can be represented without rebuilding the UV atlas.
+     */
+    private static @Nullable Key singleSheet(@NotNull ModelDefinition.Custom custom,
+                                              @NotNull JsonObject javaModel) {
+        Map<String, String> modelTextures = new TreeMap<>();
+        JsonObject textures = javaModel.getAsJsonObject("textures");
+        if (textures != null) {
+            textures.entrySet().forEach(entry -> {
+                if (entry.getValue().isJsonPrimitive()) {
+                    modelTextures.put(entry.getKey(), entry.getValue().getAsString());
+                }
+            });
+        }
+        Set<Key> used = new HashSet<>();
+        JsonArray elements = javaModel.getAsJsonArray("elements");
+        if (elements == null || elements.isEmpty()) {
+            return null;
+        }
+        for (JsonElement element : elements) {
+            if (!element.isJsonObject()) return null;
+            JsonObject faces = element.getAsJsonObject().getAsJsonObject("faces");
+            if (faces == null) continue;
+            for (var face : faces.entrySet()) {
+                if (!face.getValue().isJsonObject()) return null;
+                JsonElement textureValue = face.getValue().getAsJsonObject().get("texture");
+                if (textureValue == null) continue;
+                Key resolved = resolveTexture(textureValue.getAsString(), custom, modelTextures);
+                if (resolved == null) return null;
+                used.add(resolved);
+                if (used.size() > 1) return null;
+            }
+        }
+
+        // Models without explicit face references can still use a declared single sheet.
+        if (used.isEmpty()) {
+            used.addAll(custom.textures().values());
+            if (used.isEmpty()) {
+                for (String entry : modelTextures.values()) {
+                    Key resolved = resolveTexture(entry, custom, modelTextures);
+                    if (resolved == null) return null;
+                    used.add(resolved);
+                    if (used.size() > 1) return null;
+                }
+            }
+        }
+        return used.size() == 1 ? used.iterator().next() : null;
+    }
+
+    private static @Nullable Key resolveTexture(@NotNull String reference,
+                                                 @NotNull ModelDefinition.Custom custom,
+                                                 @NotNull Map<String, String> modelTextures) {
+        Set<String> visited = new HashSet<>();
+        String value = reference;
+        while (value.startsWith("#")) {
+            String slot = value.substring(1);
+            if (!visited.add(slot)) return null;
+            Key override = custom.textures().get(slot);
+            if (override != null) return override;
+            value = modelTextures.get(slot);
+            if (value == null) return null;
+        }
+        // The model's own namespace is the correct default for an unqualified key.
+        return Key.key(value.contains(":") ? value : custom.model().namespace() + ":" + value);
     }
 
     /**
