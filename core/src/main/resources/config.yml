@@ -21,6 +21,16 @@ base-pack: ""
 #   never  skip Bedrock entirely.
 bedrock: auto
 
+# Optional synchronization into an EXISTING standalone Geyser directory.
+# Keep this empty unless you operate Geyser in a separate process and want
+# Kalo to copy its generated.mcpack and two mapping files automatically.
+# The target directory must contain Geyser's config.yml and packs/ directory.
+# Kalo modifies ONLY packs/kalo-generated.mcpack and custom_mappings/kalo-*.json.
+# Standalone Geyser may need a restart to load changed mappings.
+# bedrock: never always takes precedence over this setting.
+bedrock-standalone:
+  directory: ""
+
 # Runtime performance controller.
 #
 # Kalo has no artificial item/block/furniture count caps. Instead it watches actual server

@@ -16,12 +16,45 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
   handling, no overwrites, and a test suite.
 - Validated CustomModelData frame sequences using entity-region scheduling
   instead of silently applying only the first frame.
+- Optional standalone Geyser local-filesystem synchronization. Copies a
+  generated pack and item/block mapping files to a verified Geyser root,
+  preserving unrelated files and refusing symlink targets.
+- Regression tests for changed/unchanged output, missing inputs and symlinks.
 
 ### Limitations
 
 - Client models and Bedrock animation controllers remain unfinished.
 - Third-party exporters remain lossy and have no public CLI command.
 - Live Bedrock verification of new behavior is still required.
+- This is not cross-process hot reload; standalone Geyser must load
+  its updated mappings and resource packs.
+
+## 0.2.1-prealpha.1
+
+### Changes from v0.2.0
+
+- **Pre-alpha status made explicit** in the README and documentation. Tagged
+  pre-alpha builds now publish as GitHub prereleases, Modrinth alpha releases
+  and Hangar Alpha channel builds rather than silently appearing stable.
+- **Correct Java resource pack format values** for Minecraft 1.21.5 (55),
+  1.21.6 (63), 1.21.7–1.21.8 (64), 1.21.9–1.21.10 (69), and 26.1 (84).
+  These numbers were independently verified from official Minecraft client
+  jars, including source SHA-1 checks. Older verified values are unchanged.
+- Unit tests cover all verified pack formats and preserve fallbacks when Kalo
+  compiles without a running server.
+
+### Pre-alpha limitations
+
+- Kalo is **not stable**. Server operators should back up existing content
+  packs and worlds and test first on a staging Paper/Folia server.
+- Bedrock 3D **custom item** conversion and generic GUI item/animation/export
+  improvements remain in **draft PRs**; they are **not** included in this build.
+- Bedrock **virtual blocks are not rendered** by Geyser, and a separate
+  standalone-Geyser deployment has not been verified end to end.
+- Full real-client verification of the supported Minecraft version range,
+  advanced models and third-party conversions remains unfinished.
+- Mohist/Forge + required client-mod protocol bridging is not part of Kalo
+  Core and is **not supported** by this release.
 
 ## 0.2.0
 
