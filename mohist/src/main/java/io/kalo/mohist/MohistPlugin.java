@@ -24,6 +24,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
+import io.kalo.mohist.content.ContentIndex;
+import io.kalo.mohist.content.ForgeRegistrySnapshot;
+import io.kalo.mohist.content.BridgeHandoff;
 
 /**
  * Spigot 1.20.1-compatible plugin. Does not load Kalo Paper/Folia classes,
@@ -67,6 +70,9 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
         }
         command.setExecutor(this);
         getServer().getPluginManager().registerEvents(this,this);
+        if (getConfig().getBoolean("auto-catalog", true)) {
+            Bukkit.getScheduler().runTaskLater(this, () -> runCatalog(null), 100L);
+        }
         getLogger().info("Kalo Mohist compatibility enabled on "+getServer().getVersion()
                 + " / Java "+System.getProperty("java.version")
                 + " (legacy 2D export only; Forge items and Geyser login are not bridged)");
@@ -97,8 +103,9 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
                 }
             }
             case "scan" -> runScan(sender);
+            case "catalog" -> runCatalog(sender);
             case "export" -> runExport(sender);
-            default -> reply(sender,ChatColor.YELLOW+"Usage: /kalomohist <status|scan|learn|export>");
+            default -> reply(sender,ChatColor.YELLOW+"Usage: /kalomohist <status|scan|catalog|learn|export>");
         }
         return true;
     }
@@ -176,6 +183,49 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
                         "More than one resource pack found. Export will not guess the active one.");
             } catch (IOException invalid) {fail(sender,"Scan",invalid);}
             finally {busy.set(false);}
+        });
+    }
+
+    /**
+     * Collect Forge IDs on the server thread. Asset ZIP processing is entirely
+     * asynchronous and the handoff stays inside the KaloMohist data directory.
+     */
+    private void runCatalog(CommandSender sender) {
+        if (!busy.compareAndSet(false,true)) {
+            if (sender!=null) reply(sender,"Scan or catalog already running");
+            return;
+        }
+        ForgeRegistrySnapshot.Result forge = ForgeRegistrySnapshot.probe(getClass().getClassLoader());
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+            try {
+                var sources = PackSources.discover(root);
+                var inventory = ContentIndex.build(root,sources,forge,getClass().getClassLoader());
+                if (!inventory.complete()) {
+                    if (sender!=null) reply(sender,ChatColor.YELLOW+
+                            "Catalog reached scan limits; previous handoff remains unchanged");
+                    getLogger().warning("Catalog incomplete; no new bridge handoff published");
+                    return;
+                }
+                Path output = getDataFolder().toPath().resolve("exports");
+                ContentIndex.write(output.resolve("kalo-content-index.json"),inventory);
+                boolean hasLegacy = java.nio.file.Files.isRegularFile(
+                        output.resolve("kalo-mohist-generated.mcpack"))
+                        && java.nio.file.Files.isRegularFile(
+                        output.resolve("kalo-mohist-items.json"));
+                BridgeHandoff.write(output.resolve("kalo-bridge-handoff.json"), inventory,hasLegacy);
+                if (sender!=null) reply(sender,ChatColor.GREEN+"Indexed "
+                        +inventory.assets().size()+" asset entries and "+inventory.registryLinks().size()
+                        +" Forge registry entries. Exported read-only bridge handoff.");
+                getLogger().info("Kalo catalog: "+inventory.assets().size()+" asset entries, "
+                        +inventory.registryLinks().size()+" Forge IDs; handoff generated");
+                for(String warning:inventory.warnings().stream().limit(6).toList())
+                    getLogger().warning("Catalog: "+warning);
+            } catch (IOException|RuntimeException invalid) {
+                getLogger().log(Level.WARNING,"Content inventory unavailable",invalid);
+                if (sender!=null) reply(sender,ChatColor.RED+"Catalog failed: "+invalid.getMessage());
+            } finally {
+                busy.set(false);
+            }
         });
     }
 

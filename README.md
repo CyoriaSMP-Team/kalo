@@ -270,9 +270,12 @@ A separate Java-17-bytecode Bukkit 1.20.1 compatibility module is located
 in mohist/ and builds Kalo-Mohist-<version>.jar. It is suitable for a Java 21
 runtime, such as the current DeadZone server, without changing its Java version.
 
-It discovers local Java resource packs and mod asset jars, observes legacy
-CustomModelData on vanilla carrier items, and exports an experimental flat
-2D Bedrock pack and Geyser legacy mapping. It does not port the native
+It discovers Java resource packs and mod asset jars, catalogs Minecraft
+namespace-based models/textures/animation metadata and Forge registry IDs,
+observes legacy CustomModelData on vanilla carrier items, and exports
+experimental 2D plus limited single-sheet static 3D Bedrock assets and
+Geyser legacy mappings. A versioned JSON inventory and handoff allows
+additional bridge or mod adapters without hardcoding TaCZ. It does not port the native
 Kalo content engine or bridge Forge/TaCZ gameplay. See docs/MOHIST_1201.md.
 
 ## External Java resource packs (experimental)
