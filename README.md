@@ -37,6 +37,8 @@ translation. That is the thing Kalo exists to do.
 > verified on Paper 26.2 + Folia. Virtual blocks have a persistent index, chunk
 > load/unload, explosion handling and a `/kalo migrate-world` dry-run.
 >
+> **Experimental Bedrock 3D:** Static Java cuboid models now have generated Bedrock geometry and held-item attachables. Real Bedrock-client validation of 3D rendering is still pending.
+>
 > **Bedrock is verified by a Bedrock player**, on a live server running Geyser and
 > Floodgate: custom item icons, native blocks placed and mined, and worn armor all render.
 > One thing does not, and cannot — see [the roadmap](#roadmap) for that and for everything

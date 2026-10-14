@@ -10,6 +10,12 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 ### Added
 
+- Experimental static 3D custom item compilation for Bedrock: geometry,
+  held-item attachables, provisional texture icon and Geyser v2 mappings.
+  Single- and multi-sheet static items can resolve model and authored texture
+  aliases; multi-sheet cuboids use a deterministic UV atlas. Parent model
+  geometry/texture overrides and standard held-item view animations are supported.
+- Tests for output, mappings, aliases, and unsupported texture combinations.
 - GUI references to Kalo content keys, usable with
   `/kalo gui open <player> <gui>`. Repaired InventoryHolder registration.
 - `/kalo export kalopack <pack>`: deterministic ZIP with safe output
@@ -23,6 +29,10 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 ### Limitations
 
+- Live Bedrock client rendering remains unverified. Full Java display transforms,
+  rigged/animated models, mixed-size texture sheets and 3D inventory previews
+  are still unsupported or incomplete.
+- This does not solve Forge login or mod-specific gameplay protocols.
 - Client models and Bedrock animation controllers remain unfinished.
 - Third-party exporters remain lossy and have no public CLI command.
 - Live Bedrock verification of new behavior is still required.
