@@ -6,6 +6,22 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Fixed
+
+- Folia-safe mana regeneration: a single global coordinator runs every second
+  and schedules player-specific updates on each player's own entity scheduler.
+  The old per-definition BukkitRunnable multiplied mana regeneration when
+  several custom items declared the cooldown feature.
+- Regen delay starts when mana is consumed. Bounds-check mana configuration
+  and prevent negative/infinite state from reaching UI updates.
+
+### Still pending
+
+- Live Folia/Paper multi-player validation and broader feature-scheduler audit.
+  Mana remains a shared player pool, not one independent pool per item.
+
 ## 0.2.1-prealpha.1
 
 ### Changes from v0.2.0
