@@ -13,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Production-ready cooldown and mana system with MMOItems-level complexity.
@@ -57,6 +58,27 @@ public final class CooldownFeature extends Feature {
     
     // Mana regen tracking: player UUID -> last regen time
     private static final Map<UUID, Long> manaRegenTime = new ConcurrentHashMap<>();
+    // A single task for the entire plugin: previously each content definition
+    // started its own BukkitRunnable and each task regenerated every player's mana.
+    private static final AtomicBoolean regenScheduled = new AtomicBoolean();
+    private static volatile ManaSettings settings = new ManaSettings(100.0, 1.0, 20L);
+
+    record ManaSettings(double maxMana, double regenPerSecond, long delayTicks) {
+        ManaSettings {
+            if (!Double.isFinite(maxMana) || maxMana <= 0) throw new IllegalArgumentException("max mana must be >0");
+            if (!Double.isFinite(regenPerSecond) || regenPerSecond < 0) throw new IllegalArgumentException("regen must be finite and >=0");
+            if (delayTicks < 0 || delayTicks > 1728000L)
+                throw new IllegalArgumentException("mana delay must be 0..1728000 ticks");
+        }
+
+        double afterTick(double current, long lastRegenMillis, long nowMillis) {
+            if (!Double.isFinite(current)) return maxMana;
+            if (nowMillis - lastRegenMillis < delayTicks * 50L) {
+                return Math.clamp(current, 0, maxMana);
+            }
+            return Math.min(maxMana, Math.max(0, current) + regenPerSecond);
+        }
+    }
 
     private CooldownFeature(@NotNull FeatureFactory.Context context) {
         super(context);
@@ -95,45 +117,59 @@ public final class CooldownFeature extends Feature {
     }
 
     /**
-     * Start mana regen task.
+     * Folia-safe mana regeneration: one global coordinator schedules the
+     * actual player state/ActionBar work on that player's own region/entity.
+     * No BukkitRunnable and no cross-region player mutation.
      */
     private void startManaRegenTask(@NotNull Map<String, String> args) {
-        double manaRegen = parseDouble(args.get("mana_regen"), 1.0);
+        double maxMana = parseDouble(args.get("mana"), 100.0);
+        double regenPerSecond = parseDouble(args.get("mana_regen"), 1.0);
         long regenDelay = parseLong(args.get("mana_regen_delay"), 20);
-        
-        if (manaRegen <= 0) return;
-        
-        new org.bukkit.scheduler.BukkitRunnable() {
-            @Override
-            public void run() {
-                long now = System.currentTimeMillis();
-                
-                for (Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    UUID playerUUID = player.getUniqueId();
-                    double maxMana = parseDouble(args.get("mana"), 100.0);
-                    double currentMana = mana.getOrDefault(playerUUID, maxMana);
-                    
-                    if (currentMana < maxMana) {
-                        // Check regen delay
-                        Long lastRegen = manaRegenTime.get(playerUUID);
-                        if (lastRegen == null || now - lastRegen >= regenDelay * 50) {
-                            double newMana = Math.min(maxMana, currentMana + manaRegen);
-                            mana.put(playerUUID, newMana);
-                            manaRegenTime.put(playerUUID, now);
-                            
-                            // Update action bar
-                            updateManaDisplay(player, newMana, maxMana);
-                        }
-                    }
-                }
+        ManaSettings requested;
+        try {
+            requested = new ManaSettings(maxMana, regenPerSecond, regenDelay);
+        } catch (IllegalArgumentException invalid) {
+            Plugins.logger().warning("Invalid mana regeneration settings: " + invalid.getMessage());
+            return;
+        }
+        // Current Kalo mana is a shared pool, not one pool per custom item.
+        // Make conflicting definitions visible and don't multiply regen tasks.
+        if (regenScheduled.get() && !settings.equals(requested)) {
+            Plugins.logger().warning("Conflicting Kalo mana settings: all content shares one"
+                    + " player mana pool; using last-loaded configuration");
+        }
+        settings = requested;
+        if (requested.regenPerSecond() <= 0 || !regenScheduled.compareAndSet(false, true)) {
+            return;
+        }
+
+        Bukkit.getGlobalRegionScheduler().runAtFixedRate(Plugins.plugin(), task -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                player.getScheduler().execute(Plugins.plugin(),
+                        () -> regenerateOnPlayerRegion(player),
+                        null, 1L);
             }
-        }.runTaskTimer((org.bukkit.plugin.java.JavaPlugin) io.kalo.Kalo.plugin(), 0L, 20L);
+        }, 20L, 20L);
+    }
+
+    private static void regenerateOnPlayerRegion(@NotNull Player player) {
+        if (!player.isOnline()) return;
+        ManaSettings config = settings;
+        if (config.regenPerSecond() <= 0) return;
+        UUID id = player.getUniqueId();
+        double current = mana.getOrDefault(id, config.maxMana());
+        long now = System.currentTimeMillis();
+        double next = config.afterTick(current, manaRegenTime.getOrDefault(id, 0L), now);
+        if (next <= current) return;
+        mana.put(id, next);
+        manaRegenTime.put(id, now);
+        updateManaDisplay(player, next, config.maxMana());
     }
 
     /**
      * Update mana display.
      */
-    private void updateManaDisplay(@NotNull Player player, double currentMana, double maxMana) {
+    private static void updateManaDisplay(@NotNull Player player, double currentMana, double maxMana) {
         int bars = 20;
         int filled = (int) (currentMana / maxMana * bars);
         StringBuilder bar = new StringBuilder("§9Mana: ");
@@ -193,6 +229,8 @@ public final class CooldownFeature extends Feature {
         UUID playerUUID = player.getUniqueId();
         double currentMana = mana.getOrDefault(playerUUID, 100.0);
         mana.put(playerUUID, Math.max(0, currentMana - amount));
+        // Regen delay starts after spending mana, not after a previous regen.
+        manaRegenTime.put(playerUUID, System.currentTimeMillis());
     }
 
     /**
