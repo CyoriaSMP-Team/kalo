@@ -21,7 +21,9 @@ Kalo owned the original gameplay item or block.
   composite), legacy item model overrides, possible block-state overrides,
   texture images, namespace sounds.json and language files.
 - Returns immutable inventories of candidates, sorted by asset path.
-- No on-disk extraction, runtime registration, commands or world changes.
+- Operator command: /kalo inspect-pack <filename>. Reads only files directly in
+  plugins/Kalo/imports/, rejects path escapes/symlinks, and scans asynchronously.
+- No on-disk extraction, runtime registration, converter deployment or world changes.
 - Archive, entry count and JSON size limits; rejects dangerous ZIP paths.
 - Tests cover model kinds, malformed JSON, zip traversal and oversized JSON.
 
@@ -72,7 +74,8 @@ the server can supply the identities.
 
 - Native mode remains default. External inspection/conversion stays off until
   explicitly selected by the server operator.
-- Phase 1 does not modify existing Kalo commands, registries or pack builders.
+- Phase 1 adds a new permission-gated read-only inspect-pack command but does not
+  modify existing Kalo commands, registries or pack builders.
 - Require a dry run and validate all identifiers before committing conversion
   outputs. Reject silent overlap with existing Kalo mappings.
 - Respect current pre-alpha and Geyser virtual-block limitations.
