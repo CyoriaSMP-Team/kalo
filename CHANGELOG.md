@@ -6,6 +6,23 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- Independent Java 17-compatible Mohist/Bukkit 1.20.1 adapter, also runnable
+  on DeadZone's Java 21. This is a separate jar, not the Paper Kalo plugin.
+- Read-only resource-pack and Forge-jar asset discovery; old CustomModelData
+  observations, optional opt-in auto-learn, flat 2D Bedrock pack and
+  experimental legacy Geyser mapping exports.
+- Module-specific archive safety limits and deterministic fixture tests.
+
+### Limitations
+
+- No native Kalo engine on Mohist, Forge/TaCZ protocol conversion, 3D item
+  rendering or hot-loaded Geyser custom items. No live Bedrock-client
+  validation, production deployment or server restart has been performed.
+
 ## 0.2.1-prealpha.5
 
 ### Added

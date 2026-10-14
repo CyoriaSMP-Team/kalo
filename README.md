@@ -264,6 +264,17 @@ model:
 | `/kalo learn-held` | `kalo.command.learn-held` |
 | `/kalo discover-packs` | `kalo.command.discover-packs` |
 
+## Mohist / DeadZone compatibility (experimental)
+
+A separate Java-17-bytecode Bukkit 1.20.1 compatibility module is located
+in mohist/ and builds Kalo-Mohist-<version>.jar. It is suitable for a Java 21
+runtime, such as the current DeadZone server, without changing its Java version.
+
+It discovers local Java resource packs and mod asset jars, observes legacy
+CustomModelData on vanilla carrier items, and exports an experimental flat
+2D Bedrock pack and Geyser legacy mapping. It does not port the native
+Kalo content engine or bridge Forge/TaCZ gameplay. See docs/MOHIST_1201.md.
+
 ## External Java resource packs (experimental)
 
 Kalo can now observe an existing server ItemStack's Java item_model component

@@ -44,6 +44,24 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Mohist 1.20.1 jar targets Java 17
+        run: |
+          jar=$(ls mohist/build/libs/Kalo-Mohist-*.jar)
+          major=$(unzip -p "$jar" io/kalo/mohist/MohistPlugin.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          echo "$jar reports class file major version $major"
+          if [ "$major" != "61" ]; then
+            echo "::error::Expected major 61 (Java 17) for Mohist 1.20.1; got $major."
+            exit 1
+          fi
+
+      - name: Upload experimental Mohist compatibility jar
+        if: matrix.java == '21'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kalo-Mohist-1.20.1-Experimental
+          path: mohist/build/libs/Kalo-Mohist-*.jar
+          if-no-files-found: error
+
       - name: Run performance macro benchmark
         run: ./gradlew :core:performanceBenchmark --stacktrace
 
