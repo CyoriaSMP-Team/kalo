@@ -100,6 +100,11 @@ public final class CommandManager implements Managerial {
                 .permission(Permission.of(PERMISSION_PREFIX + "doctor"))
                 .handler(ctx -> runDoctor(ctx.sender().getSender())));
 
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("learn-held")
+                .permission(Permission.of(PERMISSION_PREFIX + "learn-held"))
+                .handler(ctx -> runLearnHeld(context.plugin(), ctx.sender().getSender())));
+
         // Hybrid importer phase 1: safe, read-only scan; native content remains unchanged.
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("inspect-pack")
@@ -232,6 +237,66 @@ public final class CommandManager implements Managerial {
      * Inspect only a local pack in plugins/Kalo/imports. Never accept arbitrary
      * filesystem paths through a game command or replace a running pack here.
      */
+    /**
+     * Learn a real Java item_model/material pair from the operator's main hand.
+     * The actual Bukkit inventory and metadata are only read on the player's
+     * entity scheduler; disk I/O is off-thread. No live palette mutation occurs.
+     */
+    private static void runLearnHeld(@NotNull Plugin plugin, @NotNull CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can capture their held item",
+                    NamedTextColor.RED));
+            return;
+        }
+        Runnable retired = () -> sender.sendMessage(Component.text(
+                "Could not capture item because the player is offline", NamedTextColor.RED));
+        if (!player.getScheduler().execute(plugin, () -> {
+            org.bukkit.inventory.ItemStack held = player.getInventory().getItemInMainHand();
+            if (held.getType().isAir() || !held.hasItemMeta()
+                    || !held.getItemMeta().hasItemModel()) {
+                player.sendMessage(Component.text(
+                        "Hold a Java item with an item_model component (legacy CustomModelData"
+                                + " without item_model is not supported yet)", NamedTextColor.YELLOW));
+                return;
+            }
+            org.bukkit.NamespacedKey model = held.getItemMeta().getItemModel();
+            if (model == null) return;
+            io.kalo.converter.ExternalItemBindings.Binding observed;
+            try {
+                observed = new io.kalo.converter.ExternalItemBindings.Binding(
+                        net.kyori.adventure.key.Key.key(model.getNamespace(), model.getKey()),
+                        held.getType(), Math.min(99, held.getMaxStackSize()));
+            } catch (IllegalArgumentException invalid) {
+                player.sendMessage(Component.text("Unsupported held item: "
+                        + invalid.getMessage(), NamedTextColor.RED));
+                return;
+            }
+            java.nio.file.Path destination = Constants.dataFolder().toPath().resolve("external-items.yml");
+            player.sendMessage(Component.text("Saving observed item model "
+                    + observed.itemModel() + " for the next Geyser startup...",
+                    NamedTextColor.YELLOW));
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    io.kalo.converter.ExternalItemBindings.remember(destination, observed);
+                } catch (java.io.IOException failed) {
+                    throw new java.util.concurrent.CompletionException(failed);
+                }
+            }).whenComplete((unused, failed) -> player.getScheduler().execute(plugin, () -> {
+                if (failed == null) {
+                    player.sendMessage(Component.text(
+                            "Saved " + observed.itemModel() + " (" + observed.material() + "). "
+                            + "Set external-content.enabled: true, configure base-pack and "
+                            + "restart the server for Geyser to register it.",
+                            NamedTextColor.GREEN));
+                } else {
+                    Plugins.logger().log(Level.WARNING, "Could not save external item binding", failed);
+                    player.sendMessage(Component.text("Failed to save external binding; see console",
+                            NamedTextColor.RED));
+                }
+            }, null, 1L));
+        }, retired, 1L)) retired.run();
+    }
+
     private static void runInspectPack(@NotNull Context context,
                                        @NotNull CommandSender sender,
                                        @NotNull String filename) {

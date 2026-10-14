@@ -31,27 +31,48 @@ These files are CANDIDATES. A resource pack can contain item model definitions
 never used by the server. A blockstates file may simply retexture vanilla.
 No successful Geyser mapping is claimed by the scanner.
 
-## Phase 2: associations and Geyser mappings
+## Phase 2: opt-in observed item models (implemented, pre-alpha)
 
-1. Configure a local source pack explicitly. Do not accept untrusted arbitrary
-   paths or remote URLs from players.
-2. Collect actual runtime item identity from server-visible ItemStacks,
-   including item_model, custom_model_data and predicates. Inspect server block
-   states using Paper/Folia-safe scheduling.
-3. Build a separate ExternalContentDefinition, not a Kalo-owned item.
-   Unknown identities are reported rather than guessed.
-4. Compile external content into Bedrock assets and Geyser mappings. Merge into
-   BedrockRegistrationSnapshot after collision/validation checks. Keep existing
-   native IDs authoritative by default; report conflicts.
-5. Support dry-run results (mapped/partial/unsupported), deterministic builds
-   and atomic publish, retaining the prior working generation on failure.
+Kalo reuses BedrockPackCompiler and BedrockRegistrationSnapshot; it does not
+register gameplay content, overwrite native definitions, or generate a second
+pack and mapping file.
 
-This differs from current YAML importers for Oraxen/ItemsAdder/Neko/etc:
-external conversion does not claim ownership of the gameplay mechanics.
+### Setup
+
+1. Configure base-pack: my-server-pack.zip with the Java resource pack
+   supplying existing custom items. Kalo merges it into generated.zip.
+2. Set external-content.enabled: true. Optional: auto-learn: true under
+   external-content to observe server-visible player inventories and GUI menus.
+3. Hold an authored Java item and run /kalo learn-held (permission
+   kalo.command.learn-held). Kalo reads its item_model namespaced key,
+   underlying Java material and max stack size on the player's entity scheduler.
+   An IO worker saves observations to plugins/Kalo/external-items.yml.
+4. Restart Geyser/server. Kalo resolves the Java assets for each stored
+   identity and compiles a sprite or static 3D item to Bedrock.
+5. Geyser receives the existing single generated pack and mappings from Kalo.
+   For standalone Geyser use the existing sync and restart its process.
+
+Unsupported, ambiguous or missing assets are logged and not registered.
+Native item and block model IDs take priority. The original Java plugin
+continues to own all gameplay behaviour. Everything is off by default.
+
+### Important limitations
+
+- New registrations require a Geyser/server restart; they cannot hot-reload
+  into the frozen item palette.
+- Only plain item-model declarations with 2D generated/handheld sprites
+  or supported static cuboid 3D are currently mapped.
+- Condition/range/select and legacy-only CustomModelData IDs, external block
+  mappings, skulls, waypoint styles, complex animations and client-only packs
+  still need separate implementations.
+- Auto-learn records server-visible items. Client-only resource packs and mods
+  remain invisible to this plugin.
+- Integration has compiler/unit tests, not yet real Bedrock client verification.
+  No full Rainbow parity is claimed.
 
 ## Phase 3: rendering and predicates
 
-- Reuse Draft PR #2 for experimental static 3D geometry, parent models and
+- Reuse the merged static 3D geometry path for experimental conversion, parent models and
   atlases. Do not fork the geometry pipeline.
 - Add condition/range/select item-model dispatch and the corresponding Geyser
   predicate mappings.
@@ -76,8 +97,9 @@ the server can supply the identities.
   explicitly selected by the server operator.
 - Phase 1 adds a new permission-gated read-only inspect-pack command but does not
   modify existing Kalo commands, registries or pack builders.
-- Require a dry run and validate all identifiers before committing conversion
-  outputs. Reject silent overlap with existing Kalo mappings.
+- Validate external model identities and required assets before registering them.
+  Reject silent overlap with existing Kalo mappings; broader dry-run support
+  is still planned.
 - Respect current pre-alpha and Geyser virtual-block limitations.
 - Rainbow is a feature and format reference, NOT a code dependency. Kalo uses
   MIT; Rainbow has LGPL/GPL code. Use independent implementations of documented
@@ -92,5 +114,6 @@ the server can supply the identities.
 4. Each asset family verified on Java and Bedrock clients before claiming it.
 5. A failed conversion does not replace the last working pack.
 
-STATUS: Only the read-only scanner and its tests are implemented in this
-branch. Full Rainbow-equivalent conversion is NOT implemented here.
+STATUS: Phase 1 scanner and opt-in phase 2 plain-item conversion are
+implemented. Full Rainbow parity and real Bedrock client validation are not
+complete. No Fabric companion is shipped.

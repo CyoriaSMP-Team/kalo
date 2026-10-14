@@ -6,6 +6,27 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- Opt-in existing Java item_model mapping into Kalo's Bedrock/Geyser output,
+  resolving plain 2D sprites and supported static 3D models from a base Java pack.
+  Uses real ItemStack material/model observations rather than inventing mappings
+  from every unused resource-pack asset.
+- /kalo learn-held records observed item models for the next Geyser startup.
+  Optional region-safe auto-learn observes server-visible inventory/GUI items.
+- External mapping persistence, validation, native-ID collision protection,
+  and regression tests. Native Kalo output stays unchanged by default.
+
+### Limitations
+
+- Newly observed models require a Geyser/server restart; mapping changes
+  cannot be hot-reloaded into Geyser's frozen item palette.
+- Predicate-driven/legacy-only models, animated items, external custom blocks
+  and client-only resource packs are not supported by this increment.
+- Real Bedrock client validation of these external mappings remains pending.
+
 ## 0.2.1-prealpha.2
 
 ### Added

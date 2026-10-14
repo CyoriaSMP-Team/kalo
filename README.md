@@ -260,6 +260,32 @@ model:
 | `/kalo migrate-world` | `kalo.command.migrate` |
 | `/kalo gui open <player> <namespace:gui>` | `kalo.command.gui` |
 | `/kalo export kalopack <pack>` | `kalo.command.export` |
+| `/kalo inspect-pack <filename>` | `kalo.command.inspect-pack` |
+| `/kalo learn-held` | `kalo.command.learn-held` |
+
+## External Java resource packs (experimental)
+
+Kalo can now observe an existing server ItemStack's Java item_model component
+and convert a matching plain model from an authored Java resource pack to a
+Bedrock Geyser v2 mapping. This is in addition to, not a replacement for,
+Kalo's own YAML item/block engine.
+
+1. Supply the Java ZIP in base-pack (relative to plugins/Kalo/), so Java
+   players get the same source assets.
+2. Set external-content.enabled: true in plugins/Kalo/config.yml.
+3. Hold an existing custom Java item and run /kalo learn-held. This saves its
+   observed material and item-model ID to plugins/Kalo/external-items.yml.
+   Alternatively enable external-content.auto-learn: true to inspect
+   server-visible inventories and GUI menus automatically.
+4. Restart the server/Geyser to register new mappings; /kalo reload alone
+   cannot change Geyser's frozen custom-item palette.
+
+Supported: flat generated/handheld item sprites and static cuboid 3D models
+already supported by Kalo's Bedrock compiler. Conditional/range/select models,
+legacy-only CustomModelData, animations, external block mappings, client-only
+packs and mod-specific protocols are not automatically converted. Missing or
+colliding assets are reported and skipped. The opt-in feature remains pre-alpha
+and requires Bedrock-client verification. See docs/HYBRID_CONVERTER.md.
 
 ## Portable KaloPack export
 
