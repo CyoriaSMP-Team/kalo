@@ -43,9 +43,10 @@ Java 21 bytecode, then publishes to:
 | GitHub Releases | `gh release create` | nothing — uses the workflow token |
 | Modrinth | `POST /v2/version` | secret `MODRINTH_TOKEN`, variable `MODRINTH_PROJECT_ID` |
 | Hangar | `POST /api/v1/projects/{slug}/upload` | secret `HANGAR_TOKEN`, variable `HANGAR_SLUG` |
+| MCMall | optional `PATCH/POST /api/v1/products` workflow | secret `MCMALL_API_KEY`, variable `MCMALL_PRODUCT_ID` |
 | SpigotMC | **manual** | see below |
 
-Modrinth and Hangar are **skipped, not failed**, when their secret is absent, so the
+Modrinth, Hangar and MCMall are **skipped, not failed**, when their required credentials or variables are absent, so the
 workflow is useful before either account exists. Both read the supported Minecraft
 versions from the repository variable `SUPPORTED_GAME_VERSIONS`, a JSON array — for
 example `["1.21.4","26.1","26.2"]`. Keep it in step with the README's badge.

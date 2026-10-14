@@ -1,15 +1,20 @@
 # Changelog
 
-Kalo is distributed through four channels, each of which wants its own release notes.
+Kalo is distributed through multiple channels, each of which wants its own release notes.
 This file is the one place they are written; the release workflow reads the section for
 the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
-## Unreleased
+## 0.2.1-prealpha.2
 
 ### Added
 
+- Hybrid Java resource-pack inspection (phase 1): `/kalo inspect-pack <filename>`
+  indexes item-model candidates, blockstates, textures, sounds, and locales from
+  a local ZIP without modifying Kalo items or live Geyser mappings.
+- Optional MCMall publishing integration in the release workflow; publishing
+  requires both MCMALL_API_KEY and MCMALL_PRODUCT_ID.
 - Experimental static 3D custom item compilation for Bedrock: geometry,
   held-item attachables, provisional texture icon and Geyser v2 mappings.
   Single- and multi-sheet static items can resolve model and authored texture
@@ -43,6 +48,8 @@ Versions follow `plugin_version` in `gradle.properties`, and a tag must match it
 
 ### Limitations
 
+- Hybrid inspection does not yet convert external packs into Bedrock mappings,
+  import external runtime item identities, or provide Rainbow feature parity.
 - Live Bedrock client rendering remains unverified. Full Java display transforms,
   rigged/animated models, mixed-size texture sheets and 3D inventory previews
   are still unsupported or incomplete.
