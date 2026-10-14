@@ -1,6 +1,7 @@
 package io.kalo.manager;
 
 import io.kalo.Kalo;
+import io.kalo.converter.JavaResourcePackScanner;
 import io.kalo.migration.ImportReport;
 import io.kalo.migration.Importer;
 import io.kalo.migration.Importers;
@@ -63,6 +64,13 @@ public final class CommandManager implements Managerial {
                 .literal("doctor")
                 .permission(Permission.of(PERMISSION_PREFIX + "doctor"))
                 .handler(ctx -> runDoctor(ctx.sender().getSender())));
+
+        // Hybrid importer phase 1: safe, read-only scan; native content remains unchanged.
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("inspect-pack")
+                .permission(Permission.of(PERMISSION_PREFIX + "inspect-pack"))
+                .required("filename", StringParser.stringParser())
+                .handler(ctx -> runInspectPack(context, ctx.sender().getSender(), ctx.get("filename"))));
 
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("migrate-world")
@@ -145,6 +153,80 @@ public final class CommandManager implements Managerial {
                                 .orElseGet(() -> registries.armor().get(key)
                                         .map(armor -> armor.itemStack().get())
                                         .orElse(null))));
+    }
+
+    /**
+     * Inspect only a local pack in plugins/Kalo/imports. Never accept arbitrary
+     * filesystem paths through a game command or replace a running pack here.
+     */
+    private static void runInspectPack(@NotNull Context context,
+                                       @NotNull CommandSender sender,
+                                       @NotNull String filename) {
+        if (!filename.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,100}\\.zip")
+                || filename.contains("..")) {
+            sender.sendMessage(Component.text(
+                    "Use a .zip filename in plugins/Kalo/imports/ (no directories)",
+                    NamedTextColor.RED));
+            return;
+        }
+
+        java.nio.file.Path source;
+        try {
+            java.nio.file.Path imports = Constants.dataFolder().toPath().resolve("imports");
+            Files.createDirectories(imports);
+            source = imports.resolve(filename);
+            if (!Files.isRegularFile(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    || !source.toRealPath().getParent().equals(imports.toRealPath())) {
+                sender.sendMessage(Component.text(
+                        "Pack not found in plugins/Kalo/imports/: " + filename, NamedTextColor.RED));
+                return;
+            }
+        } catch (java.io.IOException exception) {
+            sender.sendMessage(Component.text(
+                    "Could not access pack folder: " + messageOf(exception), NamedTextColor.RED));
+            return;
+        }
+
+        sender.sendMessage(Component.text("Inspecting " + filename
+                + " (read-only; nothing will be imported)...", NamedTextColor.YELLOW));
+        java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                return JavaResourcePackScanner.scan(source);
+            } catch (java.io.IOException exception) {
+                throw new java.util.concurrent.CompletionException(exception);
+            }
+        }).whenComplete((report, failure) -> {
+            Runnable reply = () -> {
+                if (failure != null) {
+                    Plugins.logger().log(Level.WARNING, "Java pack inspection failed", failure);
+                    sender.sendMessage(Component.text(
+                            "Pack inspection failed: " + messageOf(failure), NamedTextColor.RED));
+                    return;
+                }
+                sender.sendMessage(Component.text("Candidate assets in " + filename + ": "
+                        + report.itemModels().size() + " item models, "
+                        + report.blockStateCandidates().size() + " blockstates, "
+                        + report.texturePaths().size() + " textures, "
+                        + report.soundDefinitions().size() + " sound registries, "
+                        + report.languageFiles().size() + " language files",
+                        NamedTextColor.AQUA));
+                sender.sendMessage(Component.text(
+                        "Candidates are not verified custom items/blocks; no Geyser mappings were installed.",
+                        NamedTextColor.GRAY));
+                report.warnings().stream().limit(5).forEach(warning ->
+                        sender.sendMessage(Component.text("  Warning: " + warning, NamedTextColor.YELLOW)));
+                if (report.warnings().size() > 5) {
+                    sender.sendMessage(Component.text(
+                            "  ... plus " + (report.warnings().size() - 5) + " more warnings",
+                            NamedTextColor.YELLOW));
+                }
+            };
+            if (sender instanceof Player player) {
+                player.getScheduler().execute(context.plugin(), reply, () -> {}, 1L);
+            } else {
+                context.plugin().getServer().getGlobalRegionScheduler().execute(context.plugin(), reply);
+            }
+        });
     }
 
     private static void runDoctor(@NotNull CommandSender sender) {
