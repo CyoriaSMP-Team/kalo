@@ -6,6 +6,26 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- Java item-model selector conversion (condition, range dispatch, select) with
+  bounded expansion, mutually exclusive Geyser v2 predicates, stable variant
+  Bedrock identifiers and shared JSON/native API registration.
+- Legacy CustomModelData observation/persistence plus conservative legacy
+  model-override compilation to Bedrock through the existing Kalo compiler.
+- Regression tests for selector fallbacks, negative conditions, range intervals,
+  duplicate thresholds, legacy source overrides and mapping parity.
+
+### Limitations
+
+- No animated texture conversion, external block override mapping, composite
+  rendering, skulls, custom waypoints or automatic client-only resource pack
+  collection. Geyser/Bedrock real-client verification is still pending.
+- Existing gameplay and native Kalo definitions are unchanged by default;
+  these features require external-content.enabled and a matching base pack.
+
 ## 0.2.1-prealpha.3
 
 ### Added

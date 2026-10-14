@@ -165,6 +165,17 @@ public final class GeyserBridge {
         int registered = 0;
         for (BedrockItemRegistration item : snapshot.get().items()) {
             try {
+                if (item.legacyCustomModelData() != null) {
+                    var options = org.geysermc.geyser.api.item.custom.CustomItemOptions.builder()
+                            .customModelData(item.legacyCustomModelData()).build();
+                    var builder = org.geysermc.geyser.api.item.custom.CustomItemData.builder()
+                            .name(item.bedrockIdentifier().replace(':', '_'))
+                            .icon(item.icon())
+                            .customItemOptions(options);
+                    if (item.displayName() != null) builder.displayName(item.displayName());
+                    if (event.register(item.javaItem(), builder.build())) registered++;
+                    continue;
+                }
                 CustomItemDefinition.Builder custom = CustomItemDefinition.builder(
                                 Identifier.of(item.bedrockIdentifier()), Identifier.of(item.model()))
                         .bedrockOptions(CustomItemBedrockOptions.builder().icon(item.icon()))
@@ -179,6 +190,14 @@ public final class GeyserBridge {
                 if (item.enchantmentGlint()) {
                     custom.component(JavaItemDataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
                 }
+                // These are exactly the predicate objects that the standalone JSON
+                // exporter received from the compiler. No second interpretation.
+                for (var predicate : item.predicates()) {
+                    custom.predicate(asGeyserPredicate(predicate));
+                }
+                if (item.predicates().size() > 1) {
+                    custom.predicateStrategy(org.geysermc.geyser.api.predicate.PredicateStrategy.AND);
+                }
 
                 event.register(Identifier.of(item.javaItem()), custom.build());
                 registered++;
@@ -189,6 +208,69 @@ public final class GeyserBridge {
         }
 
         Plugins.logger().info("Registered " + registered + " item(s) with Geyser natively");
+    }
+
+    private static org.geysermc.geyser.api.predicate.MinecraftPredicate<
+            ? super org.geysermc.geyser.api.predicate.context.item.ItemPredicateContext>
+            asGeyserPredicate(io.kalo.converter.ExternalModelPredicate predicate) {
+        var result = switch (predicate.kind()) {
+            case CONDITION -> switch (predicate.property()) {
+                case "broken" -> org.geysermc.geyser.api.predicate.item.ItemConditionPredicate.BROKEN;
+                case "damaged" -> org.geysermc.geyser.api.predicate.item.ItemConditionPredicate.DAMAGED;
+                case "fishing_rod_cast" ->
+                        org.geysermc.geyser.api.predicate.item.ItemConditionPredicate.FISHING_ROD_CAST;
+                case "custom_model_data" ->
+                        org.geysermc.geyser.api.predicate.item.ItemConditionPredicate.customModelData(predicate.index());
+                case "has_component" ->
+                        org.geysermc.geyser.api.predicate.item.ItemConditionPredicate.hasComponent(
+                                Identifier.of(predicate.value()));
+                default -> throw new IllegalArgumentException("Unsupported condition " + predicate.property());
+            };
+            case RANGE -> switch (predicate.property()) {
+                case "custom_model_data" ->
+                        org.geysermc.geyser.api.predicate.item.ItemRangeDispatchPredicate.customModelData(
+                                predicate.index(), predicate.threshold().floatValue());
+                case "count" -> predicate.normalize()
+                        ? org.geysermc.geyser.api.predicate.item.ItemRangeDispatchPredicate.normalizedCount(
+                                predicate.threshold())
+                        : org.geysermc.geyser.api.predicate.item.ItemRangeDispatchPredicate.count(
+                                (int) Math.ceil(predicate.threshold()));
+                case "damage" -> predicate.normalize()
+                        ? org.geysermc.geyser.api.predicate.item.ItemRangeDispatchPredicate.normalizedDamage(
+                                predicate.threshold())
+                        : org.geysermc.geyser.api.predicate.item.ItemRangeDispatchPredicate.damage(
+                                (int) Math.ceil(predicate.threshold()));
+                case "bundle_fullness" ->
+                        org.geysermc.geyser.api.predicate.item.ItemRangeDispatchPredicate.bundleFullness(
+                                predicate.threshold());
+                default -> throw new IllegalArgumentException("Unsupported range " + predicate.property());
+            };
+            case MATCH -> switch (predicate.property()) {
+                case "custom_model_data" ->
+                        org.geysermc.geyser.api.predicate.item.ItemMatchPredicate.customModelData(
+                                predicate.index(), predicate.value());
+                case "context_dimension" ->
+                        org.geysermc.geyser.api.predicate.MatchPredicate.dimension(
+                                Identifier.of(predicate.value()));
+                case "charge_type" ->
+                        org.geysermc.geyser.api.predicate.item.ItemMatchPredicate.chargeType(
+                                org.geysermc.geyser.api.predicate.context.item.ChargedProjectile.ChargeType.valueOf(
+                                        predicate.value().toUpperCase(java.util.Locale.ROOT)));
+                case "trim_material" ->
+                        org.geysermc.geyser.api.predicate.item.ItemMatchPredicate.trimMaterial(
+                                Identifier.of(predicate.value()));
+                default -> throw new IllegalArgumentException("Unsupported match " + predicate.property());
+            };
+        };
+        // Every branch accepts ItemPredicateContext; dimension is a predicate
+        // over its superclass MinecraftPredicateContext.
+        @SuppressWarnings("unchecked")
+        org.geysermc.geyser.api.predicate.MinecraftPredicate<
+                ? super org.geysermc.geyser.api.predicate.context.item.ItemPredicateContext> typed =
+                (org.geysermc.geyser.api.predicate.MinecraftPredicate<
+                        ? super org.geysermc.geyser.api.predicate.context.item.ItemPredicateContext>)
+                        (org.geysermc.geyser.api.predicate.MinecraftPredicate<?>) result;
+        return predicate.expected() ? typed : typed.negate();
     }
 
     private static @NotNull CustomBlockData build(@NotNull BedrockBlockRegistration block) {

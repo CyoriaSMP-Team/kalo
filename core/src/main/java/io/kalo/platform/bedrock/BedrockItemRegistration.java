@@ -2,6 +2,8 @@ package io.kalo.platform.bedrock;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import io.kalo.converter.ExternalModelPredicate;
+import java.util.List;
 
 /**
  * One item definition that the Bedrock compiler actually emitted successfully.
@@ -25,6 +27,26 @@ public record BedrockItemRegistration(
         @Nullable String displayName,
         int maxStackSize,
         @Nullable Integer maxDamage,
-        boolean enchantmentGlint
+        boolean enchantmentGlint,
+        @NotNull List<ExternalModelPredicate> predicates,
+        @Nullable Integer legacyCustomModelData
 ) {
+    public BedrockItemRegistration {
+        predicates = List.copyOf(predicates);
+    }
+    /** Keep existing native records exactly as before, without predicates. */
+    public BedrockItemRegistration(String javaItem, String bedrockIdentifier, String model,
+                                   String icon, String displayName, int maxStackSize,
+                                   Integer maxDamage, boolean enchantmentGlint) {
+        this(javaItem, bedrockIdentifier, model, icon, displayName,
+                maxStackSize, maxDamage, enchantmentGlint, List.of(), null);
+    }
+    /** Selector variant; no legacy CMD. */
+    public BedrockItemRegistration(String javaItem, String bedrockIdentifier, String model,
+                                   String icon, String displayName, int maxStackSize,
+                                   Integer maxDamage, boolean enchantmentGlint,
+                                   List<ExternalModelPredicate> predicates) {
+        this(javaItem, bedrockIdentifier, model, icon, displayName,
+                maxStackSize, maxDamage, enchantmentGlint, predicates, null);
+    }
 }

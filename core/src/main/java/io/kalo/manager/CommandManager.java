@@ -252,11 +252,18 @@ public final class CommandManager implements Managerial {
                 "Could not capture item because the player is offline", NamedTextColor.RED));
         if (!player.getScheduler().execute(plugin, () -> {
             org.bukkit.inventory.ItemStack held = player.getInventory().getItemInMainHand();
-            if (held.getType().isAir() || !held.hasItemMeta()
-                    || !held.getItemMeta().hasItemModel()) {
-                player.sendMessage(Component.text(
-                        "Hold a Java item with an item_model component (legacy CustomModelData"
-                                + " without item_model is not supported yet)", NamedTextColor.YELLOW));
+            if (held.getType().isAir() || !held.hasItemMeta()) {
+                player.sendMessage(Component.text("Hold a Java custom item", NamedTextColor.YELLOW));
+                return;
+            }
+            if (!held.getItemMeta().hasItemModel()) {
+                if (held.getItemMeta().hasCustomModelData()) {
+                    learnLegacyHeld(plugin, player, held);
+                } else {
+                    player.sendMessage(Component.text(
+                            "Held item has neither item_model nor CustomModelData",
+                            NamedTextColor.YELLOW));
+                }
                 return;
             }
             org.bukkit.NamespacedKey model = held.getItemMeta().getItemModel();
@@ -295,6 +302,37 @@ public final class CommandManager implements Managerial {
                 }
             }, null, 1L));
         }, retired, 1L)) retired.run();
+    }
+
+    private static void learnLegacyHeld(@NotNull Plugin plugin, @NotNull Player player,
+                                        @NotNull org.bukkit.inventory.ItemStack held) {
+        io.kalo.converter.ExternalLegacyItems.Binding observation;
+        try {
+            observation = new io.kalo.converter.ExternalLegacyItems.Binding(
+                    held.getType(), held.getItemMeta().getCustomModelData(),
+                    Math.min(99, held.getMaxStackSize()));
+        } catch (IllegalArgumentException invalid) {
+            player.sendMessage(Component.text("Invalid legacy custom item", NamedTextColor.RED));
+            return;
+        }
+        var destination = Constants.dataFolder().toPath().resolve("legacy-items.yml");
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                io.kalo.converter.ExternalLegacyItems.remember(destination, observation);
+            } catch (java.io.IOException failure) {
+                throw new java.util.concurrent.CompletionException(failure);
+            }
+        }).whenComplete((ignored, failure) -> player.getScheduler().execute(plugin, () -> {
+            if (failure != null) {
+                Plugins.logger().log(Level.WARNING, "Could not save legacy item observation", failure);
+                player.sendMessage(Component.text("Legacy item could not be saved", NamedTextColor.RED));
+            } else {
+                player.sendMessage(Component.text("Saved legacy CustomModelData "
+                        + observation.customModelData() + " for " + observation.material()
+                        + "; restart Geyser/server after enabling external-content",
+                        NamedTextColor.GREEN));
+            }
+        }, null, 1L));
     }
 
     private static void runInspectPack(@NotNull Context context,

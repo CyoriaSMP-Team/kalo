@@ -123,6 +123,74 @@ public final class BedrockPackCompiler {
         };
     }
 
+    /**
+     * Compile a selector branch with its own synthetic Bedrock identifier while
+     * preserving the original Java item_model and Geyser predicates.
+     */
+    public boolean addExternalVariant(@NotNull io.kalo.converter.ExternalModelVariants.Variant variant) {
+        ItemDefinition definition = variant.definition();
+        if (!addExternalItem(definition)) return false;
+        String bedrockId = definition.key().asString();
+        int index = -1;
+        for (int i = itemRegistrations.size()-1; i >= 0; i--) {
+            if (itemRegistrations.get(i).bedrockIdentifier().equals(bedrockId)) {
+                index = i; break;
+            }
+        }
+        if (index < 0) throw new IllegalStateException("Missing compiled Bedrock registration");
+        BedrockItemRegistration old = itemRegistrations.get(index);
+        itemRegistrations.set(index, new BedrockItemRegistration(old.javaItem(),
+                old.bedrockIdentifier(), variant.javaModel().asString(), old.icon(),
+                old.displayName(), old.maxStackSize(), old.maxDamage(), old.enchantmentGlint(),
+                variant.predicates()));
+
+        // Files and in-process API must use the same predicate metadata.
+        JsonArray candidates = mappedItems.getAsJsonArray(old.javaItem());
+        for (JsonElement candidate : candidates) {
+            JsonObject mapping = candidate.getAsJsonObject();
+            if (!bedrockId.equals(mapping.get("bedrock_identifier").getAsString())) continue;
+            mapping.addProperty("model", variant.javaModel().asString());
+            if (!variant.predicates().isEmpty()) {
+                JsonArray predicates = new JsonArray();
+                variant.predicates().forEach(p -> predicates.add(p.toJson()));
+                mapping.add("predicate", predicates.size() == 1 ? predicates.get(0) : predicates);
+                if (predicates.size() > 1) mapping.addProperty("predicate_strategy", "and");
+            }
+            return true;
+        }
+        throw new IllegalStateException("Bedrock mapping missing after variant compilation");
+    }
+
+    /**
+     * Legacy CustomModelData has no item_model data component. Convert the
+     * observed Java carrier's selected override, then use Geyser's legacy
+     * registration instead of pretending it is a modern item_model definition.
+     */
+    public boolean addLegacyExternalItem(@NotNull io.kalo.converter.ExternalLegacyItems.Model legacy) {
+        if (!addExternalItem(legacy.definition())) return false;
+        String identifier = legacy.definition().key().asString();
+        for (int index = itemRegistrations.size()-1; index>=0; index--) {
+            BedrockItemRegistration previous = itemRegistrations.get(index);
+            if (!identifier.equals(previous.bedrockIdentifier())) continue;
+            itemRegistrations.set(index, new BedrockItemRegistration(previous.javaItem(),
+                    previous.bedrockIdentifier(), previous.model(), previous.icon(),
+                    previous.displayName(), previous.maxStackSize(), previous.maxDamage(),
+                    previous.enchantmentGlint(), List.of(), legacy.customModelData()));
+
+            JsonArray candidates = mappedItems.getAsJsonArray(previous.javaItem());
+            for (JsonElement entry : candidates) {
+                JsonObject mapping = entry.getAsJsonObject();
+                if (!identifier.equals(mapping.get("bedrock_identifier").getAsString())) continue;
+                mapping.remove("model");
+                mapping.addProperty("type", "legacy");
+                mapping.addProperty("custom_model_data", legacy.customModelData());
+                return true;
+            }
+            throw new IllegalStateException("Missing mapping after legacy item compilation");
+        }
+        throw new IllegalStateException("Missing record after legacy item compilation");
+    }
+
     private void addSpriteItem(@NotNull ItemDefinition definition, @NotNull ModelDefinition.Sprite sprite) {
         Key key = definition.key();
         String icon = definition.bedrock().iconOverride() != null
