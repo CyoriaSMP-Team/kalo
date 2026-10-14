@@ -60,6 +60,41 @@ public final class CommandManager implements Managerial {
                 }));
 
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("gui")
+                .literal("open")
+                .permission(Permission.of(PERMISSION_PREFIX + "gui"))
+                .required("player", PlayerParser.playerParser())
+                .required("gui", NamespacedKeyParser.namespacedKeyParser())
+                .handler(ctx -> {
+                    Player player = ctx.get("player");
+                    NamespacedKey gui = ctx.get("gui");
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)
+                            || instance.guiListener() == null) {
+                        sender.sendMessage(Component.text("Kalo GUI is not initialized", NamedTextColor.RED));
+                        return;
+                    }
+                    Runnable retired = () -> sender.sendMessage(Component.text(
+                            "Player is no longer available", NamedTextColor.RED));
+                    if (!player.getScheduler().execute(context.plugin(), () -> {
+                        if (instance.guiListener().openGui(player,
+                                net.kyori.adventure.key.Key.key(gui.getNamespace(), gui.getKey()))) {
+                            sender.sendMessage(Component.text("Opened " + gui
+                                    + " for " + player.getName(), NamedTextColor.GREEN));
+                        } else {
+                            sender.sendMessage(Component.text("Unknown GUI " + gui, NamedTextColor.RED));
+                        }
+                    }, retired, 1L)) retired.run();
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("export")
+                .literal("kalopack")
+                .permission(Permission.of(PERMISSION_PREFIX + "export"))
+                .required("pack", StringParser.stringParser())
+                .handler(ctx -> runExportPack(context.plugin(), ctx.sender().getSender(), ctx.get("pack"))));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("doctor")
                 .permission(Permission.of(PERMISSION_PREFIX + "doctor"))
                 .handler(ctx -> runDoctor(ctx.sender().getSender())));
@@ -132,6 +167,44 @@ public final class CommandManager implements Managerial {
                 .permission(Permission.of(PERMISSION_PREFIX + "import"))
                 .required("path", StringParser.greedyStringParser())
                 .handler(ctx -> runImportFile(ctx.sender().getSender(), ctx.get("path"))));
+    }
+
+    /**
+     * Only KaloPack is exposed for now. The other exporters are still lossy YAML
+     * adapters and must not be advertised as completed format converters.
+     */
+    private static void runExportPack(@NotNull Plugin plugin, @NotNull CommandSender sender,
+                                      @NotNull String packName) {
+        if (!packName.matches("[a-z0-9_-]{1,64}")) {
+            sender.sendMessage(Component.text("Invalid pack name (use lowercase letters, digits, _ or -)",
+                    NamedTextColor.RED));
+            return;
+        }
+        java.nio.file.Path root = Constants.dataFolder().toPath().resolve("packs").toAbsolutePath().normalize();
+        java.nio.file.Path source = root.resolve(packName);
+        if (!Files.isDirectory(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            sender.sendMessage(Component.text("Pack does not exist: " + packName, NamedTextColor.RED));
+            return;
+        }
+        java.nio.file.Path output = Constants.dataFolder().toPath()
+                .resolve("exports").resolve(packName + ".zip").toAbsolutePath().normalize();
+        sender.sendMessage(Component.text("Exporting " + packName + " as a portable KaloPack ZIP...",
+                NamedTextColor.YELLOW));
+
+        plugin.getServer().getAsyncScheduler().runNow(plugin, task -> {
+            try {
+                io.kalo.export.ExportReport report = new io.kalo.export.KaloPackExporter().export(source, output);
+                plugin.getServer().getGlobalRegionScheduler().execute(plugin, () ->
+                        sender.sendMessage(Component.text("Exported " + report.getExportedCount()
+                                        + " files to " + output + " (existing exports are never overwritten)",
+                                NamedTextColor.GREEN)));
+            } catch (Exception e) {
+                Plugins.logger().log(Level.WARNING, "KaloPack export failed", e);
+                plugin.getServer().getGlobalRegionScheduler().execute(plugin, () ->
+                        sender.sendMessage(Component.text("Export failed: " + messageOf(e),
+                                NamedTextColor.RED)));
+            }
+        });
     }
 
     private static org.bukkit.inventory.ItemStack itemStack(@NotNull NamespacedKey key) {
