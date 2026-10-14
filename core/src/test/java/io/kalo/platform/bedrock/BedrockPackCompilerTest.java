@@ -256,6 +256,7 @@ class BedrockPackCompilerTest {
 
         assertEquals(1, result.itemCount());
         assertEquals(0, result.skippedCount());
+        assertEquals(0, result.armorCount(), "held custom items must not count as armor");
         assertNotNull(result.pack().file("models/entity/testpack_wrench.geo.json"));
         assertNotNull(result.pack().file("attachables/testpack_wrench.json"));
         assertNotNull(result.pack().file("textures/items/testpack_wrench.png"));

@@ -217,7 +217,7 @@ public final class BedrockPackCompiler {
                             "textures/items/" + icon)));
             registerItemTexture(icon, texture);
             registerItem(definition, icon);
-            attachables++;
+            // armorCount is the number of wearable armor pieces, not all attachables.
             return true;
         } catch (Exception e) {
             LOGGER.warning("Cannot convert Bedrock 3D item " + definition.key()
