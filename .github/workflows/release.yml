@@ -93,6 +93,25 @@ jobs:
             exit 1
           fi
 
+      # Mohist 1.20.1 compatibility remains a distinct experimental Java 17 jar.
+      # Do not publish it into the Paper/Folia Modrinth/Hangar channels.
+      - name: Verify the Mohist 1.20.1 jar targets Java 17
+        run: |
+          jar="mohist/build/libs/Kalo-Mohist-${{ steps.version.outputs.plugin_version }}.jar"
+          if [ ! -s "$jar" ]; then
+            echo "::error::Missing Mohist compatibility jar $jar"
+            exit 1
+          fi
+          major=$(unzip -p "$jar" io/kalo/mohist/MohistPlugin.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          if [ "$major" != "61" ]; then
+            echo "::error::Expected Mohist Java 17 bytecode (major 61); got $major"
+            exit 1
+          fi
+          unzip -p "$jar" plugin.yml | grep -q 'main: io.kalo.mohist.MohistPlugin' || {
+            echo "::error::Mohist plugin.yml missing or incorrect"
+            exit 1
+          }
+
       # Four channels each want release notes, and none of them should get an empty box.
       # Failing here costs a re-tag; shipping blank notes to Modrinth cannot be undone.
       - name: Extract this version's changelog
@@ -135,7 +154,8 @@ jobs:
             --notes-file release-notes.md \
             --generate-notes \
             --target "${{ github.sha }}" \
-            build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar
+            build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar \
+            mohist/build/libs/Kalo-Mohist-${{ steps.version.outputs.plugin_version }}.jar
 
       # Modrinth, Hangar, and MCMall are skipped rather than failed when their credentials
       # are absent, so the release workflow remains usable before every channel is configured.
