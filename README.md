@@ -256,6 +256,18 @@ model:
 | `/kalo import file <path>` | `kalo.command.import` |
 | `/kalo doctor` | `kalo.command.doctor` |
 | `/kalo migrate-world` | `kalo.command.migrate` |
+| `/kalo gui open <player> <namespace:gui>` | `kalo.command.gui` |
+| `/kalo export kalopack <pack>` | `kalo.command.export` |
+
+## Portable KaloPack export
+
+`/kalo export kalopack <pack>` writes an actual, deterministic ZIP archive in
+`plugins/Kalo/exports/<pack>.zip`. It contains `pack.yml`, configs and assets;
+exports run asynchronously and never overwrite a previous export. Only
+lowercase pack names are accepted.
+
+Oraxen, ItemsAdder and Nexo export adapters remain partial/lossy. They are
+not available as complete server commands; review API conversion reports.
 
 ## Asset validation
 

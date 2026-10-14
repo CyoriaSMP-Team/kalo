@@ -65,19 +65,22 @@ public final class GuiListener implements Listener {
      * @param player the player
      * @param guiKey the GUI content key
      */
-    public void openGui(@NotNull Player player, @NotNull Key guiKey) {
+    public boolean openGui(@NotNull Player player, @NotNull Key guiKey) {
         Gui gui = guiByKey.get(guiKey.asString());
         if (gui == null) {
             LOGGER.warning("GUI '" + guiKey.asString() + "' not found");
-            return;
+            return false;
         }
 
         GuiDefinition definition = gui.guiDefinition();
+        GuiHolder holder = new GuiHolder(guiKey);
         Inventory inventory = Bukkit.createInventory(
-                new GuiHolder(guiKey),
+                holder,
                 definition.rows() * 9,
                 MiniMessage.miniMessage().deserialize(definition.title())
         );
+
+        holder.bind(inventory);
 
         // Populate slots
         for (GuiDefinition.SlotConfig slotConfig : definition.items()) {
@@ -86,58 +89,55 @@ public final class GuiListener implements Listener {
             }
 
             ItemStack item = createItem(slotConfig);
-            inventory.setItem(slotConfig.slot(), item);
+            if (item != null) {
+                inventory.setItem(slotConfig.slot(), item);
+            } else {
+                LOGGER.warning("GUI '" + guiKey.asString() + "' slot " + slotConfig.slot()
+                        + " references unknown item '" + slotConfig.material() + "'; leaving empty");
+            }
         }
 
         player.openInventory(inventory);
         openGuis.put(player.getUniqueId(), guiKey);
+        return true;
     }
 
     /**
      * Creates an ItemStack from a slot configuration.
      */
-    private @NotNull ItemStack createItem(@NotNull GuiDefinition.SlotConfig slotConfig) {
-        // Parse material
-        org.bukkit.Material material = parseMaterial(slotConfig.material());
-        if (material == null) {
-            material = org.bukkit.Material.PAPER;
-        }
+    private @Nullable ItemStack createItem(@NotNull GuiDefinition.SlotConfig slotConfig) {
+        ItemStack item = GuiItemResolver.resolve(slotConfig.material(), slotConfig.amount(), key -> {
+            RegistryManager.GlobalRegistries registries = RegistryManager.GlobalRegistries.registries();
+            return registries.item().get(key)
+                    .map(content -> content.itemStack().get())
+                    .orElseGet(() -> registries.block().get(key)
+                            .map(content -> content.itemStack().get())
+                            .orElseGet(() -> registries.furniture().get(key)
+                                    .map(content -> content.itemStack().get())
+                                    .orElseGet(() -> registries.armor().get(key)
+                                            .map(content -> content.itemStack().get())
+                                            .orElse(null))));
+        });
+        if (item == null) return null;
 
-        ItemStack item = new ItemStack(material, slotConfig.amount());
+        // Applying optional display changes to a clone keeps the model and the original
+        // custom item identity intact, including its PDC and Geyser match components.
         ItemMeta meta = item.getItemMeta();
-
         if (meta != null) {
             if (slotConfig.displayName() != null) {
                 meta.displayName(MiniMessage.miniMessage().deserialize(slotConfig.displayName()));
             }
-
             if (!slotConfig.lore().isEmpty()) {
                 meta.lore(slotConfig.lore().stream()
                         .map(line -> MiniMessage.miniMessage().deserialize(line))
                         .toList());
             }
-
             if (slotConfig.customModelData() > 0) {
                 meta.setCustomModelData(slotConfig.customModelData());
             }
-
             item.setItemMeta(meta);
         }
-
         return item;
-    }
-
-    /**
-     * Parses a material string to a Bukkit Material.
-     */
-    private @Nullable org.bukkit.Material parseMaterial(@NotNull String materialStr) {
-        try {
-            return org.bukkit.Material.valueOf(materialStr.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            // Not a vanilla material - could be a custom item key
-            // TODO: Support custom Kalo items in GUIs
-            return null;
-        }
     }
 
     /**
@@ -250,6 +250,7 @@ public final class GuiListener implements Listener {
      */
     public static final class GuiHolder implements InventoryHolder {
         private final Key guiKey;
+        private Inventory inventory;
 
         public GuiHolder(@NotNull Key guiKey) {
             this.guiKey = guiKey;
@@ -259,9 +260,16 @@ public final class GuiListener implements Listener {
             return guiKey;
         }
 
+        void bind(@NotNull Inventory inventory) {
+            this.inventory = inventory;
+        }
+
         @Override
         public @NotNull Inventory getInventory() {
-            throw new UnsupportedOperationException("GuiHolder is not a real holder");
+            if (inventory == null) {
+                throw new IllegalStateException("GUI inventory has not been created yet");
+            }
+            return inventory;
         }
     }
 }

@@ -6,6 +6,23 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## Unreleased
+
+### Added
+
+- GUI references to Kalo content keys, usable with
+  `/kalo gui open <player> <gui>`. Repaired InventoryHolder registration.
+- `/kalo export kalopack <pack>`: deterministic ZIP with safe output
+  handling, no overwrites, and a test suite.
+- Validated CustomModelData frame sequences using entity-region scheduling
+  instead of silently applying only the first frame.
+
+### Limitations
+
+- Client models and Bedrock animation controllers remain unfinished.
+- Third-party exporters remain lossy and have no public CLI command.
+- Live Bedrock verification of new behavior is still required.
+
 ## 0.2.0
 
 ### Added
