@@ -1,0 +1,5 @@
+# Kalo Mohist 1.20.1 - independent compatibility bridge
+# This is NOT the Paper/Folia Kalo engine and DOES NOT implement Forge protocol translation.
+# Java Runtime on DeadZone is 21; this plugin intentionally compiles to Java 17
+# bytecode for the Minecraft 1.20.1 baseline and runs normally on Java 21.
+auto-learn: true
