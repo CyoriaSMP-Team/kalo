@@ -280,10 +280,17 @@ Kalo's own YAML item/block engine.
 4. Restart the server/Geyser to register new mappings; /kalo reload alone
    cannot change Geyser's frozen custom-item palette.
 
-Supported: flat generated/handheld item sprites and static cuboid 3D models
-already supported by Kalo's Bedrock compiler. Conditional/range/select models,
-legacy-only CustomModelData, animations, external block mappings, client-only
-packs and mod-specific protocols are not automatically converted. Missing or
+Supported (experimental): plain, conditional (broken/damaged/custom-model-data
+flags/component/fishing-rod), range-dispatch (count/damage/custom-model-data/
+bundle-fullness), and select (custom-model-data strings, charge type, trim
+material, dimension) item models, including the existing static cuboid 3D
+converter and plain 2D sprites. CustomModelData-only legacy items can also be
+observed and mapped using the base pack's legacy item model overrides;
+observations are saved to plugins/Kalo/legacy-items.yml.
+
+Animated textures, composite selectors, complex nested geometry transforms,
+external block mappings, skulls, waypoint icons, client-only packs and
+mod-specific protocols are not automatically converted. Missing or
 colliding assets are reported and skipped. The opt-in feature remains pre-alpha
 and requires Bedrock-client verification. See docs/HYBRID_CONVERTER.md.
 

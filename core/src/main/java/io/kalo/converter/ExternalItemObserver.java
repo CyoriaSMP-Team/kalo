@@ -38,6 +38,8 @@ import java.util.logging.Level;
 public final class ExternalItemObserver implements Listener, AutoCloseable {
     private final Plugin plugin;
     private final Path file;
+    private final Path legacyFile;
+    private final Set<String> seenLegacy = ConcurrentHashMap.newKeySet();
     private final ExecutorService writer = Executors.newSingleThreadExecutor(
             Thread.ofPlatform().daemon(true).name("kalo-external-item-writer", 0).factory());
     private final Set<String> seen = ConcurrentHashMap.newKeySet();
@@ -47,8 +49,12 @@ public final class ExternalItemObserver implements Listener, AutoCloseable {
     public ExternalItemObserver(@NotNull Plugin plugin) throws java.io.IOException {
         this.plugin = plugin;
         this.file = Constants.dataFolder().toPath().resolve("external-items.yml");
+        this.legacyFile = Constants.dataFolder().toPath().resolve("legacy-items.yml");
         for (ExternalItemBindings.Binding binding : ExternalItemBindings.load(file)) {
             seen.add(binding.itemModel().asString());
+        }
+        for (ExternalLegacyItems.Binding binding : ExternalLegacyItems.load(legacyFile)) {
+            seenLegacy.add(binding.id());
         }
     }
 
@@ -104,13 +110,18 @@ public final class ExternalItemObserver implements Listener, AutoCloseable {
     private void rememberObserved(ItemStack[] items) {
         if (closed.get()) return;
         Map<String, ExternalItemBindings.Binding> newBindings = new java.util.LinkedHashMap<>();
+        Map<String, ExternalLegacyItems.Binding> legacyBindings = new java.util.LinkedHashMap<>();
         for (ItemStack item : items) {
             ExternalItemBindings.Binding binding = observed(item);
             if (binding != null && !seen.contains(binding.itemModel().asString())) {
                 newBindings.putIfAbsent(binding.itemModel().asString(), binding);
+            } else if (binding == null) {
+                ExternalLegacyItems.Binding legacy = observedLegacy(item);
+                if (legacy != null && !seenLegacy.contains(legacy.id())) {
+                    legacyBindings.putIfAbsent(legacy.id(), legacy);
+                }
             }
         }
-        if (newBindings.isEmpty()) return;
         for (ExternalItemBindings.Binding binding : newBindings.values()) {
             if (!seen.add(binding.itemModel().asString())) continue;
             try {
@@ -126,6 +137,35 @@ public final class ExternalItemObserver implements Listener, AutoCloseable {
             } catch (java.util.concurrent.RejectedExecutionException closing) {
                 seen.remove(binding.itemModel().asString());
             }
+        }
+
+        for (ExternalLegacyItems.Binding binding : legacyBindings.values()) {
+            if (!seenLegacy.add(binding.id())) continue;
+            try {
+                writer.execute(() -> {
+                    try {
+                        ExternalLegacyItems.remember(legacyFile, binding);
+                    } catch (Exception failure) {
+                        seenLegacy.remove(binding.id());
+                        Plugins.logger().log(Level.WARNING,
+                                "Could not save legacy CustomModelData " + binding.id(), failure);
+                    }
+                });
+            } catch (java.util.concurrent.RejectedExecutionException closing) {
+                seenLegacy.remove(binding.id());
+            }
+        }
+    }
+
+    private static ExternalLegacyItems.Binding observedLegacy(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) return null;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || meta.hasItemModel() || !meta.hasCustomModelData()) return null;
+        try {
+            return new ExternalLegacyItems.Binding(
+                    item.getType(), meta.getCustomModelData(), Math.min(99, item.getMaxStackSize()));
+        } catch (RuntimeException invalid) {
+            return null;
         }
     }
 

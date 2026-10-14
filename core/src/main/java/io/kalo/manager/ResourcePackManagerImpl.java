@@ -356,15 +356,30 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                                 + ": the content identifier belongs to native Kalo");
                         continue;
                     }
-                    var definition = io.kalo.converter.ExternalItemModelResolver.resolve(javaPack, binding);
-                    if (definition == null) {
-                        LOGGER.warning("External model " + binding.itemModel()
-                                + " is missing, unsupported or has unresolved Java assets");
-                    } else if (compiler.addExternalItem(definition)) {
+                    try {
+                        var variants = io.kalo.converter.ExternalModelVariants.resolve(javaPack, binding);
+                        for (var variant : variants) {
+                            if (compiler.addExternalVariant(variant)) {
+                                mapped++;
+                            } else {
+                                LOGGER.warning("Could not compile external selector branch "
+                                        + variant.definition().key() + " for " + binding.itemModel());
+                            }
+                        }
+                    } catch (RuntimeException invalid) {
+                        LOGGER.warning("Skipping unsupported Java item selector "
+                                + binding.itemModel() + ": " + invalid.getMessage());
+                    }
+                }
+                for (var legacy : io.kalo.converter.ExternalLegacyItems.load(
+                        Constants.dataFolder().toPath().resolve("legacy-items.yml"))) {
+                    var model = io.kalo.converter.ExternalLegacyItems.resolve(javaPack, legacy);
+                    if (model == null) {
+                        LOGGER.warning("No supported legacy override in the base pack for " + legacy.id());
+                    } else if (compiler.addLegacyExternalItem(model)) {
                         mapped++;
                     } else {
-                        LOGGER.warning("External model " + binding.itemModel()
-                                + " could not compile to Bedrock or collides with native content");
+                        LOGGER.warning("Legacy external item conflicts with Kalo content: " + legacy.id());
                     }
                 }
                 if (mapped > 0) {

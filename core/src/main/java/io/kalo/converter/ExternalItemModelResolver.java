@@ -80,6 +80,41 @@ public final class ExternalItemModelResolver {
         }
     }
 
+    /** Resolve a leaf Java item model using the existing conservative sprite/3D rules. */
+    static @Nullable ItemDefinition resolveModel(ResourcePack source,
+            ExternalItemBindings.Binding binding, Key outputKey, Key modelKey) {
+        try {
+            JsonObject model = json(source, "assets/" + modelKey.namespace()
+                    + "/models/" + modelKey.value() + ".json");
+            if (model == null) return null;
+            ModelDefinition converted;
+            JsonElement elements = model.get("elements");
+            String parent = string(model, "parent");
+            boolean flat = "minecraft:item/generated".equals(parent)
+                    || "minecraft:item/handheld".equals(parent)
+                    || "item/generated".equals(parent) || "item/handheld".equals(parent);
+            if ((elements != null && elements.isJsonArray() && !elements.getAsJsonArray().isEmpty())
+                    || (!flat && parent != null)) {
+                converted = new ModelDefinition.Custom(modelKey, Map.of());
+            } else {
+                if (!flat) return null;
+                JsonObject textures = model.getAsJsonObject("textures");
+                String layer = textures == null ? null : string(textures, "layer0");
+                if (layer == null || layer.startsWith("#")) return null;
+                Key texture = Key.key(layer);
+                if (source.file("assets/" + texture.namespace() + "/textures/"
+                        + texture.value() + ".png") == null) return null;
+                converted = new ModelDefinition.Sprite(texture);
+            }
+            return ItemDefinition.builder(outputKey)
+                    .model(converted).display(DisplayProperties.empty())
+                    .behaviour(new ItemBehaviour(binding.maxStackSize(), null, false))
+                    .java(new JavaOptions(binding.material())).build();
+        } catch (RuntimeException bad) {
+            return null;
+        }
+    }
+
     private static @Nullable JsonObject json(ResourcePack pack, String path) {
         Writable writable = pack.file(path);
         if (writable == null) return null;

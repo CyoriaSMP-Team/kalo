@@ -60,11 +60,26 @@ continues to own all gameplay behaviour. Everything is off by default.
 
 - New registrations require a Geyser/server restart; they cannot hot-reload
   into the frozen item palette.
-- Only plain item-model declarations with 2D generated/handheld sprites
-  or supported static cuboid 3D are currently mapped.
-- Condition/range/select and legacy-only CustomModelData IDs, external block
-  mappings, skulls, waypoint styles, complex animations and client-only packs
-  still need separate implementations.
+- Plain item models and condition/range_dispatch/select selector trees are
+  compiled to branch-specific Geyser v2 item definitions. Each branch gets
+  a stable deterministic Bedrock identifier. Predicates are shared by both
+  the JSON mapping exporter and the in-process Geyser API bridge.
+- Java conditions: broken, damaged, custom_model_data flags, has_component,
+  fishing_rod/cast. Ranges: custom_model_data floats, count, damage and
+  bundle/fullness, including scale/normalize where valid. Select:
+  custom_model_data strings, charge_type, trim_material, context_dimension.
+  Unknown selectors fail closed rather than silently using the wrong model.
+- Legacy CustomModelData-only items are learned from the actual held item or
+  auto-learn inventories, and saved to legacy-items.yml. For a base pack
+  containing old-style models/item/<material>.json overrides, the last
+  matching legacy override is compiled into the same Bedrock output, using
+  Geyser's legacy mapping path.
+- Conditional variants only support the 2D and static 3D leaf models Kalo's
+  converter already handles. Nested unknown selectors, composites, animated
+  textures, external block mappings, skulls, waypoint styles, additional
+  Java display transforms and client-only packs remain out of scope.
+- Neither legacy item matching nor predicate display has yet been verified
+  end-to-end with a real Bedrock player on current Geyser versions.
 - Auto-learn records server-visible items. Client-only resource packs and mods
   remain invisible to this plugin.
 - Integration has compiler/unit tests, not yet real Bedrock client verification.
@@ -74,11 +89,11 @@ continues to own all gameplay behaviour. Everything is off by default.
 
 - Reuse the merged static 3D geometry path for experimental conversion, parent models and
   atlases. Do not fork the geometry pipeline.
-- Add condition/range/select item-model dispatch and the corresponding Geyser
-  predicate mappings.
-- Add flipbook animation, GUI icon and first/third person transform validation.
-- Introduce separate verified coverage for skulls, waypoints, sounds, locales,
-  legacy CustomModelData, and advanced equipment.
+- Broaden model coverage to composite and advanced special selectors,
+  including display_context GUI fallbacks and richer transforms.
+- Add flipbook animation, GUI icon and first/third-person transform validation.
+- Introduce separately tested coverage for skulls, waypoints, sounds, locales,
+  advanced equipment and legacy behaviour on actual clients.
 - Validate on REAL Bedrock clients. Passing unit tests alone is insufficient.
 
 ## Phase 4: optional client companion
