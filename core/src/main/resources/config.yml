@@ -29,6 +29,7 @@ bedrock: auto
 pause-menu:
   enabled: false
   logo: "branding/pause-logo.png"
+  title: "<glyph:pause_logo>" # Native glyph registry placeholder for ESC header
   glyph-codepoint: "E7C0" # Private-use BMP character, must not overlap other fonts
   height: 30              # Display height; bitmap keeps original aspect ratio
   ascent: 26              # Baseline position (must not exceed height)

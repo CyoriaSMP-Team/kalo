@@ -44,6 +44,10 @@ public final class PauseMenuBranding {
     // Every branding texture is one glyph (one char in one row), so this is
     // also the maximum size of the resulting PNG file.
     private static final int MAX_GLYPH_DIMENSION = 256;
+    // FontSet's filtered glyph path rejects advances over 32 px. Splitting
+    // also ensures each atlas sprite occupies comfortably less than a page.
+    private static final int TARGET_SLICE_ADVANCE = 28;
+    private static final int MAX_LOGO_SLICES = 32;
 
     private PauseMenuBranding() { }
 
@@ -87,8 +91,8 @@ public final class PauseMenuBranding {
         } catch (NumberFormatException exception) {
             throw new IOException("pause-menu.glyph-codepoint must be a hexadecimal PUA character", exception);
         }
-        if (codepoint < 0xE000 || codepoint > 0xF8FF) {
-            throw new IOException("pause-menu.glyph-codepoint must be a BMP private-use character (E000-F8FF)");
+        if (codepoint < 0xE000 || codepoint > 0xF8FF - MAX_LOGO_SLICES + 1) {
+            throw new IOException("pause-menu.glyph-codepoint must leave space for the native bitmap slices (E000-F8E0)");
         }
 
         int height = section.getInt("height", 30);
@@ -125,119 +129,58 @@ public final class PauseMenuBranding {
     }
 
     public static void apply(@NotNull ResourcePack pack, @NotNull Settings settings) throws IOException {
-        byte[] image = Files.readAllBytes(settings.logo());
-        if (image.length > MAX_PNG_SIZE || image.length < 24) {
-            throw new IOException("Pause-menu logo PNG must be 24 bytes to 4 MiB");
-        }
-        if (!(image[0] == (byte) 0x89 && image[1] == 'P' && image[2] == 'N' && image[3] == 'G')) {
-            throw new IOException("Pause-menu logo is not a PNG");
-        }
-        BufferedImage preview = ImageIO.read(new ByteArrayInputStream(image));
-        if (preview == null || preview.getWidth() < 1 || preview.getHeight() < 1
-                || preview.getWidth() > 4096 || preview.getHeight() > 4096) {
-            throw new IOException("Pause-menu PNG image has invalid dimensions");
-        }
-        // A valid 512x188 PNG may still show as a missing-character square:
-        // Minecraft's bitmap font glyphs have a strict 256x256 texture limit.
-        // Scale during native pack generation, preserving the original PNG and
-        // its aspect ratio for future configuration changes.
-        image = fitBitmapGlyph(image, preview);
+        validateMenuTranslations(pack, settings);
+        Map<String, NativeGlyphRegistry.Definition> items = Map.of("pause_logo",
+                new NativeGlyphRegistry.Definition("pause_logo", settings.logo(),
+                        settings.codepoint(), settings.height(), settings.ascent()));
+        Map<String,String> glyphs = NativeGlyphRegistry.compile(pack, items);
+        writeMenuTranslations(pack, settings, glyphs);
+    }
 
-        // Prepare every changed file before mutating the pack (all-or-nothing).
-        JsonObject font = readObject(pack.file(FONT_PATH), FONT_PATH);
-        JsonArray providers = font.has("providers") ? font.getAsJsonArray("providers").deepCopy() : new JsonArray();
-        if (providers.size() == 0) {
-            for (String include : DEFAULT_FONT_REFERENCES) {
-                JsonObject reference = new JsonObject();
-                reference.addProperty("type", "reference");
-                reference.addProperty("id", include);
-                providers.add(reference);
+    /** Validate all language documents before any glyph pack modifications. */
+    public static void validateMenuTranslations(@NotNull ResourcePack pack,
+                                                @NotNull Settings settings) throws IOException {
+        for (String locale : settings.locales().keySet()) {
+            String path = "assets/minecraft/lang/" + locale + ".json";
+            try {
+                Writable existing = pack.file(path);
+                if (existing != null) JsonParser.parseString(
+                        new String(existing.toByteArray(), StandardCharsets.UTF_8)).getAsJsonObject();
+            } catch (RuntimeException error) {
+                throw new IOException("Invalid existing translation " + path, error);
             }
         }
-        String glyph = Character.toString(settings.codepoint());
-        for (var element : providers) {
-            if (!element.isJsonObject()) continue;
-            JsonObject existing = element.getAsJsonObject();
-            if (!existing.has("chars")) continue;
-            for (var row : existing.getAsJsonArray("chars")) {
-                if (row.isJsonPrimitive() && row.getAsString().contains(glyph)) {
-                    throw new IOException("Pause-menu glyph U+"
-                            + Integer.toHexString(settings.codepoint()).toUpperCase(Locale.ROOT)
-                            + " already used by another font provider");
-                }
-            }
-        }
-        JsonObject branding = new JsonObject();
-        branding.addProperty("type", "bitmap");
-        branding.addProperty("file", PROVIDER_FILE);
-        branding.addProperty("height", settings.height());
-        branding.addProperty("ascent", settings.ascent());
-        JsonArray characters = new JsonArray();
-        characters.add(glyph);
-        branding.add("chars", characters);
-        JsonArray mergedProviders = new JsonArray();
-        mergedProviders.add(branding);
-        for (var element : providers) mergedProviders.add(element);
-        font.add("providers", mergedProviders);
+    }
 
-        Map<String, JsonObject> languages = new java.util.LinkedHashMap<>();
+    public static void writeMenuTranslations(@NotNull ResourcePack pack, @NotNull Settings settings,
+                                             @NotNull Map<String,String> glyphs) throws IOException {
+        writeMenuTranslations(pack, settings, glyphs, "<glyph:pause_logo>");
+    }
+
+    public static void writeMenuTranslations(@NotNull ResourcePack pack, @NotNull Settings settings,
+                                             @NotNull Map<String,String> glyphs,
+                                             @NotNull String titleTemplate) throws IOException {
+        String title = NativeGlyphRegistry.render(titleTemplate, glyphs);
+        Map<String, JsonObject> updates = new java.util.LinkedHashMap<>();
         for (var entry : settings.locales().entrySet()) {
             String path = "assets/minecraft/lang/" + entry.getKey() + ".json";
-            JsonObject root = readObject(pack.file(path), path);
-            root.addProperty("menu.game", glyph);
-            root.addProperty("menu.paused", glyph);
-            root.addProperty("menu.returnToGame", entry.getValue().returnToGame());
-            root.addProperty("menu.disconnect", entry.getValue().disconnect());
-            languages.put(path, root);
+            JsonObject object;
+            try {
+                Writable old = pack.file(path);
+                object = old == null ? new JsonObject() :
+                        JsonParser.parseString(new String(old.toByteArray(), StandardCharsets.UTF_8))
+                                .getAsJsonObject().deepCopy();
+            } catch (RuntimeException error) {
+                throw new IOException("Invalid existing translation " + path, error);
+            }
+            object.addProperty("menu.game", title);
+            object.addProperty("menu.paused", title);
+            object.addProperty("menu.returnToGame", entry.getValue().returnToGame());
+            object.addProperty("menu.disconnect", entry.getValue().disconnect());
+            updates.put(path, object);
         }
-
-        pack.file(FONT_PATH, Json.writable(font));
-        pack.file(LOGO_PATH, Writable.bytes(image));
-        for (var entry : languages.entrySet()) {
-            pack.file(entry.getKey(), Json.writable(entry.getValue()));
-        }
-    }
-
-    /** Reduces only oversized glyphs; already-valid PNGs remain byte-identical. */
-    private static byte[] fitBitmapGlyph(byte[] image, BufferedImage source) throws IOException {
-        int width = source.getWidth();
-        int height = source.getHeight();
-        if (width <= MAX_GLYPH_DIMENSION && height <= MAX_GLYPH_DIMENSION) {
-            return image;
-        }
-        double factor = Math.min((double) MAX_GLYPH_DIMENSION / width,
-                (double) MAX_GLYPH_DIMENSION / height);
-        int targetWidth = Math.max(1, (int) Math.round(width * factor));
-        int targetHeight = Math.max(1, (int) Math.round(height * factor));
-        // Defensive clamp for rounding a dimension very close to the cap.
-        targetWidth = Math.min(targetWidth, MAX_GLYPH_DIMENSION);
-        targetHeight = Math.min(targetHeight, MAX_GLYPH_DIMENSION);
-        BufferedImage reduced = new BufferedImage(targetWidth, targetHeight,
-                BufferedImage.TYPE_INT_ARGB);
-        Graphics2D graphics = reduced.createGraphics();
-        try {
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                    RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            graphics.setRenderingHint(RenderingHints.KEY_RENDERING,
-                    RenderingHints.VALUE_RENDER_QUALITY);
-            graphics.drawImage(source, 0, 0, targetWidth, targetHeight, null);
-        } finally {
-            graphics.dispose();
-        }
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        if (!ImageIO.write(reduced, "png", bytes)) {
-            throw new IOException("Cannot encode resized pause-menu logo PNG");
-        }
-        return bytes.toByteArray();
-    }
-
-    private static JsonObject readObject(Writable existing, String path) throws IOException {
-        if (existing == null) return new JsonObject();
-        try {
-            return JsonParser.parseString(new String(existing.toByteArray(), StandardCharsets.UTF_8))
-                    .getAsJsonObject().deepCopy();
-        } catch (RuntimeException exception) {
-            throw new IOException("Cannot merge pause-menu branding with " + path, exception);
+        for (var item : updates.entrySet()) {
+            pack.file(item.getKey(), Json.writable(item.getValue()));
         }
     }
 }

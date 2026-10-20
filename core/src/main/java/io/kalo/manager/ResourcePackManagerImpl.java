@@ -304,13 +304,36 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         if (!(Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin)) return;
         org.bukkit.configuration.ConfigurationSection menu =
                 plugin.getConfig().getConfigurationSection("pause-menu");
-        if (menu == null || !menu.getBoolean("enabled", false)) return;
         try {
-            var settings = io.kalo.pack.branding.PauseMenuBranding.settings(
-                    menu, Constants.dataFolder().toPath());
-            io.kalo.pack.branding.PauseMenuBranding.apply(pack, settings);
-            LOGGER.info("Generated native Kalo pause-menu branding with "
-                    + settings.locales().size() + " locale(s)");
+            var definitions = io.kalo.pack.branding.NativeGlyphRegistry.load(Constants.dataFolder().toPath());
+            io.kalo.pack.branding.PauseMenuBranding.Settings branding = null;
+            if (menu != null && menu.getBoolean("enabled", false)) {
+                branding = io.kalo.pack.branding.PauseMenuBranding.settings(
+                        menu, Constants.dataFolder().toPath());
+                io.kalo.pack.branding.PauseMenuBranding.validateMenuTranslations(pack, branding);
+                if (definitions.containsKey("pause_logo")) {
+                    throw new IOException("Glyph name pause_logo is reserved for the built-in ESC branding");
+                }
+                definitions.put("pause_logo", new io.kalo.pack.branding.NativeGlyphRegistry.Definition(
+                        "pause_logo", branding.logo(), branding.codepoint(), branding.height(), branding.ascent()));
+            }
+            // Preflight placeholder names before mutating the in-memory pack.
+            String menuTitle = menu == null ? "<glyph:pause_logo>" :
+                    menu.getString("title", "<glyph:pause_logo>");
+            if (branding != null) {
+                var keys = new java.util.HashMap<String,String>();
+                definitions.forEach((id, def) -> keys.put(id, "#"));
+                io.kalo.pack.branding.NativeGlyphRegistry.render(menuTitle, keys);
+            }
+            var glyphs = io.kalo.pack.branding.NativeGlyphRegistry.compile(pack, definitions);
+            if (branding != null) {
+                io.kalo.pack.branding.PauseMenuBranding.writeMenuTranslations(
+                        pack, branding, glyphs, menuTitle);
+            }
+            if (!definitions.isEmpty()) {
+                LOGGER.info("Generated Kalo Native Glyph Registry (" + definitions.size()
+                        + " glyphs), including ESC logo if enabled");
+            }
         } catch (IOException | IllegalArgumentException error) {
             LOGGER.log(Level.SEVERE,
                     "Cannot generate native Kalo pause-menu branding; check config and logo. "
