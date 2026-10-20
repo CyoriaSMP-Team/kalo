@@ -58,16 +58,16 @@ class PauseMenuBrandingTest {
         byte[] png = Files.readAllBytes(logo(folder));
         PauseMenuBranding.apply(p, settings(folder.resolve("branding/pause-logo.png")));
         JsonObject font = json(p, "assets/minecraft/font/default.json");
-        assertEquals(3, font.getAsJsonArray("providers").size());
+        assertEquals(4, font.getAsJsonArray("providers").size());
         assertEquals("kalo:font/pause_logo.png",
                 font.getAsJsonArray("providers").get(0).getAsJsonObject().get("file").getAsString());
         assertEquals("itim.ttf",
-                font.getAsJsonArray("providers").get(1).getAsJsonObject().get("file").getAsString());
+                font.getAsJsonArray("providers").get(2).getAsJsonObject().get("file").getAsString());
         assertEquals("nexo:shift",
-                font.getAsJsonArray("providers").get(2).getAsJsonObject().get("id").getAsString());
+                font.getAsJsonArray("providers").get(3).getAsJsonObject().get("id").getAsString());
 
         JsonObject en = json(p, "assets/minecraft/lang/en_us.json");
-        assertEquals("\uE7C0\uE7C1\uE7C2\uE7C3", en.get("menu.game").getAsString());
+        assertEquals("\uE7C0\uE7C4\uE7C1\uE7C5\uE7C2\uE7C6\uE7C3", en.get("menu.game").getAsString());
         assertEquals("Ruby", en.get("item.cyoria.ruby").getAsString());
         assertEquals("Back to CyoriaSMP", en.get("menu.returnToGame").getAsString());
         assertEquals("กลับสู่ CyoriaSMP",
@@ -94,7 +94,7 @@ class PauseMenuBrandingTest {
         assertEquals(0, decoded.getRGB(0, 0) >>> 24, "Transparent background preserved");
         assertTrue((decoded.getRGB(10, 10) >>> 24) > 0, "Visible pixels survive resampling");
         assertArrayEquals(originalBytes, Files.readAllBytes(source), "Source file must remain untouched");
-        assertEquals("\uE7C0\uE7C1\uE7C2\uE7C3", json(pack, "assets/minecraft/lang/en_us.json")
+        assertEquals("\uE7C0\uE7C4\uE7C1\uE7C5\uE7C2\uE7C6\uE7C3", json(pack, "assets/minecraft/lang/en_us.json")
                 .get("menu.game").getAsString());
     }
 
@@ -115,9 +115,9 @@ class PauseMenuBrandingTest {
         ResourcePack p = pack();
         PauseMenuBranding.apply(p, settings(logo(dir)));
         JsonObject font = json(p, "assets/minecraft/font/default.json");
-        assertEquals(4, font.getAsJsonArray("providers").size());
+        assertEquals(5, font.getAsJsonArray("providers").size());
         assertEquals("minecraft:include/default",
-                font.getAsJsonArray("providers").get(2).getAsJsonObject().get("id").getAsString());
+                font.getAsJsonArray("providers").get(3).getAsJsonObject().get("id").getAsString());
     }
 
     @Test
