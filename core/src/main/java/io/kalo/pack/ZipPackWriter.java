@@ -117,14 +117,32 @@ public final class ZipPackWriter {
     }
 
     static @NotNull String packMetaJson(@NotNull PackMeta meta) {
-        JsonObject supportedFormats = new JsonObject();
-        supportedFormats.addProperty("min_inclusive", meta.minFormat());
-        supportedFormats.addProperty("max_inclusive", meta.maxFormat());
-
         JsonObject packSection = new JsonObject();
-        packSection.addProperty("pack_format", meta.format());
         packSection.addProperty("description", meta.description());
-        packSection.add("supported_formats", supportedFormats);
+
+        // Minecraft 1.21.9+ (resource format >=65) requires min_format and
+        // max_format. The old supported_formats field is INVALID for packs
+        // targeting only modern formats. Omitting min/max caused 1.21.11
+        // clients to reject the ENTIRE pack, including the ESC logo glyph.
+        if (meta.maxFormat() >= 65) {
+            com.google.gson.JsonArray min = new com.google.gson.JsonArray();
+            min.add(meta.minFormat());
+            min.add(0);
+            com.google.gson.JsonArray max = new com.google.gson.JsonArray();
+            max.add(meta.maxFormat());
+            max.add(0);
+            packSection.add("min_format", min);
+            packSection.add("max_format", max);
+        }
+        if (meta.minFormat() < 65) {
+            // Keep legacy metadata ONLY if the advertised range includes an
+            // actual pre-1.21.9 pack format. Mixed ranges carry both schemas.
+            JsonObject supportedFormats = new JsonObject();
+            supportedFormats.addProperty("min_inclusive", meta.minFormat());
+            supportedFormats.addProperty("max_inclusive", meta.maxFormat());
+            packSection.addProperty("pack_format", meta.format());
+            packSection.add("supported_formats", supportedFormats);
+        }
 
         JsonObject root = new JsonObject();
         root.add("pack", packSection);
