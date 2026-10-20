@@ -40,6 +40,29 @@ pause-menu:
       return-to-game: "กลับเข้าเกม"
       disconnect: "ออกจากเซิร์ฟเวอร์"
 
+  # Server-side real clickable ESC button (Java 1.21.11 dialogs).
+  # Kalo creates world/datapacks/kalo-pause-menu; Minecraft registry reload
+  # (or world restart) is necessary after changing these entries.
+  dialog:
+    enabled: false
+    title: "CyoriaSMP"
+    pause-button: "เมนู CyoriaSMP"
+    description: "ทางลัดสำหรับผู้เล่น CyoriaSMP"
+    columns: 2
+    buttons:
+      - label: "เมนูเซิร์ฟเวอร์"
+        type: command
+        value: "/menu"
+      - label: "ตลาด"
+        type: command
+        value: "/shop"
+      - label: "เว็บไซต์"
+        type: url
+        value: "https://www.cyoriasmp.com"
+      - label: "Discord"
+        type: url
+        value: "https://discord.cyoriasmp.com"
+
 # Optional synchronization into an EXISTING standalone Geyser directory.
 # Keep this empty unless you operate Geyser in a separate process and want
 # Kalo to copy its generated.mcpack and two mapping files automatically.
