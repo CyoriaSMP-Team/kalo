@@ -92,6 +92,13 @@ pack-host:
   # Legacy default listens on all interfaces, matching previous versions.
   bind-address: "0.0.0.0"
 
+  # Optional direct publish. Kalo uploads completed packs via the private
+  # Tailnet/WireGuard endpoint and only advertises after Relay confirms bytes.
+  # Empty = legacy local HTTP hosting; no Relay upload.
+  relay-upload-url: ""
+  # Absolute path to a private bearer token file; never commit the token.
+  relay-token-file: ""
+
   # true kicks players who decline or fail to download. Leave false unless the content is
   # essential to play — a failed download then only means missing textures, not no access.
   required: false
