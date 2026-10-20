@@ -45,6 +45,7 @@ public final class NativeGlyphRegistry {
     private static final Pattern NAME = Pattern.compile("[a-z][a-z0-9_]{0,48}");
     private static final int GLYPH_MAX = 256;
     private static final int MAX_SLICES = 32;
+    private static final int MAX_RESERVED_CODEPOINTS = 2 * MAX_SLICES - 1;
     private static final double SAFE_ADVANCE = 30;
     private static final int MAX_PNG_BYTES = 4 * 1024 * 1024;
 
@@ -134,7 +135,7 @@ public final class NativeGlyphRegistry {
             if (!NAME.matcher(entry.getKey()).matches() || !entry.getKey().equals(def.name())) {
                 throw new IOException("Invalid glyph id " + entry.getKey());
             }
-            if (def.codepoint() < 0xE000 || def.codepoint() > 0xF8FF - MAX_SLICES + 1) {
+            if (def.codepoint() < 0xE000 || def.codepoint() > 0xF8FF - MAX_RESERVED_CODEPOINTS + 1) {
                 throw new IOException("Glyph " + def.name() + " codepoint outside safe private-use range");
             }
             if (def.height() < 1 || def.height() > 128
@@ -164,12 +165,24 @@ public final class NativeGlyphRegistry {
             if ((double) dstW / slices * def.height() / dstH > SAFE_ADVANCE) {
                 throw new IOException("Glyph " + def.name() + " is too wide after 32 slices");
             }
+            // BitmapProvider adds +1 pixel to every glyph's integer advance.
+            // Add invisible spacing codepoints to compensate seams between
+            // columns; correction comes from actual alpha-trimmed widths.
             StringBuilder glyphs = new StringBuilder();
+            StringBuilder visibleGlyphs = new StringBuilder();
+            JsonObject spacing = new JsonObject();
             for (int i = 0; i < slices; i++) {
                 int value = def.codepoint() + i;
                 if (!reserved.add(value)) throw new IOException("Duplicate glyph codepoint U+"
                         + Integer.toHexString(value).toUpperCase(java.util.Locale.ROOT));
                 glyphs.appendCodePoint(value);
+                visibleGlyphs.appendCodePoint(value);
+                if (i < slices - 1) {
+                    int spacer = def.codepoint() + slices + i;
+                    if (!reserved.add(spacer)) throw new IOException("Duplicate kerning codepoint U+"
+                            + Integer.toHexString(spacer).toUpperCase(java.util.Locale.ROOT));
+                    glyphs.appendCodePoint(spacer);
+                }
             }
             byte[] sprite = raw;
             int paddedWidth = dstW + (slices - dstW % slices) % slices;
@@ -187,6 +200,27 @@ public final class NativeGlyphRegistry {
                 if (!ImageIO.write(sheet, "png", result)) throw new IOException("Cannot encode glyph sprite");
                 sprite = result.toByteArray();
             }
+            if (slices > 1) {
+                BufferedImage emitted = ImageIO.read(new ByteArrayInputStream(sprite));
+                int cellWidth = emitted.getWidth() / slices;
+                double scale = (double) def.height() / emitted.getHeight();
+                double idealStep = cellWidth * scale;
+                for (int i = 0; i < slices - 1; i++) {
+                    int actualWidth = 0;
+                    scan: for (int column = cellWidth - 1; column >= 0; column--) {
+                        for (int y = 0; y < emitted.getHeight(); y++) {
+                            if ((emitted.getRGB(i * cellWidth + column, y) >>> 24) != 0) {
+                                actualWidth = column + 1;
+                                break scan;
+                            }
+                        }
+                    }
+                    // The client computes floor(actualWidth * scale + 0.5) + 1.
+                    int advance = (int) Math.floor(actualWidth * scale + 0.5d) + 1;
+                    spacing.addProperty(Character.toString(def.codepoint() + slices + i),
+                            (float) (idealStep - advance));
+                }
+            }
             String assetPath = "assets/kalo/textures/font/" + def.name() + ".png";
             String providerId = "kalo:font/" + def.name() + ".png";
             JsonObject provider = new JsonObject();
@@ -195,9 +229,15 @@ public final class NativeGlyphRegistry {
             provider.addProperty("height", def.height());
             provider.addProperty("ascent", def.ascent());
             JsonArray chars = new JsonArray();
-            chars.add(glyphs.toString());
+            chars.add(visibleGlyphs.toString());
             provider.add("chars", chars);
             front.add(provider);
+            if (spacing.size() > 0) {
+                JsonObject spaceProvider = new JsonObject();
+                spaceProvider.addProperty("type", "space");
+                spaceProvider.add("advances", spacing);
+                front.add(spaceProvider);
+            }
             assets.put(assetPath, sprite);
             symbols.put(def.name(), glyphs.toString());
         }
