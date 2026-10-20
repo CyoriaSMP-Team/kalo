@@ -39,6 +39,7 @@ public final class PackHost {
     private final String publicAddress;
     private final String publicBaseUrl;
     private final String bindAddress;
+    private final @Nullable RelayPackPublisher relayPublisher;
 
     private volatile HttpServer server;
     private ExecutorService executor;
@@ -56,6 +57,13 @@ public final class PackHost {
      */
     public PackHost(@NotNull File packFile, int port, @NotNull String publicAddress,
                     @NotNull String publicBaseUrl, @NotNull String bindAddress) {
+        this(packFile, port, publicAddress, publicBaseUrl, bindAddress, null);
+    }
+
+    public PackHost(@NotNull File packFile, int port, @NotNull String publicAddress,
+                    @NotNull String publicBaseUrl, @NotNull String bindAddress,
+                    @Nullable RelayPackPublisher relayPublisher) {
+        this.relayPublisher = relayPublisher;
         this.packFile = packFile;
         this.port = port;
         this.publicAddress = publicAddress;
@@ -92,8 +100,12 @@ public final class PackHost {
             server.setExecutor(executor);
             server.start();
 
-            refresh();
-            LOGGER.info("Serving the resource pack at " + url());
+            if (relayPublisher == null) {
+                refresh();
+                LOGGER.info("Serving the resource pack at " + url());
+            } else {
+                LOGGER.info("Direct Relay publisher ready; resource pack held until Relay confirms upload");
+            }
             return true;
         } catch (IOException | RuntimeException e) {
             stop();
@@ -129,6 +141,40 @@ public final class PackHost {
         byte[] bytes = readPack();
         version = new PackVersion(
                 UUID.randomUUID().toString(), bytes == null ? "" : computeSha1(bytes), bytes);
+    }
+
+    public boolean relayMode() {
+        return relayPublisher != null;
+    }
+
+    /**
+     * Publish an immutable version to the private Relay API before exposing the
+     * snapshot to players. A failed upload cannot replace a known-good version.
+     * Same pack bytes always produce the same version ID across restarts.
+     */
+    public synchronized boolean publishToRelay() throws IOException, InterruptedException {
+        if (relayPublisher == null) {
+            throw new IllegalStateException("Direct Relay publishing is not configured");
+        }
+        byte[] bytes = readPack();
+        if (bytes == null) {
+            throw new IOException("No generated resource pack is available");
+        }
+        String sha1 = computeSha1(bytes);
+        if (sha1.isBlank()) {
+            throw new IOException("Could not compute resource pack hash");
+        }
+        // Name-based UUID derives from the content hash: identical packs retain
+        // their public URL, even when the Minecraft server restarts.
+        String token = UUID.nameUUIDFromBytes(
+                sha1.getBytes(java.nio.charset.StandardCharsets.US_ASCII)).toString();
+        PackVersion before = version;
+        if (before.bytes() != null && before.token().equals(token) && before.sha1().equals(sha1)) {
+            return false;
+        }
+        relayPublisher.upload(token, bytes);
+        version = new PackVersion(token, sha1, bytes);
+        return true;
     }
 
     public @NotNull String url() {
