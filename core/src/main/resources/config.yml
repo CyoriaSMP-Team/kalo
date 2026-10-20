@@ -21,6 +21,25 @@ base-pack: ""
 #   never  skip Bedrock entirely.
 bedrock: auto
 
+# First-party vanilla Java ESC / Pause Menu branding (no client mod).
+# Kalo adds the PNG as a bitmap font glyph and overrides selected vanilla
+# translation keys when generating the pack. It does not add clickable buttons.
+# Put your own PNG in plugins/Kalo/branding/pause-logo.png, enable this, then
+# run /kalo reload. The base-pack never needs manual editing.
+pause-menu:
+  enabled: false
+  logo: "branding/pause-logo.png"
+  glyph-codepoint: "E7C0" # Private-use BMP character, must not overlap other fonts
+  height: 30              # Display height; bitmap keeps original aspect ratio
+  ascent: 26              # Baseline position (must not exceed height)
+  translations:
+    en_us:
+      return-to-game: "Back to the server"
+      disconnect: "Disconnect"
+    th_th:
+      return-to-game: "กลับเข้าเกม"
+      disconnect: "ออกจากเซิร์ฟเวอร์"
+
 # Optional synchronization into an EXISTING standalone Geyser directory.
 # Keep this empty unless you operate Geyser in a separate process and want
 # Kalo to copy its generated.mcpack and two mapping files automatically.
