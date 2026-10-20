@@ -177,6 +177,21 @@ class PackHostTest {
     }
 
     @Test
+    void customHttpsUrlWorksWithLoopbackOnlyBind(@TempDir Path dir) throws IOException {
+        Path pack = dir.resolve("generated.zip");
+        Files.write(pack, "kalo https pack".getBytes());
+        int port = freePort();
+        host = new PackHost(pack.toFile(), port, "unused.example.net",
+                "https://kalo.cyoriasmp.com/", "127.0.0.1");
+        assertTrue(host.start());
+        assertTrue(host.url().startsWith("https://kalo.cyoriasmp.com/"));
+        assertTrue(host.url().endsWith("/pack.zip"));
+        // Public advertised URL is HTTPS; the private tunnel origin uses HTTP.
+        String path = URI.create(host.url()).getPath();
+        assertArrayEquals(Files.readAllBytes(pack), get("http://127.0.0.1:" + port + path));
+    }
+
+    @Test
     void ipv6PublicAddressIsRenderedAsAValidUrl(@TempDir Path dir) {
         host = new PackHost(dir.resolve("generated.zip").toFile(), 8163, "::1");
 

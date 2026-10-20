@@ -37,6 +37,8 @@ public final class PackHost {
     private final File packFile;
     private final int port;
     private final String publicAddress;
+    private final String publicBaseUrl;
+    private final String bindAddress;
 
     private volatile HttpServer server;
     private ExecutorService executor;
@@ -45,9 +47,20 @@ public final class PackHost {
             new PackVersion(UUID.randomUUID().toString(), "", null);
 
     public PackHost(@NotNull File packFile, int port, @NotNull String publicAddress) {
+        this(packFile, port, publicAddress, "", "0.0.0.0");
+    }
+
+    /**
+     * Allows HTTPS delivery through a reverse proxy / Cloudflare Tunnel while
+     * the pack listener stays bound exclusively to the local loopback interface.
+     */
+    public PackHost(@NotNull File packFile, int port, @NotNull String publicAddress,
+                    @NotNull String publicBaseUrl, @NotNull String bindAddress) {
         this.packFile = packFile;
         this.port = port;
         this.publicAddress = publicAddress;
+        this.publicBaseUrl = publicBaseUrl.trim().replaceAll("/+$", "");
+        this.bindAddress = bindAddress;
     }
 
     /** @return whether the host started; a failure here must not stop the plugin */
@@ -58,11 +71,20 @@ public final class PackHost {
                 // advertise :0 and therefore hand every player an unreachable URL.
                 throw new IllegalArgumentException("port must be between 1 and 65535, got " + port);
             }
-            if (publicAddress.isBlank()) {
+            if (publicBaseUrl.isEmpty() && publicAddress.isBlank()) {
                 throw new IllegalArgumentException("public address must not be blank");
             }
+            if (!publicBaseUrl.isEmpty()) {
+                java.net.URI uri = java.net.URI.create(publicBaseUrl);
+                if (!("https".equalsIgnoreCase(uri.getScheme())
+                        || "http".equalsIgnoreCase(uri.getScheme()))
+                        || uri.getHost() == null || uri.getUserInfo() != null
+                        || uri.getQuery() != null || uri.getFragment() != null) {
+                    throw new IllegalArgumentException("pack-host.public-url must be an HTTP(S) URL");
+                }
+            }
 
-            server = HttpServer.create(new InetSocketAddress(port), 0);
+            server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
             server.createContext("/", this::handle);
             // A virtual-thread executor: downloads are IO-bound and a pack can be tens of
             // megabytes, so a fixed pool would stall joins behind slow clients.
@@ -132,6 +154,9 @@ public final class PackHost {
     }
 
     private @NotNull String url(@NotNull String token) {
+        if (!publicBaseUrl.isEmpty()) {
+            return publicBaseUrl + "/" + token + "/pack.zip";
+        }
         String address = publicAddress.trim();
         // URI syntax requires brackets around an IPv6 literal.
         if (address.indexOf(':') >= 0 && !(address.startsWith("[") && address.endsWith("]"))) {
