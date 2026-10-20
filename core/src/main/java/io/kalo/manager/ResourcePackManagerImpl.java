@@ -262,6 +262,10 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
         Bukkit.getPluginManager().callEvent(new AsyncResourcePackGenerationEvent(resourcePack));
 
+        // Native Kalo ESC branding is applied last, after the base-pack and all
+        // content providers, so existing fonts, items and translations survive.
+        applyPauseMenuBranding(resourcePack);
+
         // After the event: a listener may have supplied the very asset that would
         // otherwise look missing.
         io.kalo.pack.PackValidator.report(io.kalo.pack.PackValidator.validate(resourcePack));
@@ -292,6 +296,25 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                 }
                 LOGGER.info("Pack available at " + host.url());
             }
+        }
+    }
+
+    /** First-party vanilla ESC/menu branding driven by Kalo's own config. */
+    private static void applyPauseMenuBranding(@NotNull ResourcePack pack) {
+        if (!(Kalo.plugin() instanceof org.bukkit.plugin.java.JavaPlugin plugin)) return;
+        org.bukkit.configuration.ConfigurationSection menu =
+                plugin.getConfig().getConfigurationSection("pause-menu");
+        if (menu == null || !menu.getBoolean("enabled", false)) return;
+        try {
+            var settings = io.kalo.pack.branding.PauseMenuBranding.settings(
+                    menu, Constants.dataFolder().toPath());
+            io.kalo.pack.branding.PauseMenuBranding.apply(pack, settings);
+            LOGGER.info("Generated native Kalo pause-menu branding with "
+                    + settings.locales().size() + " locale(s)");
+        } catch (IOException | IllegalArgumentException error) {
+            LOGGER.log(Level.SEVERE,
+                    "Cannot generate native Kalo pause-menu branding; check config and logo. "
+                            + "Other resource pack assets remain available.", error);
         }
     }
 
