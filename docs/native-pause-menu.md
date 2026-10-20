@@ -58,7 +58,7 @@ pause-menu:
     description: "ทางลัดสำหรับผู้เล่น CyoriaSMP"
     columns: 2
     buttons:
-      - { label: "เมนูเซิร์ฟเวอร์", type: command, value: "/menu" }
+      - { label: "กลับจุดเกิด", type: command, value: "/spawn" }
       - { label: "ตลาด", type: command, value: "/shop" }
       - { label: "เว็บไซต์", type: url, value: "https://www.cyoriasmp.com" }
       - { label: "Discord", type: url, value: "https://discord.cyoriasmp.com" }

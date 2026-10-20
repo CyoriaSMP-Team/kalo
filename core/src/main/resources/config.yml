@@ -50,9 +50,9 @@ pause-menu:
     description: "ทางลัดสำหรับผู้เล่น CyoriaSMP"
     columns: 2
     buttons:
-      - label: "เมนูเซิร์ฟเวอร์"
+      - label: "กลับจุดเกิด"
         type: command
-        value: "/menu"
+        value: "/spawn"
       - label: "ตลาด"
         type: command
         value: "/shop"

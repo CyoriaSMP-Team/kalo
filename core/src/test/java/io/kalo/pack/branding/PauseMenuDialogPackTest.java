@@ -18,7 +18,7 @@ class PauseMenuDialogPackTest {
     private static PauseMenuDialogPack.Settings example() {
         return new PauseMenuDialogPack.Settings("CyoriaSMP", "เมนู CyoriaSMP",
                 "ทางลัดเซิร์ฟเวอร์", 2, List.of(
-                new PauseMenuDialogPack.Button("เมนูเซิร์ฟเวอร์", "command", "/menu"),
+                new PauseMenuDialogPack.Button("กลับจุดเกิด", "command", "/spawn"),
                 new PauseMenuDialogPack.Button("ตลาด", "command", "/shop"),
                 new PauseMenuDialogPack.Button("เว็บไซต์", "url", "https://www.cyoriasmp.com"),
                 new PauseMenuDialogPack.Button("Discord", "url", "https://discord.cyoriasmp.com")));
@@ -38,7 +38,7 @@ class PauseMenuDialogPackTest {
         assertEquals(4,dialog.getAsJsonArray("actions").size());
         JsonObject first = dialog.getAsJsonArray("actions").get(0).getAsJsonObject();
         assertEquals("minecraft:run_command", first.getAsJsonObject("action").get("type").getAsString());
-        assertEquals("/menu",first.getAsJsonObject("action").get("command").getAsString());
+        assertEquals("/spawn",first.getAsJsonObject("action").get("command").getAsString());
         JsonObject last = dialog.getAsJsonArray("actions").get(3).getAsJsonObject();
         assertEquals("minecraft:open_url",last.getAsJsonObject("action").get("type").getAsString());
         assertEquals("https://discord.cyoriasmp.com",last.getAsJsonObject("action").get("url").getAsString());
