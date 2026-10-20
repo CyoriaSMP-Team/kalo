@@ -54,6 +54,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
 
         // Writes config.yml on first run without overwriting an edited one.
         saveDefaultConfig();
+        installPauseDialog();
 
         Path virtualBlockFile = getDataFolder().toPath().resolve("virtual-blocks.kvb");
         try {
@@ -156,6 +157,25 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         Kalo.unregisterPlugin();
     }
 
+    /** Build the Java pause-screen dialog registry as an owned Kalo datapack. */
+    private void installPauseDialog() {
+        var menu = getConfig().getConfigurationSection("pause-menu.dialog");
+        if (menu == null || !menu.getBoolean("enabled", false)) return;
+        try {
+            if (getServer().getWorlds().isEmpty()) {
+                throw new IOException("Cannot install pause dialog: no loaded world");
+            }
+            var settings = io.kalo.pack.branding.PauseMenuDialogPack.parse(menu);
+            boolean updated = io.kalo.pack.branding.PauseMenuDialogPack.install(
+                    getServer().getWorlds().get(0).getWorldFolder().toPath(), settings);
+            getLogger().info("Native pause dialog datapack " + (updated ? "updated" : "unchanged")
+                    + " (buttons=" + settings.buttons().size()
+                    + "). Load the world datapack registry to apply changes.");
+        } catch (IOException | RuntimeException error) {
+            getLogger().log(Level.SEVERE, "Failed to generate native pause dialog datapack", error);
+        }
+    }
+
     /** Accessed by the command route after listeners have been initialized. */
     public GuiListener guiListener() { return guiListener; }
 
@@ -188,6 +208,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
             reloadableList.get(i).end(context);
         }
         reloadConfig();
+        installPauseDialog();
         reloadableList.forEach(reloadable -> reloadable.preload(context));
         reloadableList.forEach(reloadable -> reloadable.start(context));
 
