@@ -10,8 +10,11 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -37,6 +40,10 @@ public final class PauseMenuBranding {
     private static final List<String> DEFAULT_FONT_REFERENCES = List.of(
             "minecraft:include/space", "minecraft:include/default", "minecraft:include/unifont");
     private static final int MAX_PNG_SIZE = 4 * 1024 * 1024;
+    // Minecraft bitmap providers reject an individual glyph bigger than 256x256.
+    // Every branding texture is one glyph (one char in one row), so this is
+    // also the maximum size of the resulting PNG file.
+    private static final int MAX_GLYPH_DIMENSION = 256;
 
     private PauseMenuBranding() { }
 
@@ -130,6 +137,11 @@ public final class PauseMenuBranding {
                 || preview.getWidth() > 4096 || preview.getHeight() > 4096) {
             throw new IOException("Pause-menu PNG image has invalid dimensions");
         }
+        // A valid 512x188 PNG may still show as a missing-character square:
+        // Minecraft's bitmap font glyphs have a strict 256x256 texture limit.
+        // Scale during native pack generation, preserving the original PNG and
+        // its aspect ratio for future configuration changes.
+        image = fitBitmapGlyph(image, preview);
 
         // Prepare every changed file before mutating the pack (all-or-nothing).
         JsonObject font = readObject(pack.file(FONT_PATH), FONT_PATH);
@@ -184,6 +196,39 @@ public final class PauseMenuBranding {
         for (var entry : languages.entrySet()) {
             pack.file(entry.getKey(), Json.writable(entry.getValue()));
         }
+    }
+
+    /** Reduces only oversized glyphs; already-valid PNGs remain byte-identical. */
+    private static byte[] fitBitmapGlyph(byte[] image, BufferedImage source) throws IOException {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        if (width <= MAX_GLYPH_DIMENSION && height <= MAX_GLYPH_DIMENSION) {
+            return image;
+        }
+        double factor = Math.min((double) MAX_GLYPH_DIMENSION / width,
+                (double) MAX_GLYPH_DIMENSION / height);
+        int targetWidth = Math.max(1, (int) Math.round(width * factor));
+        int targetHeight = Math.max(1, (int) Math.round(height * factor));
+        // Defensive clamp for rounding a dimension very close to the cap.
+        targetWidth = Math.min(targetWidth, MAX_GLYPH_DIMENSION);
+        targetHeight = Math.min(targetHeight, MAX_GLYPH_DIMENSION);
+        BufferedImage reduced = new BufferedImage(targetWidth, targetHeight,
+                BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = reduced.createGraphics();
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            graphics.setRenderingHint(RenderingHints.KEY_RENDERING,
+                    RenderingHints.VALUE_RENDER_QUALITY);
+            graphics.drawImage(source, 0, 0, targetWidth, targetHeight, null);
+        } finally {
+            graphics.dispose();
+        }
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        if (!ImageIO.write(reduced, "png", bytes)) {
+            throw new IOException("Cannot encode resized pause-menu logo PNG");
+        }
+        return bytes.toByteArray();
     }
 
     private static JsonObject readObject(Writable existing, String path) throws IOException {

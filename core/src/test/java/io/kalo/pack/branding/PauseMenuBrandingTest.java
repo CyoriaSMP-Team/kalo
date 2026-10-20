@@ -77,6 +77,40 @@ class PauseMenuBrandingTest {
     }
 
     @Test
+    void downscalesOversizedLogoWithoutChangingOriginalFile(@TempDir Path folder) throws Exception {
+        Path source = Files.createDirectories(folder.resolve("branding")).resolve("large.png");
+        BufferedImage original = new BufferedImage(512, 188, BufferedImage.TYPE_INT_ARGB);
+        original.setRGB(20, 20, 0xFF30A0F0);
+        assertTrue(ImageIO.write(original, "png", source.toFile()));
+        byte[] originalBytes = Files.readAllBytes(source);
+
+        ResourcePack pack = pack();
+        PauseMenuBranding.apply(pack, settings(source));
+        byte[] generated = pack.file("assets/kalo/textures/font/pause_logo.png").toByteArray();
+        BufferedImage decoded = ImageIO.read(new java.io.ByteArrayInputStream(generated));
+        assertNotNull(decoded);
+        assertEquals(256, decoded.getWidth());
+        assertEquals(94, decoded.getHeight());
+        assertEquals(0, decoded.getRGB(0, 0) >>> 24, "Transparent background preserved");
+        assertTrue((decoded.getRGB(10, 10) >>> 24) > 0, "Visible pixels survive resampling");
+        assertArrayEquals(originalBytes, Files.readAllBytes(source), "Source file must remain untouched");
+        assertEquals("\uE7C0", json(pack, "assets/minecraft/lang/en_us.json")
+                .get("menu.game").getAsString());
+    }
+
+    @Test
+    void handlesTallOversizedLogo(@TempDir Path folder) throws Exception {
+        Path source = folder.resolve("tall.png");
+        assertTrue(ImageIO.write(new BufferedImage(120, 600, BufferedImage.TYPE_INT_ARGB), "png", source.toFile()));
+        ResourcePack pack = pack();
+        PauseMenuBranding.apply(pack, settings(source));
+        BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(
+                pack.file("assets/kalo/textures/font/pause_logo.png").toByteArray()));
+        assertEquals(51, image.getWidth());
+        assertEquals(256, image.getHeight());
+    }
+
+    @Test
     void startsWithVanillaFallbackIfNoFontExists(@TempDir Path dir) throws Exception {
         ResourcePack p = pack();
         PauseMenuBranding.apply(p, settings(logo(dir)));
