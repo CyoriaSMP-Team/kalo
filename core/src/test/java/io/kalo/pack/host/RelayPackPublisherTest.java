@@ -62,6 +62,7 @@ class RelayPackPublisherTest {
                 "https://kalo.example", "127.0.0.1", publisher);
 
         assertTrue(host.start());
+        assertNull(host.server(), "Direct mode should not listen on a local HTTP port");
         assertNull(host.snapshot(), "No Relay acknowledgement, no player-visible pack");
         assertTrue(host.publishToRelay());
         assertNotNull(host.snapshot());

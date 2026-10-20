@@ -42,6 +42,7 @@ public final class PackHost {
     private final @Nullable RelayPackPublisher relayPublisher;
 
     private volatile HttpServer server;
+    private volatile boolean started;
     private ExecutorService executor;
     /** URL, hash and bytes change as one snapshot. */
     private volatile PackVersion version =
@@ -92,6 +93,13 @@ public final class PackHost {
                 }
             }
 
+            if (relayPublisher != null) {
+                // Direct publishing has no need to open a local pack HTTP listener.
+                started = true;
+                LOGGER.info("Direct Relay publisher ready; no local HTTP port opened");
+                return true;
+            }
+
             server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
             server.createContext("/", this::handle);
             // A virtual-thread executor: downloads are IO-bound and a pack can be tens of
@@ -99,13 +107,9 @@ public final class PackHost {
             executor = Executors.newVirtualThreadPerTaskExecutor();
             server.setExecutor(executor);
             server.start();
-
-            if (relayPublisher == null) {
-                refresh();
-                LOGGER.info("Serving the resource pack at " + url());
-            } else {
-                LOGGER.info("Direct Relay publisher ready; resource pack held until Relay confirms upload");
-            }
+            started = true;
+            refresh();
+            LOGGER.info("Serving the resource pack at " + url());
             return true;
         } catch (IOException | RuntimeException e) {
             stop();
@@ -116,6 +120,7 @@ public final class PackHost {
     }
 
     public void stop() {
+        started = false;
         HttpServer running = server;
         server = null;
         if (running != null) {
@@ -193,7 +198,7 @@ public final class PackHost {
     /** A coherent URL/hash pair for one resource-pack request. */
     public @Nullable Snapshot snapshot() {
         PackVersion current = version;
-        if (server == null || current.bytes() == null || current.sha1().isEmpty()) {
+        if (!started || current.bytes() == null || current.sha1().isEmpty()) {
             return null;
         }
         return new Snapshot(url(current.token()), current.sha1());
