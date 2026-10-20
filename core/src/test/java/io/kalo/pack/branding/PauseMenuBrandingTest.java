@@ -67,7 +67,7 @@ class PauseMenuBrandingTest {
                 font.getAsJsonArray("providers").get(2).getAsJsonObject().get("id").getAsString());
 
         JsonObject en = json(p, "assets/minecraft/lang/en_us.json");
-        assertEquals("\uE7C0", en.get("menu.game").getAsString());
+        assertEquals("\uE7C0\uE7C1\uE7C2\uE7C3", en.get("menu.game").getAsString());
         assertEquals("Ruby", en.get("item.cyoria.ruby").getAsString());
         assertEquals("Back to CyoriaSMP", en.get("menu.returnToGame").getAsString());
         assertEquals("กลับสู่ CyoriaSMP",
@@ -94,7 +94,7 @@ class PauseMenuBrandingTest {
         assertEquals(0, decoded.getRGB(0, 0) >>> 24, "Transparent background preserved");
         assertTrue((decoded.getRGB(10, 10) >>> 24) > 0, "Visible pixels survive resampling");
         assertArrayEquals(originalBytes, Files.readAllBytes(source), "Source file must remain untouched");
-        assertEquals("\uE7C0", json(pack, "assets/minecraft/lang/en_us.json")
+        assertEquals("\uE7C0\uE7C1\uE7C2\uE7C3", json(pack, "assets/minecraft/lang/en_us.json")
                 .get("menu.game").getAsString());
     }
 
