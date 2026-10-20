@@ -84,6 +84,14 @@ pack-host:
   # on the same machine as the server.
   public-address: "127.0.0.1"
 
+  # Optional full public base URL for HTTPS reverse proxies / Cloudflare Tunnel.
+  # If set, Kalo sends https://hostname/<token>/pack.zip instead of http://host:port/.
+  public-url: ""
+
+  # Listener interface. Keep this on loopback if accessed only through a local proxy.
+  # Legacy default listens on all interfaces, matching previous versions.
+  bind-address: "0.0.0.0"
+
   # true kicks players who decline or fail to download. Leave false unless the content is
   # essential to play — a failed download then only means missing textures, not no access.
   required: false

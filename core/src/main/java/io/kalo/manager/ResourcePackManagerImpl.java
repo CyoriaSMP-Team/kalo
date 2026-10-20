@@ -117,6 +117,8 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                 config.getBoolean("pack-host.enabled", false),
                 config.getInt("pack-host.port", 8163),
                 config.getString("pack-host.public-address", "127.0.0.1"),
+                config.getString("pack-host.public-url", ""),
+                config.getString("pack-host.bind-address", "0.0.0.0"),
                 config.getBoolean("pack-host.required", false));
 
         if (desired.equals(packHostSettings)
@@ -131,7 +133,8 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         }
 
         packHost = new io.kalo.pack.host.PackHost(
-                generatedPackFile(), desired.port(), desired.publicAddress());
+                generatedPackFile(), desired.port(), desired.publicAddress(),
+                desired.publicUrl(), desired.bindAddress());
 
         if (packHost.start()) {
             delivery = new io.kalo.pack.host.PackDeliveryListener(packHost, desired.required());
@@ -141,7 +144,9 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         }
     }
 
-    private record PackHostSettings(boolean enabled, int port, @NotNull String publicAddress, boolean required) {
+    private record PackHostSettings(boolean enabled, int port, @NotNull String publicAddress,
+                                    @NotNull String publicUrl, @NotNull String bindAddress,
+                                    boolean required) {
     }
 
     @Override
