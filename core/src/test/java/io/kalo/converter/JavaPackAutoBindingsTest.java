@@ -34,7 +34,7 @@ class JavaPackAutoBindingsTest {
 
     @Test
     void discoversOnlyKnownMinecraftItemCarriers() {
-        var bindings = JavaPackAutoBindings.discover(source());
+        var bindings = JavaPackAutoBindings.discover(source(), material -> true, material -> 1);
         assertEquals(1, bindings.size());
         assertEquals(Material.DIAMOND_SWORD, bindings.getFirst().material());
         assertEquals("minecraft:diamond_sword", bindings.getFirst().itemModel().asString());
@@ -43,7 +43,7 @@ class JavaPackAutoBindingsTest {
     @Test
     void convertsTheExactJavaIconWithoutRequiringVanillaFallbackAssets() throws IOException {
         ResourcePack java = source();
-        var bindings = JavaPackAutoBindings.discover(java);
+        var bindings = JavaPackAutoBindings.discover(java, material -> true, material -> 1);
         var variants = ExternalModelVariants.resolveAuto(java, bindings.getFirst());
         assertEquals(1, variants.size());
         assertEquals("custom_model_data", variants.getFirst().predicates().getFirst().property());
@@ -67,7 +67,7 @@ class JavaPackAutoBindingsTest {
         java.file("assets/minecraft/items/diamond_sword.json", Writable.string("""
                 {"model":{"type":"minecraft:special","base":"minecraft:item/diamond_sword"}}
                 """));
-        var binding = JavaPackAutoBindings.discover(java).getFirst();
+        var binding = JavaPackAutoBindings.discover(java, material -> true, material -> 1).getFirst();
         assertThrows(IllegalArgumentException.class, () -> ExternalModelVariants.resolveAuto(java, binding));
     }
 }
