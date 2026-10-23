@@ -112,7 +112,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         // Subscribes to Geyser's block event. Must come after content is loaded, since
         // Geyser may already be enabled and fire immediately.
         io.kalo.integration.GeyserIntegration.registerIfPresent(this);
-        if (getConfig().getBoolean("bedrock.auto-convert-deluxemenus-forms", false)) {
+        if (getConfig().getBoolean("bedrock-forms.enabled", false)) {
             try {
                 getServer().getPluginManager().registerEvents(
                         io.kalo.converter.DeluxeMenuFormBridge.create(this), this);
