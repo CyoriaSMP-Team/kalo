@@ -31,7 +31,7 @@ public final class GuiCustomSkullScanner {
     private static final int MAX_PROFILES = 1024;
     private static final int MAX_BASE64_LENGTH = 8192;
     private static final Pattern HEAD = Pattern.compile(
-            "(?im)^\\s*material\\s*:\\s*[\\"']?basehead-([A-Za-z0-9+/=]+)");
+            "(?im)^\\s*material\\s*:\\s*['\\x22]?basehead-([A-Za-z0-9+/=]+)");
     private static final Pattern URL = Pattern.compile(
             "(?i)^https?://textures\\.minecraft\\.net/texture/([a-f0-9]{40,128})$");
 
