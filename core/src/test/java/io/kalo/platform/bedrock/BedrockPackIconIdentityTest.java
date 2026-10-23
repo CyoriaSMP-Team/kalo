@@ -36,6 +36,24 @@ class BedrockPackIconIdentityTest {
     }
 
     @Test
+    void usesExactlyTheJavaPackIconPixelsByDefaultWithoutPauseMenuBranding() throws IOException {
+        BufferedImage javaIcon = new BufferedImage(128,128,BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
+            javaIcon.setRGB(x,y,x<64 ? 0xFF123456 : 0xFFFFAA00);
+        }
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        assertTrue(ImageIO.write(javaIcon,"PNG",output));
+        byte[] converted = BedrockPackIcon.create(dir,null,Writable.bytes(output.toByteArray())).toByteArray();
+        BufferedImage bedrock = ImageIO.read(new ByteArrayInputStream(converted));
+        assertEquals(256,bedrock.getWidth());
+        assertEquals(256,bedrock.getHeight());
+        for (int y=0;y<128;y++) for (int x=0;x<128;x++) {
+            assertEquals(javaIcon.getRGB(x,y),bedrock.getRGB(x*2,y*2));
+            assertEquals(javaIcon.getRGB(x,y),bedrock.getRGB(x*2+1,y*2+1));
+        }
+    }
+
+    @Test
     void blocksPathTraversalAndCreatesFallbackWhenBrandingMissing() throws IOException {
         byte[] icon = BedrockPackIcon.create(dir, "../missing.png", null).toByteArray();
         assertEquals(256, ImageIO.read(new ByteArrayInputStream(icon)).getWidth());

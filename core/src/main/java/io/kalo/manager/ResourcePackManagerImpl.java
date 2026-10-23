@@ -550,12 +550,11 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
         BedrockPackCompiler.Result result = compiler.finish();
 
-        // Always provide a real Bedrock pack icon. Prefer the already configured
-        // Cyoria/Kalo branding; the Java base pack's pack.png is the fallback.
+        // One visual source of truth: use Java pack.png for the Bedrock pack icon.
+        // A separate logo is used only when bedrock-pack-icon is explicitly set.
         try {
             String logo = io.kalo.utils.Plugins.plugin().getConfig()
-                    .getString("bedrock-pack-icon", io.kalo.utils.Plugins.plugin().getConfig()
-                            .getString("pause-menu.logo", "branding/cyoriasmp-logo.png"));
+                    .getString("bedrock-pack-icon", null);
             result.pack().file("pack_icon.png", io.kalo.platform.bedrock.BedrockPackIcon.create(
                     Constants.dataFolder().toPath(), logo, javaPack.file("pack.png")));
         } catch (Exception invalidIcon) {
