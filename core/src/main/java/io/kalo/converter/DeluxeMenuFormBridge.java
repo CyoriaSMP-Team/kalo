@@ -9,6 +9,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.geysermc.cumulus.form.SimpleForm;
 import org.geysermc.cumulus.util.FormImage;
@@ -41,20 +44,25 @@ public final class DeluxeMenuFormBridge implements Listener {
     private static final Set<String> SAFE_ACTIONS = Set.of("player", "close", "sound", "message", "openguimenu");
     private final JavaPlugin plugin;
     private final Map<String, Menu> commands;
+    private final Map<String, Menu> menuIds;
 
     record Action(String type, String argument) {}
     record Button(int slot, String text, String imageUrl, List<Action> actions) {}
     record Menu(String id, String title, String permission, List<Button> buttons) {}
 
-    private DeluxeMenuFormBridge(JavaPlugin plugin, Map<String, Menu> commands) {
+    private DeluxeMenuFormBridge(JavaPlugin plugin, Map<String, Menu> commands,
+            Map<String, Menu> menuIds) {
         this.plugin = plugin;
         this.commands = Map.copyOf(commands);
+        this.menuIds = Map.copyOf(menuIds);
     }
 
     public static @NotNull DeluxeMenuFormBridge create(@NotNull JavaPlugin plugin) {
         File directory = new File(plugin.getDataFolder().getParentFile(), "DeluxeMenus");
         File configFile = new File(directory, "config.yml");
         Map<String, Menu> mapping = new HashMap<>();
+        Map<String, Menu> safeMenuIds = new HashMap<>();
+        Set<String> ambiguous = new java.util.HashSet<>();
         int skipped = 0;
         if (configFile.isFile()) {
             YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
@@ -74,14 +82,18 @@ public final class DeluxeMenuFormBridge implements Listener {
                         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(menuFile);
                         Menu menu = parse(id, yaml);
                         if (menu == null) { skipped++; continue; }
+                        safeMenuIds.put(id.toLowerCase(Locale.ROOT), menu);
                         List<String> aliases = record.isSet("command")
                                 ? strings(record, "command") : strings(yaml, "open_command");
                         for (String alias : aliases) {
                             String command = alias.trim().toLowerCase(Locale.ROOT);
                             if (!command.matches("[a-z0-9_:-]{1,64}")) continue;
                             // Duplicates are ambiguous; never pick a menu at random.
-                            if (mapping.containsKey(command)) mapping.remove(command);
-                            else mapping.put(command, menu);
+                            if (ambiguous.contains(command)) continue;
+                            if (mapping.containsKey(command)) {
+                                mapping.remove(command);
+                                ambiguous.add(command);
+                            } else mapping.put(command, menu);
                         }
                     } catch (Exception error) {
                         plugin.getLogger().log(Level.WARNING,
@@ -94,7 +106,7 @@ public final class DeluxeMenuFormBridge implements Listener {
         plugin.getLogger().info("Kalo Bedrock Forms ready: " + mapping.size()
                 + " safe DeluxeMenus open command(s), " + skipped
                 + " complex menu(s) delegated to original DeluxeMenus");
-        return new DeluxeMenuFormBridge(plugin, mapping);
+        return new DeluxeMenuFormBridge(plugin, mapping, safeMenuIds);
     }
 
     static Menu parse(String id, YamlConfiguration yaml) {
@@ -166,6 +178,74 @@ public final class DeluxeMenuFormBridge implements Listener {
         return ChatColor.stripColor(ChatColor.translateAlternateColorCodes('&', value));
     }
 
+    /**
+     * Intercept real DeluxeMenus inventories as a second route. Many plugins
+     * navigate using Player.performCommand() or DeluxeMenus.openMenu() directly,
+     * neither of which necessarily emits PlayerCommandPreprocessEvent. A Bedrock
+     * player must get the same form regardless of which route opened the menu.
+     *
+     * Check the *actual* inventory holder and registered menu ID. Never match
+     * only the GUI title, which other plugins can freely reuse.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        if (!plugin.getConfig().getBoolean("bedrock-forms.enabled", false)) return;
+        if (!(event.getPlayer() instanceof Player player)) return;
+        String menuName = menuNameFromDeluxeHolder(event.getInventory().getHolder());
+        if (menuName == null) return;
+        Menu menu = menuIds.get(menuName.toLowerCase(Locale.ROOT));
+        if (menu == null || !allowed(player, menu)) return;
+        try {
+            if (!isBedrockPlayer(player)) return;
+            // Do not suppress the Java fallback until Bedrock confirms the
+            // Form was accepted. InventoryOpenEvent is raised before the Java
+            // inventory opens, so cancellation keeps that chest window off-wire.
+            if (sendForm(player, menu)) event.setCancelled(true);
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.WARNING,
+                    "Could not translate DeluxeMenus inventory " + menu.id(), error);
+        }
+    }
+
+    /** Isolated reflection avoids a direct Paper plugin-classloader dependency. */
+    static String menuNameFromDeluxeHolder(InventoryHolder holder) {
+        if (holder == null || !holder.getClass().getName()
+                .equals("com.extendedclip.deluxemenus.menu.MenuHolder")) return null;
+        try {
+            Object name = holder.getClass().getMethod("getMenuName").invoke(holder);
+            return name instanceof String s && !s.isBlank() ? s : null;
+        } catch (ReflectiveOperationException exception) {
+            return null;
+        }
+    }
+
+    private boolean allowed(Player player, Menu menu) {
+        return menu.permission().isBlank() || player.hasPermission(menu.permission());
+    }
+
+    private boolean isBedrockPlayer(Player player) {
+        try {
+            GeyserApi api = GeyserApi.api();
+            if (api != null && (api.isBedrockPlayer(player.getUniqueId())
+                    || api.connectionByUuid(player.getUniqueId()) != null)) return true;
+        } catch (RuntimeException ignored) {
+            // Optional API may still be initializing; Floodgate can confirm.
+        }
+        // On Floodgate setups the backend Java UUID can differ from the UUID
+        // Geyser indexes. Ask Floodgate itself, never infer from a name prefix.
+        Plugin floodgate = plugin.getServer().getPluginManager().getPlugin("floodgate");
+        if (floodgate == null || !floodgate.isEnabled()) return false;
+        try {
+            Class<?> api = floodgate.getClass().getClassLoader().loadClass(
+                    "org.geysermc.floodgate.api.FloodgateApi");
+            Object instance = api.getMethod("getInstance").invoke(null);
+            return Boolean.TRUE.equals(api.getMethod("isFloodgatePlayer", java.util.UUID.class)
+                    .invoke(instance, player.getUniqueId()));
+        } catch (ReflectiveOperationException ignored) {
+            return false;
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         if (!plugin.getConfig().getBoolean("bedrock-forms.enabled", false)) return;
@@ -174,32 +254,69 @@ public final class DeluxeMenuFormBridge implements Listener {
         Menu menu = commands.get(message.substring(1).toLowerCase(Locale.ROOT));
         if (menu == null) return;
         Player player = event.getPlayer();
-        if (!menu.permission().isBlank() && !player.hasPermission(menu.permission())) return;
+        if (!allowed(player, menu)) return;
         try {
-            if (!GeyserApi.api().isBedrockPlayer(player.getUniqueId())) return;
-            SimpleForm.Builder form = SimpleForm.builder().title(menu.title())
-                    .content("CyoriaSMP · Bedrock");
-            for (Button button : menu.buttons()) {
-                if (button.imageUrl() != null) {
-                    form.button(button.text(), FormImage.Type.URL, button.imageUrl());
-                } else form.button(button.text());
-            }
-            form.validResultHandler(response -> {
-                int index = response.clickedButtonId();
-                if (index < 0 || index >= menu.buttons().size()) return;
-                player.getScheduler().run(plugin, task -> {
-                    if (player.isOnline() && (menu.permission().isBlank()
-                            || player.hasPermission(menu.permission()))) {
-                        execute(player, menu.buttons().get(index));
-                    }
-                }, () -> {});
-            });
-            if (GeyserApi.api().sendForm(player.getUniqueId(), form.build())) {
-                event.setCancelled(true);
-            }
+            if (!isBedrockPlayer(player)) return;
+            if (sendForm(player, menu)) event.setCancelled(true);
         } catch (Exception failure) {
             plugin.getLogger().log(Level.WARNING, "Could not show Bedrock Form; keeping original GUI", failure);
         }
+    }
+
+    private boolean sendForm(Player player, Menu menu) {
+        SimpleForm.Builder form = SimpleForm.builder().title(menu.title())
+                .content("CyoriaSMP · Bedrock");
+        for (Button button : menu.buttons()) {
+            if (button.imageUrl() != null) {
+                form.button(button.text(), FormImage.Type.URL, button.imageUrl());
+            } else form.button(button.text());
+        }
+        form.validResultHandler(response -> {
+            int index = response.clickedButtonId();
+            if (index < 0 || index >= menu.buttons().size()) return;
+            player.getScheduler().run(plugin, task -> {
+                if (player.isOnline() && allowed(player, menu)) {
+                    execute(player, menu.buttons().get(index));
+                }
+            }, () -> {});
+        });
+        org.geysermc.cumulus.form.SimpleForm ready = form.build();
+        boolean sent = false;
+        // A Floodgate player uses an injected Java UUID (0...9-xuid).
+        // Geyser connection lookup may not index that injected UUID. Prefer the
+        // authoritative Floodgate forms transport for Floodgate players.
+        Plugin floodgate = plugin.getServer().getPluginManager().getPlugin("floodgate");
+        if (floodgate != null && floodgate.isEnabled()) {
+            try {
+                Class<?> api = floodgate.getClass().getClassLoader().loadClass(
+                        "org.geysermc.floodgate.api.FloodgateApi");
+                Object instance = api.getMethod("getInstance").invoke(null);
+                boolean floodgatePlayer = Boolean.TRUE.equals(api.getMethod(
+                        "isFloodgatePlayer", java.util.UUID.class).invoke(instance, player.getUniqueId()));
+                if (floodgatePlayer) {
+                    Object accepted = api.getMethod("sendForm", java.util.UUID.class,
+                            org.geysermc.cumulus.form.Form.class)
+                            .invoke(instance, player.getUniqueId(), ready);
+                    sent = Boolean.TRUE.equals(accepted);
+                }
+            } catch (ReflectiveOperationException | LinkageError error) {
+                plugin.getLogger().log(Level.FINE,
+                        "Floodgate form API unavailable, trying Geyser API", error);
+            }
+        }
+        if (!sent) {
+            GeyserApi api = GeyserApi.api();
+            if (api != null) {
+                var connection = api.connectionByUuid(player.getUniqueId());
+                if (connection != null) sent = connection.sendForm(ready);
+                else sent = api.sendForm(player.getUniqueId(), ready);
+            }
+        }
+        if (sent) plugin.getLogger().info("Kalo opened Bedrock Form " + menu.id()
+                + " for " + player.getName());
+        else plugin.getLogger().warning("No Bedrock Form transport for "
+                + player.getName() + " (" + menu.id() + "); using original GUI");
+        return sent;
     }
 
     private void execute(Player player, Button button) {
