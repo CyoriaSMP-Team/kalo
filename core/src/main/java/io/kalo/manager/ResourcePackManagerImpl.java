@@ -485,7 +485,22 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                     .resolve("external-items.yml");
             try {
                 int mapped = 0;
-                for (var binding : io.kalo.converter.ExternalItemBindings.load(bindingsFile)) {
+                java.util.List<io.kalo.converter.ExternalItemBindings.Binding> observed =
+                        io.kalo.converter.ExternalItemBindings.load(bindingsFile);
+                var explicitKeys = new java.util.HashSet<net.kyori.adventure.key.Key>();
+                observed.forEach(binding -> explicitKeys.add(binding.itemModel()));
+                var allBindings = new java.util.ArrayList<>(observed);
+                boolean autoBind = io.kalo.utils.Plugins.plugin().getConfig()
+                        .getBoolean("external-content.auto-bind-vanilla-items", false);
+                if (autoBind) {
+                    var discovered = io.kalo.converter.JavaPackAutoBindings.discover(javaPack);
+                    for (var binding : discovered) {
+                        if (explicitKeys.add(binding.itemModel())) allBindings.add(binding);
+                    }
+                    LOGGER.info("Discovered " + discovered.size()
+                            + " Java vanilla item definition(s) for native Bedrock mapping");
+                }
+                for (var binding : allBindings) {
                     var key = binding.itemModel();
                     if (registries.item().get(key).isPresent()
                             || registries.armor().get(key).isPresent()
@@ -496,7 +511,9 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
                         continue;
                     }
                     try {
-                        var variants = io.kalo.converter.ExternalModelVariants.resolve(javaPack, binding);
+                        var variants = autoBind && !observed.contains(binding)
+                                ? io.kalo.converter.ExternalModelVariants.resolveAuto(javaPack, binding)
+                                : io.kalo.converter.ExternalModelVariants.resolve(javaPack, binding);
                         for (var variant : variants) {
                             if (compiler.addExternalVariant(variant)) {
                                 mapped++;

@@ -21,6 +21,21 @@ public final class ExternalModelVariants {
     private record Threshold(double value, JsonObject model) {}
 
     public static List<Variant> resolve(ResourcePack pack, ExternalItemBindings.Binding binding) {
+        return resolve(pack, binding, false);
+    }
+
+    /**
+     * For auto-discovered vanilla carriers, unresolved *vanilla fallback* assets
+     * are expected: vanilla textures need not be copied into a Java resource pack.
+     * Translate only the authored custom models that are really present. Failure
+     * to translate one branch never manufactures a replacement for the vanilla item.
+     */
+    public static List<Variant> resolveAuto(ResourcePack pack, ExternalItemBindings.Binding binding) {
+        return resolve(pack, binding, true);
+    }
+
+    private static List<Variant> resolve(ResourcePack pack,
+            ExternalItemBindings.Binding binding, boolean skipUnresolved) {
         Key model = binding.itemModel();
         JsonObject root = read(pack, "assets/" + model.namespace() + "/items/" + model.value() + ".json");
         if (root == null) throw new IllegalArgumentException("Missing item model " + model);
@@ -38,7 +53,13 @@ public final class ExternalModelVariants {
             Key output = plain ? model : Key.key("kalo_external",
                     digest(model.asString() + "|" + binding.material()) + "_" + i);
             ItemDefinition definition = ExternalItemModelResolver.resolveModel(pack, binding, output, leaf.model());
-            if (definition == null) throw new IllegalArgumentException("Unresolved Java item leaf " + leaf.model());
+            if (definition == null) {
+                if (skipUnresolved) continue;
+                throw new IllegalArgumentException("Unresolved Java item leaf " + leaf.model());
+            }
+            // An unqualified automatic fallback could override the stock item
+            // for every Bedrock player; preserve the actual vanilla renderer.
+            if (skipUnresolved && leaf.predicates().isEmpty()) continue;
             result.add(new Variant(definition, model, leaf.predicates()));
         }
         return List.copyOf(result);
