@@ -10,6 +10,9 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -81,6 +84,13 @@ public final class JavaAssetsBedrockTranslator {
                 // Bedrock needs native textures/ paths and atlases instead.
                 String stem = relative.substring(0, relative.length() - 4);
                 String destination = "textures/kalo/java/" + namespace + "/" + relative;
+                // Bedrock warns at 80+ characters in archive paths and some clients
+                // refuse those packs entirely. Preserve the full Java asset through
+                // a deterministic short archive name, while the atlas maps its source
+                // identifier to the real Bedrock path. Hashing is not truncation.
+                if (destination.length() >= 80) {
+                    destination = shortTexturePath(path);
+                }
                 if (bedrock.file(destination) == null) bedrock.file(destination, asset.getValue());
                 String bedrockPath = destination.substring(0, destination.length() - 4);
                 String atlasKey = "java_" + namespace + "_" + stem.replaceAll("[^a-zA-Z0-9_]", "_");
@@ -189,6 +199,16 @@ public final class JavaAssetsBedrockTranslator {
         }
         return new Report(textureCount, vanillaCount, soundCount, locales.size(),
                 entryCount, unsupported.count, unsupported.examples);
+    }
+
+    private static String shortTexturePath(String sourcePath) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(sourcePath.getBytes(StandardCharsets.UTF_8));
+            return "textures/kalo/converted/" + HexFormat.of().formatHex(digest, 0, 16) + ".png";
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("Java runtime is missing SHA-256", impossible);
+        }
     }
 
     private static final class ConversionIssues {

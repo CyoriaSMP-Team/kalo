@@ -41,6 +41,24 @@ class JavaAssetsBedrockTranslatorTest {
     }
 
     @Test
+    void longJavaTexturePathsAreNotDroppedAndBedrockZipPathsRemainShort() throws IOException {
+        ResourcePack java = pack();
+        String longName = "assets/nexo/textures/item/nexo_furniture/connectable/"
+                + "connectable_inner_dyeable.png";
+        java.file(longName, Writable.bytes(new byte[]{10, 11, 12}));
+        ResourcePack bedrock = pack();
+        JsonObject items = new JsonObject();
+        var report = JavaAssetsBedrockTranslator.translate(java, bedrock, items, new JsonObject());
+        assertEquals(1, report.textures());
+        String atlasKey = "java_nexo_item_nexo_furniture_connectable_connectable_inner_dyeable";
+        String target = items.getAsJsonObject(atlasKey).get("textures").getAsString() + ".png";
+        assertTrue(target.startsWith("textures/kalo/converted/"));
+        assertTrue(target.length() < 80);
+        assertArrayEquals(new byte[]{10, 11, 12}, bedrock.file(target).toByteArray());
+        assertTrue(bedrock.files().keySet().stream().allMatch(name -> name.length() < 80));
+    }
+
+    @Test
     void translatesLanguageJsonAndSoundDefinitions() throws IOException {
         ResourcePack java = pack();
         java.file("assets/cyoria/lang/th_th.json", Writable.string("{\"item.cyoria.axe\":\"ขวานแห่งดาว\",\"message\":\"หนึ่ง\\nสอง\"}"));
