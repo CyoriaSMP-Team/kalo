@@ -75,4 +75,17 @@ class DeluxeMenuFormBridgeTest {
         assertNull(DeluxeMenuFormBridge.parse("forged", menu(RTP.replace("[close]", "[openguimenu] ../../admin"))));
         assertNull(DeluxeMenuFormBridge.parse("funds", menu(RTP.replace("[close]", "[console] eco give player 100"))));
     }
+    @Test
+    void recognizesActualDeluxeMenusHolderEvenWithoutSlashCommandEvent() {
+        org.bukkit.inventory.InventoryHolder holder =
+                new com.extendedclip.deluxemenus.menu.MenuHolder("Warp-RTP");
+        assertEquals("Warp-RTP", DeluxeMenuFormBridge.menuNameFromDeluxeHolder(holder));
+        assertNull(DeluxeMenuFormBridge.menuNameFromDeluxeHolder(
+                new org.bukkit.inventory.InventoryHolder() {
+                    @Override public org.bukkit.inventory.Inventory getInventory() { return null; }
+                }), "Never convert a chest GUI owned by another plugin");
+        assertNull(DeluxeMenuFormBridge.menuNameFromDeluxeHolder(
+                new com.extendedclip.deluxemenus.menu.MenuHolder("")));
+    }
+
 }
