@@ -42,25 +42,48 @@ class BedrockPackIconIdentityTest {
     }
 
     @Test
-    void contentChangesInvalidateBedrockCacheVersionWithoutChangingPackUuid() throws IOException {
+    void changedContentRotatesBedrockPackIdentityWithBoundedVersion() throws IOException {
         ResourcePack pack = new ResourcePackImpl(PackMeta.of(0, "test"));
-        pack.file("manifest.json", Writable.string("{\"format_version\":2,\"header\":{\"uuid\":\"stable\",\"version\":[1,0,0]},\"modules\":[{\"version\":[1,0,0]}]}"));
+        pack.file("manifest.json", Writable.string("{\"format_version\":2,\"header\":{\"uuid\":\"stable\",\"version\":[1,0,1102407676]},\"modules\":[{\"type\":\"resources\",\"uuid\":\"old-module\",\"version\":[1,0,1102407676]}]}"));
         pack.file("textures/items/foo.png", Writable.bytes(new byte[]{1}));
         BedrockPackIdentity.refreshVersion(pack);
-        JsonObject first = JsonParser.parseString(new String(pack.file("manifest.json").toByteArray(),
-                StandardCharsets.UTF_8)).getAsJsonObject();
-        int firstVersion = first.getAsJsonObject("header").getAsJsonArray("version").get(2).getAsInt();
+        JsonObject first = manifest(pack);
+        String firstUuid = first.getAsJsonObject("header").get("uuid").getAsString();
+        String firstModuleUuid = first.getAsJsonArray("modules").get(0).getAsJsonObject().get("uuid").getAsString();
+        assertDoesNotThrow(() -> java.util.UUID.fromString(firstUuid));
+        assertDoesNotThrow(() -> java.util.UUID.fromString(firstModuleUuid));
+        assertNotEquals(firstUuid, firstModuleUuid);
+        assertEquals("[1,1,0]", first.getAsJsonObject("header").getAsJsonArray("version").toString());
+        assertEquals(first.getAsJsonObject("header").get("version"),
+                first.getAsJsonArray("modules").get(0).getAsJsonObject().get("version"));
+
         BedrockPackIdentity.refreshVersion(pack);
-        JsonObject rerun = JsonParser.parseString(new String(pack.file("manifest.json").toByteArray(),
-                StandardCharsets.UTF_8)).getAsJsonObject();
-        assertEquals(firstVersion, rerun.getAsJsonObject("header").getAsJsonArray("version").get(2).getAsInt());
+        JsonObject rerun = manifest(pack);
+        assertEquals(firstUuid, rerun.getAsJsonObject("header").get("uuid").getAsString());
+        assertEquals(firstModuleUuid, rerun.getAsJsonArray("modules").get(0).getAsJsonObject().get("uuid").getAsString());
         pack.file("textures/items/foo.png", Writable.bytes(new byte[]{2}));
         BedrockPackIdentity.refreshVersion(pack);
-        JsonObject changed = JsonParser.parseString(new String(pack.file("manifest.json").toByteArray(),
+        JsonObject changed = manifest(pack);
+        assertNotEquals(firstUuid, changed.getAsJsonObject("header").get("uuid").getAsString());
+        assertNotEquals(firstModuleUuid,
+                changed.getAsJsonArray("modules").get(0).getAsJsonObject().get("uuid").getAsString());
+        assertEquals("[1,1,0]", changed.getAsJsonObject("header").getAsJsonArray("version").toString());
+
+        // Reverting content yields exactly the first identity; no new cached pack.
+        pack.file("textures/items/foo.png", Writable.bytes(new byte[]{1}));
+        BedrockPackIdentity.refreshVersion(pack);
+        assertEquals(firstUuid, manifest(pack).getAsJsonObject("header").get("uuid").getAsString());
+    }
+
+    private static JsonObject manifest(ResourcePack pack) throws IOException {
+        return JsonParser.parseString(new String(pack.file("manifest.json").toByteArray(),
                 StandardCharsets.UTF_8)).getAsJsonObject();
-        assertNotEquals(firstVersion, changed.getAsJsonObject("header").getAsJsonArray("version").get(2).getAsInt());
-        assertEquals("stable", changed.getAsJsonObject("header").get("uuid").getAsString());
-        assertEquals(changed.getAsJsonObject("header").get("version"),
-                changed.getAsJsonArray("modules").get(0).getAsJsonObject().get("version"));
+    }
+
+    @Test
+    void missingPackModulesFailsInsteadOfPublishingUnusablePack() {
+        ResourcePack pack = new ResourcePackImpl(PackMeta.of(0, "test"));
+        pack.file("manifest.json", Writable.string("{\"format_version\":2,\"header\":{\"version\":[1,0,0]}}"));
+        assertThrows(IOException.class, () -> BedrockPackIdentity.refreshVersion(pack));
     }
 }
