@@ -137,10 +137,15 @@ public final class DeluxeMenuFormBridge implements Listener {
             String title = strip(item.getString("display_name", key));
             if (title.isBlank()) title = key;
             String description = item.getStringList("lore").stream()
-                    .map(DeluxeMenuFormBridge::strip).filter(s -> !s.isBlank()).findFirst().orElse("");
+                    .map(DeluxeMenuFormBridge::strip)
+                    .map(String::trim)
+                    .filter(line -> !line.isBlank() && !line.equalsIgnoreCase("ข้อมูล")
+                            && !line.equalsIgnoreCase("info")
+                            && !line.toLowerCase(Locale.ROOT).contains("click to"))
+                    .findFirst().orElse("");
             String label = title + (description.isBlank() ? "" : "\n" + description);
             if (label.length() > 200) label = label.substring(0, 200);
-            String image = GuiCustomSkullScanner.decodeTextureUrl(item.getString("material", ""));
+            String image = GuiHeadIcons.iconPathForMaterial(item.getString("material", ""));
             buttons.add(new Button(slot, label, image, actions));
             if (buttons.size() > MAX_BUTTONS) return null;
         }
@@ -267,8 +272,11 @@ public final class DeluxeMenuFormBridge implements Listener {
         SimpleForm.Builder form = SimpleForm.builder().title(menu.title())
                 .content("CyoriaSMP · Bedrock");
         for (Button button : menu.buttons()) {
-            if (button.imageUrl() != null) {
-                form.button(button.text(), FormImage.Type.URL, button.imageUrl());
+            if (button.imageUrl() != null &&
+                    new File(plugin.getDataFolder(), "gui-icons/"
+                            + button.imageUrl().substring("textures/ui/kalo_gui_heads/".length())
+                            + ".png").isFile()) {
+                form.button(button.text(), FormImage.Type.PATH, button.imageUrl());
             } else form.button(button.text());
         }
         form.validResultHandler(response -> {

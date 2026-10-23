@@ -550,6 +550,14 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
         BedrockPackCompiler.Result result = compiler.finish();
 
+        // Kalo's Bedrock Forms use portraits made from the same DeluxeMenus
+        // skin textures Java displays. Add them before refreshing pack identity.
+        if (io.kalo.utils.Plugins.plugin().getConfig()
+                .getBoolean("bedrock-forms.enabled", false)) {
+            io.kalo.converter.GuiHeadIcons.addToPack(result.pack(),
+                    Constants.dataFolder().toPath().getParent(), LOGGER);
+        }
+
         // One visual source of truth: use Java pack.png for the Bedrock pack icon.
         // A separate logo is used only when bedrock-pack-icon is explicitly set.
         try {
