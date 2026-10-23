@@ -166,7 +166,13 @@ public final class ExternalModelVariants {
                     visit(object(node,"fallback"),path,leaves,depth+1,auto);
                 }
             }
-            default -> throw new IllegalArgumentException("Unsupported selector " + kind);
+            default -> {
+                // Auto-discovered Java items can mix Kalo-renderable custom
+                // branches with Java-only fallbacks (notably shield's "special"
+                // renderer). Never map an unsupported fallback to a fabricated
+                // Bedrock item, but do not discard the supported branches either.
+                if (!auto) throw new IllegalArgumentException("Unsupported selector " + kind);
+            }
         }
         if (leaves.size() > MAX_BRANCHES) throw new IllegalArgumentException("Too many variants");
     }

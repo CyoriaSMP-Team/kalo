@@ -189,4 +189,27 @@ class ExternalModelVariantsTest {
                 "Never install a catch-all vanilla replacement without a matching component");
     }
 
+    @Test
+    void autoMappedShieldRetainsCustomModelButSkipsUnsupportedVanillaSpecialFallback() {
+        ResourcePack source = pack("""
+                {"type":"minecraft:condition","property":"minecraft:using_item",
+                 "on_true":{"type":"minecraft:special","base":"test:item/vanilla_shield"},
+                 "on_false":{"type":"minecraft:range_dispatch","property":"minecraft:custom_model_data",
+                             "entries":[{"threshold":20461,"model":%s}],
+                             "fallback":{"type":"minecraft:special","base":"test:item/shield"}}}
+                """.formatted(A));
+        assertThrows(IllegalArgumentException.class, () -> ExternalModelVariants.resolve(source, observed()));
+        var variants = ExternalModelVariants.resolveAuto(source, observed());
+        assertEquals(1, variants.size());
+        assertEquals(20461d, variants.getFirst().predicates().getFirst().threshold());
+        assertEquals("test:item/a", ((io.kalo.content.item.definition.ModelDefinition.Sprite)
+                variants.getFirst().definition().model()).texture().asString());
+    }
+
+    @Test
+    void unknownAutoModelCannotCreateAccidentalVanillaCatchAllMapping() {
+        ResourcePack source = pack("{\"type\":\"minecraft:special\",\"base\":\"test:item/unknown\"}");
+        assertThrows(IllegalArgumentException.class, () -> ExternalModelVariants.resolveAuto(source, observed()));
+    }
+
 }
