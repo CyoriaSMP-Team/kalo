@@ -4,6 +4,7 @@ import io.kalo.content.item.Item;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
 import io.kalo.manager.RegistryManager;
+import io.kalo.converter.GuiCustomSkullScanner;
 import io.kalo.platform.bedrock.BedrockBlockRegistration;
 import io.kalo.platform.bedrock.BedrockItemRegistration;
 import io.kalo.platform.bedrock.BedrockRegistrationSnapshot;
@@ -20,6 +21,7 @@ import org.geysermc.geyser.api.event.EventRegistrar;
 import org.geysermc.geyser.api.event.bedrock.SessionLoadResourcePacksEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCustomBlocksEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCustomItemsEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCustomSkullsEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineResourcePacksEvent;
 import org.geysermc.geyser.api.item.custom.v2.CustomItemBedrockOptions;
 import org.geysermc.geyser.api.item.custom.v2.CustomItemDefinition;
@@ -78,6 +80,8 @@ public final class GeyserBridge {
                 GeyserBridge::onDefineCustomBlocks);
         GeyserApi.api().eventBus().subscribe(registrar, GeyserDefineCustomItemsEvent.class,
                 GeyserBridge::onDefineCustomItems);
+        GeyserApi.api().eventBus().subscribe(registrar, GeyserDefineCustomSkullsEvent.class,
+                GeyserBridge::onDefineCustomSkulls);
         GeyserApi.api().eventBus().subscribe(registrar, GeyserDefineResourcePacksEvent.class,
                 GeyserBridge::onDefineResourcePacks);
         // Initial generation finishes before this bridge is installed. The per-session
@@ -140,6 +144,40 @@ public final class GeyserBridge {
 
         Plugins.logger().info("Registered and mapped " + registered + " block(s) with Geyser natively"
                 + (virtual > 0 ? "; " + virtual + " virtual block(s) render as entities instead" : ""));
+    }
+
+    /**
+     * Register menu custom heads before Geyser generates its Bedrock skull pack.
+     * Files are scanned on every Geyser startup/reload, so changing DeluxeMenus
+     * never requires hand-editing a second Bedrock-only mapping file.
+     */
+    private static void onDefineCustomSkulls(@NotNull GeyserDefineCustomSkullsEvent event) {
+        if (!Plugins.plugin().getConfig().getBoolean("bedrock.auto-register-gui-heads", true)) {
+            return;
+        }
+        Path pluginsDirectory = Plugins.plugin().getDataFolder().toPath().getParent();
+        if (pluginsDirectory == null) return;
+        Path menus = pluginsDirectory.resolve("DeluxeMenus").resolve("gui_menus");
+        try {
+            var scan = GuiCustomSkullScanner.discover(menus);
+            int registered = 0;
+            for (String skinHash : scan.skinHashes()) {
+                try {
+                    event.register(skinHash, GeyserDefineCustomSkullsEvent.SkullTextureType.SKIN_HASH);
+                    registered++;
+                } catch (Exception ex) {
+                    Plugins.logger().log(Level.WARNING,
+                            "Could not register Java GUI skull " + skinHash + " with Geyser", ex);
+                }
+            }
+            Plugins.logger().info("Auto-registered " + registered + " DeluxeMenus custom skull(s) with Geyser"
+                    + " from " + scan.filesScanned() + " Java menu file(s)"
+                    + (scan.invalidProfiles() > 0
+                        ? "; rejected " + scan.invalidProfiles() + " invalid profile(s)" : ""));
+        } catch (Exception ex) {
+            // A misconfigured menu must never disable Geyser or prevent login.
+            Plugins.logger().log(Level.WARNING, "Could not scan DeluxeMenus GUI textures", ex);
+        }
     }
 
     /**
