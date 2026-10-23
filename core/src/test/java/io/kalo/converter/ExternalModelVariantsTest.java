@@ -137,4 +137,56 @@ class ExternalModelVariantsTest {
         var result=compiler.finish();
         assertFalse(mapping(result,0).has("predicate"));
     }
+    @Test
+    void autoMappedBowKeepsRealJavaIdleModelWithoutPretendingGeyserCanDetectDrawing() throws Exception {
+        ResourcePack java = pack("""
+                {"type":"minecraft:condition","property":"minecraft:using_item",
+                 "on_true":{"type":"minecraft:range_dispatch","property":"minecraft:use_duration",
+                            "entries":[{"threshold":1,"model":%s}]},
+                 "on_false":{"type":"minecraft:range_dispatch","property":"minecraft:custom_model_data",
+                            "entries":[{"threshold":18298,"model":%s}],
+                            "fallback":{"type":"minecraft:model","model":"test:item/vanilla_not_in_pack"}}}
+                """.formatted(B,A));
+        assertThrows(IllegalArgumentException.class, () -> ExternalModelVariants.resolve(java, observed()));
+        var variants = ExternalModelVariants.resolveAuto(java, observed());
+        assertEquals(1,variants.size(),"Only the custom authored idle model can be mapped safely");
+        assertInstanceOf(io.kalo.content.item.definition.ModelDefinition.Sprite.class,
+                variants.getFirst().definition().model());
+        assertEquals(1,variants.getFirst().predicates().size());
+        assertEquals("custom_model_data",variants.getFirst().predicates().getFirst().property());
+        assertEquals(18298d,variants.getFirst().predicates().getFirst().threshold());
+        assertEquals("test:example", variants.getFirst().javaModel().asString());
+        assertFalse(variants.getFirst().predicates().stream()
+                .anyMatch(p -> p.property().equals("using_item") || p.property().equals("use_duration")));
+    }
+
+    @Test
+    void autoMappedCrossbowDuplicateThresholdsUseLastAuthoredJavaModel() {
+        ResourcePack java = pack("""
+                {"type":"minecraft:range_dispatch","property":"minecraft:custom_model_data",
+                 "entries":[{"threshold":24236,"model":%s},
+                            {"threshold":24236,"model":%s},
+                            {"threshold":24236,"model":%s}],
+                 "fallback":{"type":"minecraft:model","model":"test:item/vanilla_not_in_pack"}}
+                """.formatted(A,B,C));
+        assertThrows(IllegalArgumentException.class, () -> ExternalModelVariants.resolve(java, observed()));
+        var variants = ExternalModelVariants.resolveAuto(java,observed());
+        assertEquals(1,variants.size(),"Java picks only the last entry at equal thresholds");
+        var model = variants.getFirst().definition().model();
+        assertInstanceOf(io.kalo.content.item.definition.ModelDefinition.Sprite.class,model);
+        var sprite = (io.kalo.content.item.definition.ModelDefinition.Sprite)model;
+        assertEquals("test:item/c",sprite.texture().asString());
+        assertEquals(24236d,variants.getFirst().predicates().getFirst().threshold());
+    }
+
+    @Test
+    void autoIdleBranchWithoutItemIdentityDoesNotOverrideVanilla() {
+        var java = pack("""
+                {"type":"minecraft:condition","property":"minecraft:using_item",
+                 "on_true":%s,"on_false":%s}
+                """.formatted(B,A));
+        assertTrue(ExternalModelVariants.resolveAuto(java,observed()).isEmpty(),
+                "Never install a catch-all vanilla replacement without a matching component");
+    }
+
 }

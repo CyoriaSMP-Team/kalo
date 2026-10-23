@@ -40,7 +40,7 @@ public final class ExternalModelVariants {
         JsonObject root = read(pack, "assets/" + model.namespace() + "/items/" + model.value() + ".json");
         if (root == null) throw new IllegalArgumentException("Missing item model " + model);
         List<Leaf> leaves = new ArrayList<>();
-        visit(object(root, "model"), List.of(), leaves, 0);
+        visit(object(root, "model"), List.of(), leaves, 0, skipUnresolved);
         if (leaves.isEmpty()) throw new IllegalArgumentException("No renderable models");
         boolean plain = leaves.size() == 1 && leaves.getFirst().predicates().isEmpty();
         List<Variant> result = new ArrayList<>();
@@ -66,7 +66,7 @@ public final class ExternalModelVariants {
     }
 
     private static void visit(JsonObject node, List<ExternalModelPredicate> predicates,
-                              List<Leaf> leaves, int depth) {
+                              List<Leaf> leaves, int depth, boolean auto) {
         if (depth >= MAX_DEPTH || leaves.size() > MAX_BRANCHES) throw new IllegalArgumentException("Too many selector branches");
         String kind = normalized(str(node, "type"));
         switch (kind) {
@@ -78,15 +78,23 @@ public final class ExternalModelVariants {
             case "empty" -> { }
             case "condition" -> {
                 String property = normalized(str(node, "property"));
-                if (!Set.of("broken", "damaged", "custom_model_data", "has_component", "fishing_rod_cast")
-                        .contains(property)) throw new IllegalArgumentException("Unsupported condition " + property);
-                String component = property.equals("has_component") ? str(node, "component") : null;
-                if (property.equals("has_component") && component == null) throw new IllegalArgumentException("Missing component");
-                ExternalModelPredicate test = new ExternalModelPredicate(
-                        ExternalModelPredicate.Kind.CONDITION, property, component, null,
-                        integer(node, "index", 0), true, false);
-                visit(object(node, "on_true"), plus(predicates, test), leaves, depth+1);
-                visit(object(node, "on_false"), plus(predicates, test.negated()), leaves, depth+1);
+                if (auto && property.equals("using_item")) {
+                    // Geyser v2 has no using_item predicate. For auto-discovered
+                    // vanilla carriers only, retain the idle appearance rather
+                    // than dropping all custom models (bows/shields). This does
+                    // NOT claim to track bow draw or shield blocking animation.
+                    visit(object(node, "on_false"), predicates, leaves, depth + 1, true);
+                } else {
+                    if (!Set.of("broken", "damaged", "custom_model_data", "has_component", "fishing_rod_cast")
+                            .contains(property)) throw new IllegalArgumentException("Unsupported condition " + property);
+                    String component = property.equals("has_component") ? str(node, "component") : null;
+                    if (property.equals("has_component") && component == null) throw new IllegalArgumentException("Missing component");
+                    ExternalModelPredicate test = new ExternalModelPredicate(
+                            ExternalModelPredicate.Kind.CONDITION, property, component, null,
+                            integer(node, "index", 0), true, false);
+                    visit(object(node, "on_true"), plus(predicates, test), leaves, depth+1, auto);
+                    visit(object(node, "on_false"), plus(predicates, test.negated()), leaves, depth+1, auto);
+                }
             }
             case "range_dispatch" -> {
                 String property = normalized(str(node, "property"));
@@ -110,16 +118,25 @@ public final class ExternalModelVariants {
                     if (!Double.isFinite(threshold)) throw new IllegalArgumentException("Invalid range threshold");
                     ordered.add(new Threshold(threshold, object(entry, "model")));
                 }
+                // Stable sort preserves authoring order for equal thresholds.
+                // Java chooses the LAST matching entry, even if thresholds are
+                // identical. Auto-discovered packs may contain duplicates (e.g.
+                // Cyoria crossbow); retain only the last author-specified model.
+                // Explicit operator mappings remain strict about ambiguity.
                 ordered.sort(Comparator.comparingDouble(Threshold::value));
-                for (int i=1;i<ordered.size();i++)
-                    if (ordered.get(i-1).value()==ordered.get(i).value()) throw new IllegalArgumentException("Duplicate threshold");
+                for (int i=ordered.size()-2;i>=0;i--) {
+                    if (Double.compare(ordered.get(i).value(), ordered.get(i+1).value()) == 0) {
+                        if (auto) ordered.remove(i);
+                        else throw new IllegalArgumentException("Duplicate threshold");
+                    }
+                }
                 for (int i=0;i<ordered.size();i++) {
                     List<ExternalModelPredicate> path = plus(predicates, range(property, ordered.get(i).value(), index,normalize));
                     if (i+1 < ordered.size()) path = plus(path, range(property,ordered.get(i+1).value(),index,normalize).negated());
-                    visit(ordered.get(i).model(), path, leaves, depth+1);
+                    visit(ordered.get(i).model(), path, leaves, depth+1, auto);
                 }
                 if (node.has("fallback")) visit(object(node, "fallback"), plus(predicates,
-                        range(property, ordered.getFirst().value(), index, normalize).negated()), leaves,depth+1);
+                        range(property, ordered.getFirst().value(), index, normalize).negated()), leaves,depth+1,auto);
             }
             case "select" -> {
                 String property = normalized(str(node, "property"));
@@ -139,14 +156,14 @@ public final class ExternalModelVariants {
                                 ExternalModelPredicate.Kind.MATCH, property, value.getAsString(),null,index,true,false);
                         if (matches.stream().anyMatch(x -> x.value().equals(match.value()))) throw new IllegalArgumentException("Duplicate case value");
                         matches.add(match);
-                        visit(object(entry,"model"),plus(predicates,match),leaves,depth+1);
+                        visit(object(entry,"model"),plus(predicates,match),leaves,depth+1,auto);
                     }
                 }
                 if (matches.isEmpty()) throw new IllegalArgumentException("No cases");
                 if (node.has("fallback")) {
                     List<ExternalModelPredicate> path = predicates;
                     for (var match : matches) path = plus(path, match.negated());
-                    visit(object(node,"fallback"),path,leaves,depth+1);
+                    visit(object(node,"fallback"),path,leaves,depth+1,auto);
                 }
             }
             default -> throw new IllegalArgumentException("Unsupported selector " + kind);
