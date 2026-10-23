@@ -368,7 +368,7 @@ class BedrockPackCompilerTest {
     }
 
     @Test
-    void multiSheetAtlasRejectsIncompatibleImageDimensionsWithoutMappings() throws IOException {
+    void multiSheetAtlasPreservesDifferentResolutionSourcePngs() throws IOException {
         ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
         java.file("assets/testpack/textures/item/red.png", Writable.bytes(solidPng(16,16,0xFFFF0000)));
         java.file("assets/testpack/textures/item/blue.png", Writable.bytes(solidPng(32,16,0xFF0000FF)));
@@ -381,10 +381,57 @@ class BedrockPackCompilerTest {
                 .model(new ModelDefinition.Custom(Key.key("testpack", "item/multi"), Map.of()))
                 .build();
         BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
-        assertEquals(1, result.skippedCount());
-        assertEquals(0, result.itemCount());
-        assertNull(result.pack().file("textures/models/items/testpack_multi.png"));
-        assertTrue(result.itemRegistrations().isEmpty());
+        assertEquals(0, result.skippedCount());
+        assertEquals(1, result.itemCount());
+        assertEquals(1, result.itemRegistrations().size());
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(
+                result.pack().file("textures/models/items/testpack_multi.png").toByteArray()));
+        assertEquals(48, atlas.getWidth());
+        assertEquals(16, atlas.getHeight());
+        assertEquals(0xFFFF0000, atlas.getRGB(0, 0));
+        assertEquals(0xFF0000FF, atlas.getRGB(16, 0));
+        assertEquals(0xFF0000FF, atlas.getRGB(47, 0));
+        JsonObject geometry = json(result.pack().file("models/entity/testpack_multi.geo.json"))
+                .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals(48, geometry.getAsJsonObject("description").get("texture_width").getAsInt());
+        JsonObject faces = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject().getAsJsonObject("uv");
+        assertEquals(16, faces.getAsJsonObject("south").getAsJsonArray("uv").get(0).getAsInt());
+        assertEquals(32, faces.getAsJsonObject("south").getAsJsonArray("uv_size").get(0).getAsInt());
+    }
+
+    @Test
+    void animatedJavaTextureUsesOriginalFirstFrameWithoutStretchingWholeStrip() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
+        java.file("assets/testpack/textures/item/red.png", Writable.bytes(solidPng(64,64,0xFFFF0000)));
+        java.file("assets/testpack/textures/item/animation.png", Writable.bytes(solidPng(32,96,0xFF00FF00)));
+        java.file("assets/testpack/textures/item/animation.png.mcmeta", Writable.string(
+                "{\"animation\":{\"frametime\":3}}"));
+        java.file("assets/testpack/models/item/animated.json", Writable.string("""
+                {"textures":{"red":"testpack:item/red","effect":"testpack:item/animation"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#red","uv":[0,0,16,16]},
+                                       "south":{"texture":"#effect","uv":[0,0,16,16]}}}]}
+                """));
+        ItemDefinition def = ItemDefinition.builder(Key.key("testpack", "animated"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/animated"), Map.of())).build();
+        var result = compile(java, List.of(new StubItem(def)));
+        assertEquals(1, result.itemCount());
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(
+                result.pack().file("textures/models/items/testpack_animated.png").toByteArray()));
+        assertEquals(96, atlas.getWidth());
+        assertEquals(64, atlas.getHeight());
+        assertEquals(0xFFFF0000, atlas.getRGB(0,0));
+        assertEquals(0xFF00FF00, atlas.getRGB(64, 0));
+        assertEquals(0, atlas.getRGB(64, 40) >>> 24,
+                "Do not stretch Java's three-frame strip into a 96px-tall single image");
+        JsonObject geometry = json(result.pack().file("models/entity/testpack_animated.geo.json"))
+                .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals(96, geometry.getAsJsonObject("description").get("texture_width").getAsInt());
+        JsonObject faces = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject().getAsJsonObject("uv");
+        assertEquals(64, faces.getAsJsonObject("south").getAsJsonArray("uv").get(0).getAsInt());
+        assertEquals(32, faces.getAsJsonObject("south").getAsJsonArray("uv_size").get(1).getAsInt());
     }
 
     @Test
