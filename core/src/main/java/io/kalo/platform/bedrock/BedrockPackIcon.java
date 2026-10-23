@@ -23,11 +23,12 @@ public final class BedrockPackIcon {
 
     private BedrockPackIcon() {}
 
-    /** Prefer the server branding configured in Kalo, then Java pack.png, then Kalo's fallback. */
+    /** Use Java pack.png by default; an explicit Bedrock-only override wins if requested. */
     public static @NotNull Writable create(@NotNull Path kaloFolder,
                                             @Nullable String configuredLogo,
                                             @Nullable Writable javaPackIcon) throws IOException {
         BufferedImage image = null;
+        boolean fromJavaPack = false;
         if (configuredLogo != null && !configuredLogo.isBlank()) {
             Path root = kaloFolder.toAbsolutePath().normalize();
             Path logo = root.resolve(configuredLogo).normalize();
@@ -37,12 +38,17 @@ public final class BedrockPackIcon {
         }
         if (image == null && javaPackIcon != null) {
             byte[] bytes = javaPackIcon.toByteArray();
-            if (bytes.length <= MAX_IMAGE_BYTES) image = ImageIO.read(new ByteArrayInputStream(bytes));
+            if (bytes.length <= MAX_IMAGE_BYTES) {
+                image = ImageIO.read(new ByteArrayInputStream(bytes));
+                fromJavaPack = image != null;
+            }
         }
         BufferedImage icon = new BufferedImage(SIDE, SIDE, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = icon.createGraphics();
         try {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, fromJavaPack
+                    ? RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+                    : RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setColor(new Color(17, 22, 30));
             g.fillRect(0, 0, SIDE, SIDE);
