@@ -787,6 +787,21 @@ public final class BedrockPackCompiler {
 
     /** Writes the files that describe the pack as a whole. Call once, after all adds. */
     public @NotNull Result finish() {
+        // Translate Java base-pack resources into Bedrock-native paths before atlas
+        // serialization. Custom item/block registrations below are still authoritative.
+        JavaAssetsBedrockTranslator.Report translation =
+                JavaAssetsBedrockTranslator.translate(javaSource, pack, textureData, terrainTextureData);
+        if (translation.textures() > 0 || translation.soundFiles() > 0 || translation.locales() > 0) {
+            LOGGER.info("Converted Java base assets for Bedrock: " + translation.textures()
+                    + " textures (" + translation.vanillaTextures() + " vanilla overrides), "
+                    + translation.soundFiles() + " sounds, " + translation.locales() + " language(s)");
+        }
+        if (translation.unsupportedAssets() > 0) {
+            LOGGER.warning(translation.unsupportedAssets()
+                    + " Java asset descriptor(s) still need specialized Bedrock conversion"
+                    + " or runtime Geyser item/block identity; examples: "
+                    + translation.unsupportedExamples());
+        }
         JsonObject itemTexture = new JsonObject();
         itemTexture.addProperty("resource_pack_name", "kalo");
         itemTexture.addProperty("texture_name", "atlas.items");
@@ -801,6 +816,8 @@ public final class BedrockPackCompiler {
             blockDefinitions.entrySet().forEach(entry -> blocks.add(entry.getKey(), entry.getValue()));
             pack.file("blocks.json", Json.writable(blocks));
 
+        }
+        if (!terrainTextureData.isEmpty()) {
             JsonObject terrain = new JsonObject();
             terrain.addProperty("resource_pack_name", "kalo");
             terrain.addProperty("texture_name", "atlas.terrain");

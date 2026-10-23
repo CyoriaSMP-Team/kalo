@@ -253,10 +253,6 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         compileRegistrylessTypes(resourcePack);
         mergeBasePack(resourcePack);
 
-        if (bedrockWanted()) {
-            generateBedrockPack(resourcePack);
-        }
-
         RegistryManager.GlobalRegistries.registries().item().forEach(content ->
                 content.featureEventBus().call(new ResourcePackGenerationEvent(resourcePack)));
 
@@ -269,6 +265,13 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
         // After the event: a listener may have supplied the very asset that would
         // otherwise look missing.
         io.kalo.pack.PackValidator.report(io.kalo.pack.PackValidator.validate(resourcePack));
+
+        // Assemble the Bedrock output from the FINAL Java asset graph, including
+        // async resource-pack providers and branding. The old ordering missed
+        // everything those contributors added after Java content compilation.
+        if (bedrockWanted()) {
+            generateBedrockPack(resourcePack);
+        }
 
         final boolean changed;
         try {
@@ -530,7 +533,29 @@ public final class ResourcePackManagerImpl implements ResourcePackManager, Manag
 
         BedrockPackCompiler.Result result = compiler.finish();
 
+        // Always provide a real Bedrock pack icon. Prefer the already configured
+        // Cyoria/Kalo branding; the Java base pack's pack.png is the fallback.
         try {
+            String logo = io.kalo.utils.Plugins.plugin().getConfig()
+                    .getString("bedrock-pack-icon", io.kalo.utils.Plugins.plugin().getConfig()
+                            .getString("pause-menu.logo", "branding/cyoriasmp-logo.png"));
+            result.pack().file("pack_icon.png", io.kalo.platform.bedrock.BedrockPackIcon.create(
+                    Constants.dataFolder().toPath(), logo, javaPack.file("pack.png")));
+        } catch (Exception invalidIcon) {
+            LOGGER.log(Level.WARNING, "Could not generate Bedrock pack icon; using fallback", invalidIcon);
+            try {
+                result.pack().file("pack_icon.png", io.kalo.platform.bedrock.BedrockPackIcon.create(
+                        Constants.dataFolder().toPath(), null, null));
+            } catch (IOException unexpected) {
+                LOGGER.log(Level.SEVERE, "Could not create default Bedrock icon", unexpected);
+            }
+        }
+
+        try {
+            // Bedrock caches by UUID + manifest version. Recompute the version after
+            // adding the branding icon so clients fetch changed packs instead of the
+            // previously cached 595-byte placeholder.
+            io.kalo.platform.bedrock.BedrockPackIdentity.refreshVersion(result.pack());
             BedrockPackWriter.write(new File(Constants.dataFolder(), "generated.mcpack"), result.pack().files());
 
             // Geyser's own custom_mappings format, so a separate Geyser process needs no
