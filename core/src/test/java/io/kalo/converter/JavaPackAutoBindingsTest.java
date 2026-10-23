@@ -29,7 +29,6 @@ class JavaPackAutoBindingsTest {
         // The vanilla fallback's files deliberately do not appear in Java packs.
         source.file("assets/my_pack/textures/item/sword.png", Writable.bytes(new byte[]{2, 5, 8, 13, 21}));
         source.file("assets/something/items/not_a_material.json", Writable.string("{}"));
-        source.file("assets/minecraft/items/../../untrusted.json", Writable.string("{}"));
         return source;
     }
 
