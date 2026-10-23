@@ -168,7 +168,7 @@ public final class DeluxeMenuFormBridge implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
-        if (!plugin.getConfig().getBoolean("bedrock.auto-convert-deluxemenus-forms", false)) return;
+        if (!plugin.getConfig().getBoolean("bedrock-forms.enabled", false)) return;
         String message = event.getMessage().trim();
         if (!message.startsWith("/") || message.indexOf(' ') >= 0) return;
         Menu menu = commands.get(message.substring(1).toLowerCase(Locale.ROOT));
