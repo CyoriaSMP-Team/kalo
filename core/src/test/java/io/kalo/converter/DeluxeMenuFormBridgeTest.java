@@ -61,6 +61,16 @@ class DeluxeMenuFormBridgeTest {
     }
 
     @Test
+    void usesMeaningfulLoreInsteadOfTheLiteralInfoHeading() {
+        var result = DeluxeMenuFormBridge.parse("rtp",menu(RTP.replace(
+                "lore: ['&7Play survival']",
+                "lore: ['&aข้อมูล', '&7ขนาด: 50,000 x 50,000', '&7CLICK TO RTP']")));
+        assertNotNull(result);
+        assertTrue(result.buttons().getFirst().text().contains("50,000 x 50,000"));
+        assertFalse(result.buttons().getFirst().text().contains("ข้อมูล"));
+    }
+
+    @Test
     void blocksConsolePurchasesAndPlayerRequirementBypasses() {
         String console = RTP.replace("[player] betterrtp world world", "[console] eco give %player_name% 100");
         assertNull(DeluxeMenuFormBridge.parse("unsafe", menu(console)));

@@ -70,6 +70,11 @@ public final class GuiCustomSkullScanner {
     }
 
     /** Return the Java menu's original Minecraft skin image URL for Cumulus Forms. */
+    static String decodeMaterialHash(String material) {
+        if (material == null || !material.regionMatches(true, 0, "basehead-", 0, 9)) return null;
+        return decodeTextureHash(material.substring(9));
+    }
+
     static String decodeTextureUrl(String material) {
         if (material == null || !material.regionMatches(true, 0, "basehead-", 0, 9)) return null;
         String hash = decodeTextureHash(material.substring(9));
