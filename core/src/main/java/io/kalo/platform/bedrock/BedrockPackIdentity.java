@@ -14,9 +14,20 @@ import java.nio.charset.StandardCharsets;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.UUID;
 
-/** Version Bedrock packs by actual contents so clients never reuse an empty cached pack. */
+/**
+ * Give each distinct Bedrock pack a distinct identity, rather than encoding a
+ * 31-bit SHA-256 fragment in a manifest version number.
+ *
+ * Bedrock can reject oversized version parts. Furthermore, an arbitrary hash
+ * converted to a version may go *backwards*, making an updated pack appear
+ * older to clients caching a previous release under the same UUID.
+ * The immutable content-derived UUID prevents that cache collision and the
+ * conservative version numbers remain valid for normal Bedrock manifests.
+ */
 public final class BedrockPackIdentity {
     private BedrockPackIdentity() {}
 
@@ -43,19 +54,40 @@ public final class BedrockPackIdentity {
                 digest.update((byte) 0);
             }
             byte[] hash = digest.digest();
-            int versionPatch = (((hash[0] & 127) << 24) | ((hash[1] & 255) << 16)
-                    | ((hash[2] & 255) << 8) | (hash[3] & 255));
+            // Different content must *not* reuse the same Bedrock cache key. Use
+            // domain-separated UUIDs for the header and resource module so they
+            // are deterministic across server restarts without sharing identities.
+            JsonObject header = root.getAsJsonObject("header");
+            JsonArray modules = root.getAsJsonArray("modules");
+            if (header == null || modules == null || modules.isEmpty()) {
+                throw new IOException("Generated Bedrock pack is missing header/modules");
+            }
+            // A fixed, small version is sufficient because changes rotate the
+            // content-derived UUID. 1.1.0 also avoids the old 1.0.<hash> scheme.
             JsonArray version = new JsonArray();
             version.add(1);
+            version.add(1);
             version.add(0);
-            version.add(versionPatch);
-            root.getAsJsonObject("header").add("version", version);
-            for (var module : root.getAsJsonArray("modules")) {
-                module.getAsJsonObject().add("version", version.deepCopy());
+            header.add("version", version);
+            header.addProperty("uuid", contentUuid("kalo:header", hash));
+            for (var module : modules) {
+                JsonObject definition = module.getAsJsonObject();
+                if (!"resources".equals(definition.get("type").getAsString())) {
+                    throw new IOException("Unsupported Kalo Bedrock module type");
+                }
+                definition.add("version", version.deepCopy());
+                definition.addProperty("uuid", contentUuid("kalo:module", hash));
             }
             pack.file("manifest.json", Json.writable(root));
         } catch (NoSuchAlgorithmException impossible) {
             throw new IOException("JVM is missing SHA-256", impossible);
         }
+    }
+
+    private static String contentUuid(String scope, byte[] contentHash) {
+        byte[] scopeBytes = scope.getBytes(StandardCharsets.UTF_8);
+        byte[] identity = Arrays.copyOf(scopeBytes, scopeBytes.length + contentHash.length);
+        System.arraycopy(contentHash, 0, identity, scopeBytes.length, contentHash.length);
+        return UUID.nameUUIDFromBytes(identity).toString();
     }
 }
