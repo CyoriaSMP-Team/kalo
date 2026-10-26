@@ -207,6 +207,34 @@ class ExternalModelVariantsTest {
     }
 
     @Test
+    void autoFishingRodSkipsVanillaParentOnlyFallbackAndKeepsAuthoredVariants() throws Exception {
+        ResourcePack source = pack("""
+                {"type":"minecraft:condition","property":"minecraft:fishing_rod/cast",
+                  "on_true":{"type":"minecraft:range_dispatch","property":"minecraft:custom_model_data",
+                    "entries":[{"threshold":24999,"model":%s}],
+                    "fallback":{"type":"minecraft:model","model":"minecraft:item/fishing_rod_cast"}},
+                  "on_false":{"type":"minecraft:range_dispatch","property":"minecraft:custom_model_data",
+                    "entries":[{"threshold":24999,"model":%s}],
+                    "fallback":{"type":"minecraft:model","model":"minecraft:item/fishing_rod"}}}
+                """.formatted(A, B));
+        source.file("assets/minecraft/items/fishing_rod.json",
+                source.file("assets/test/items/example.json"));
+        source.file("assets/minecraft/models/item/fishing_rod.json", Writable.string("""
+                {"parent":"item/handheld_rod","overrides":[
+                  {"predicate":{"custom_model_data":24999},"model":"test:item/a"}]}
+                """));
+        var binding = new ExternalItemBindings.Binding(
+                Key.key("minecraft:fishing_rod"), Material.FISHING_ROD, 1);
+        var variants = ExternalModelVariants.resolveAuto(source, binding);
+        assertEquals(2, variants.size(),
+                "Only authored cast/idle appearances should become Bedrock custom items");
+        BedrockPackCompiler compiler = new BedrockPackCompiler(source,
+                new ResourcePackImpl(PackMeta.of(0, "rod")));
+        for (var variant : variants) assertTrue(compiler.addExternalVariant(variant));
+        assertEquals(2, compiler.finish().itemCount());
+    }
+
+    @Test
     void unknownAutoModelCannotCreateAccidentalVanillaCatchAllMapping() {
         ResourcePack source = pack("{\"type\":\"minecraft:special\",\"base\":\"test:item/unknown\"}");
         assertThrows(IllegalArgumentException.class, () -> ExternalModelVariants.resolveAuto(source, observed()));
