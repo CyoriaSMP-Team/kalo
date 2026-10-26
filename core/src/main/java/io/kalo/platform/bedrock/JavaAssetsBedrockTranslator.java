@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Translates portable Java assets into Bedrock's native resource-pack layout.
@@ -39,8 +40,10 @@ public final class JavaAssetsBedrockTranslator {
 
     public record Report(int textures, int vanillaTextures, int soundFiles,
                          int locales, int languageEntries, int unsupportedAssets,
+                         @NotNull Map<String, Integer> unsupportedByType,
                          @NotNull List<String> unsupportedExamples) {
         public Report {
+            unsupportedByType = Map.copyOf(unsupportedByType);
             unsupportedExamples = List.copyOf(unsupportedExamples);
         }
     }
@@ -198,7 +201,7 @@ public final class JavaAssetsBedrockTranslator {
             bedrock.file("texts/languages.json", Json.writable(enabled));
         }
         return new Report(textureCount, vanillaCount, soundCount, locales.size(),
-                entryCount, unsupported.count, unsupported.examples);
+                entryCount, unsupported.count, unsupported.byType, unsupported.examples);
     }
 
     private static String shortTexturePath(String sourcePath) {
@@ -214,9 +217,18 @@ public final class JavaAssetsBedrockTranslator {
     private static final class ConversionIssues {
         private int count;
         private final List<String> examples = new ArrayList<>();
+        private final Map<String, Integer> byType = new TreeMap<>();
 
         void note(String path) {
             count++;
+            String[] parts = path.split("/", 4);
+            String category = parts.length < 4 ? "other"
+                    : parts[2].equals("textures") && parts[3].endsWith(".mcmeta")
+                    ? "animation metadata" : parts[2];
+            if (parts.length == 4 && !parts[1].matches("[a-z0-9_.-]+")) {
+                category = "invalid namespace";
+            }
+            byType.merge(category, 1, Integer::sum);
             // Bounded report: do not retain thousands of model paths in memory.
             if (examples.size() < MAX_REPORT_EXAMPLES) examples.add(path);
         }

@@ -798,8 +798,10 @@ public final class BedrockPackCompiler {
         }
         if (translation.unsupportedAssets() > 0) {
             LOGGER.warning(translation.unsupportedAssets()
-                    + " Java asset descriptor(s) still need specialized Bedrock conversion"
-                    + " or runtime Geyser item/block identity; examples: "
+                    + " Java asset descriptor(s) not directly translatable (by type: "
+                    + translation.unsupportedByType() + "). These are files, NOT a count of"
+                    + " broken Bedrock items; custom models need a runtime Geyser"
+                    + " item/block identity or a specialized converter. Examples: "
                     + translation.unsupportedExamples());
         }
         JsonObject itemTexture = new JsonObject();

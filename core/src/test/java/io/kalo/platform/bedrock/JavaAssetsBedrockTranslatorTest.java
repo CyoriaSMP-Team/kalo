@@ -89,6 +89,21 @@ class JavaAssetsBedrockTranslatorTest {
         var report = JavaAssetsBedrockTranslator.translate(java, bedrock, new JsonObject(), new JsonObject());
         assertArrayEquals(new byte[]{9}, bedrock.file("textures/items/diamond_sword.png").toByteArray());
         assertEquals(1, report.unsupportedAssets());
+        assertEquals(1, report.unsupportedByType().get("models"));
         assertTrue(report.unsupportedExamples().getFirst().contains("3d_sword"));
     }
+    @Test
+    void reportsDescriptorFamiliesWithoutCallingThemBrokenItems() {
+        ResourcePack java = pack();
+        java.file("assets/demo/models/item/weapon.json", Writable.string("{}"));
+        java.file("assets/demo/items/weapon.json", Writable.string("{}"));
+        java.file("assets/demo/textures/item/weapon.png.mcmeta", Writable.string("{}"));
+        var report = JavaAssetsBedrockTranslator.translate(java, pack(),
+                new JsonObject(), new JsonObject());
+        assertEquals(3, report.unsupportedAssets());
+        assertEquals(1, report.unsupportedByType().get("models"));
+        assertEquals(1, report.unsupportedByType().get("items"));
+        assertEquals(1, report.unsupportedByType().get("animation metadata"));
+    }
+
 }
