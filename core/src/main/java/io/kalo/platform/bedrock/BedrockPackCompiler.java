@@ -288,6 +288,12 @@ public final class BedrockPackCompiler {
             JsonObject bone = geometry.getAsJsonArray("minecraft:geometry").get(0)
                     .getAsJsonObject().getAsJsonArray("bones").get(0).getAsJsonObject();
             bone.addProperty("binding", "q.item_slot_to_bone_name(context.item_slot)");
+            // Java rotates and scales a held model about its centre, so pivot there too;
+            // the hold animations are positioned relative to this centre.
+            double[] center = BedrockItemDisplay.centerOf(bone.getAsJsonArray("cubes"));
+            JsonArray pivot = new JsonArray();
+            for (double value : center) pivot.add(value);
+            bone.add("pivot", pivot);
             // Block geometry can name each Java texture slot separately. A held
             // single-sheet attachable instead has one Material.default, so normalize
             // all of its converted face material slots to that Bedrock material.
@@ -309,7 +315,9 @@ public final class BedrockPackCompiler {
             }
             pack.file("models/entity/" + shorthand + ".geo.json", Json.writable(geometry));
             pack.file("attachables/" + shorthand + ".json",
-                    Json.writable(BedrockAttachable.heldItem(key, geometryId, modelTexture)));
+                    Json.writable(BedrockAttachable.heldItem(key, geometryId, modelTexture, shorthand)));
+            pack.file(BedrockItemDisplay.animationPath(shorthand), Json.writable(
+                    BedrockItemDisplay.animations(shorthand, javaModel, bone.get("name").getAsString(), center)));
             registerItemTexture(icon, texture);
             registerItem(definition, icon);
             // armorCount is the number of wearable armor pieces, not all attachables.

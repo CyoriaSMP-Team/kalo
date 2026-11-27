@@ -85,7 +85,8 @@ public final class BedrockAttachable {
      * The geometry's single bone contains the Bedrock item-slot binding.
      */
     static @NotNull JsonObject heldItem(@NotNull Key item, @NotNull String geometryId,
-                                        @NotNull String texturePath) {
+                                        @NotNull String texturePath,
+                                        @NotNull String shorthand) {
         JsonObject materials = new JsonObject();
         materials.addProperty("default", "entity_alphatest");
         materials.addProperty("enchanted", "entity_alphatest_glint");
@@ -97,11 +98,11 @@ public final class BedrockAttachable {
         JsonObject geometry = new JsonObject();
         geometry.addProperty("default", geometryId);
 
-        // Vanilla first/third-person hold offsets: without these an item can
-        // render in Bedrock but float at the wrong orientation in the player's hand.
+        // Per-item hold poses generated from the Java model's display block; see
+        // BedrockItemDisplay. They are pack-side animations, not vanilla ones.
         JsonObject animations = new JsonObject();
-        animations.addProperty("hold_first_person", "animation.steve_head.hold_first_person");
-        animations.addProperty("hold_third_person", "animation.steve_head.hold_third_person");
+        animations.addProperty("hold_first_person", BedrockItemDisplay.animationId(shorthand, true));
+        animations.addProperty("hold_third_person", BedrockItemDisplay.animationId(shorthand, false));
         JsonObject firstPerson = new JsonObject();
         firstPerson.addProperty("hold_first_person", "context.is_first_person == 1.0");
         JsonObject thirdPerson = new JsonObject();
