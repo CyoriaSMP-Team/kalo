@@ -6,6 +6,49 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## 0.2.1
+
+Rolls up everything since 0.2.1-prealpha.7.
+
+### Added
+
+- Native clickable ESC pause menu, server-side dialogs and configurable pause-menu
+  branding, with a Kalo-native named glyph registry and a safe logo atlas.
+- Bedrock: translation of Java resource-pack assets into Bedrock resources, custom item
+  images derived from the Java pack, and content-addressed Bedrock packs with safe
+  manifest versions.
+- Bedrock: Kalo-native DeluxeMenus Forms conversion routed through Floodgate, automatic
+  DeluxeMenus GUI skull mapping with Geyser, and Java GUI head portraits in the Forms pack.
+- Bedrock: held 3D items now get per-item first- and third-person hold animations
+  generated from the Java model's `display` transforms, with the pivot at the model
+  centre. Items without `display` use the Bedrock Wiki's bound-item pose.
+- Pack host: HTTPS proxy public URL and loopback bind support; direct Kalo to Relay
+  publishing without a timer or watcher; immutable resource-pack HTTP caching.
+- Tag-based Modrinth publishing workflow.
+
+### Fixed
+
+- Bedrock: shorter GUI head paths with migration of the existing icon cache, limited
+  generated texture paths for all clients, original Java texture pixels kept in 3D
+  atlases, Java resource-pack icon used by default, bow/shield idle models and Java
+  crossbow thresholds preserved, custom shield images kept, parent-only vanilla item
+  fallbacks skipped with clearer descriptor warnings, and the Forms toggle separated
+  from Kalo pack mode.
+- Java pack: modern 1.21.11 pack metadata so clients no longer reject the pack,
+  automatic resizing of oversize bitmap logo glyphs, bitmap logo seams removed with
+  per-slice kerning, and the validator now ignores vanilla fallbacks and model
+  texture variables.
+- Modrinth multipart version upload in CI.
+
+### Limitations
+
+- Bedrock output has not been verified on a real Bedrock client. In particular the
+  Java-to-Bedrock conversion of held-item `display` transforms (axis signs, units and
+  position offset) is an unmeasured approximation; items may render offset or rotated.
+- Vanilla parent models (for example `item/handheld`) are not read for `display`, so
+  those items get the default hold pose. Only the main (right) hand is posed.
+- No production deployment has been performed.
+
 ## 0.2.1-prealpha.7
 
 ### Added
