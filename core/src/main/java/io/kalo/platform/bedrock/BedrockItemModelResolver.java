@@ -68,6 +68,16 @@ final class BedrockItemModelResolver {
             if (level.has("texture_size")) {
                 flattened.add("texture_size", level.get("texture_size").deepCopy());
             }
+            if (level.has("display") && level.get("display").isJsonObject()) {
+                // Per-context override: a child's firstperson_righthand replaces the
+                // parent's, but contexts the child does not author are inherited.
+                JsonObject merged = flattened.has("display")
+                        ? flattened.getAsJsonObject("display") : new JsonObject();
+                for (var entry : level.getAsJsonObject("display").entrySet()) {
+                    merged.add(entry.getKey(), entry.getValue().deepCopy());
+                }
+                flattened.add("display", merged);
+            }
             if (level.has("elements")) {
                 flattened.add("elements", level.get("elements").deepCopy());
             }
