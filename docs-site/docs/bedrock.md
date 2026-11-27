@@ -6,79 +6,47 @@ nav_order: 5
 
 # 🌏 Bedrock Support
 
-Kalo has built-in Bedrock support through Geyser. No additional plugins or paid addons required.
+One YAML definition compiles to a Java pack and to Bedrock output. Kalo writes a `.mcpack` and registers it with Geyser.
 
-## Requirements
+**Pre-alpha:** only the rows marked tested have been seen on a real Bedrock client.
 
-- [Geyser](https://geysermc.org/) plugin installed on the same server
-- [Floodgate](https://geysermc.org/) (optional, for Bedrock player authentication)
+| Feature | Status | Notes |
+|---|---|---|
+| Sprite item icons | ✅ Tested on a Bedrock client | Derived from your Java pack |
+| Native blocks | ✅ Tested on a Bedrock client | Placed and mined |
+| Worn armor | ✅ Tested on a Bedrock client | Attachable with the vanilla layer hidden |
+| 3D item models | ⚠️ Experimental, not client-verified | Static cuboid models, including multi-sheet textures |
+| Held 3D item position | ⚠️ Experimental, not client-verified | Generated from the model `display` transforms |
+| Virtual ItemDisplay blocks | ❌ Not supported | Geyser cannot show an `ItemDisplay` to Bedrock |
+| Furniture, paintings, sounds | ⚠️ Verify with your content pack | Block-backed or basic support |
+| DeluxeMenus as Forms | ⚠️ Experimental | Opt-in, needs Floodgate |
 
 ## Setup
 
-### Same Server (Recommended)
+**Same server (recommended):** install Geyser, optionally Floodgate, then Kalo. Kalo registers everything with Geyser directly.
 
-If Geyser runs as a plugin on the same server, Kalo automatically registers everything:
+**Separate Geyser process:** set `bedrock: always`, then copy the generated files or sync them:
 
-1. Install Geyser and Floodgate
-2. Install Kalo
-3. Start the server
-
-Kalo will log:
+```yaml
+bedrock: always
+bedrock-standalone:
+  directory: "/path/to/geyser"   # must contain Geyser's config.yml and packs/
 ```
-[Kalo] Registering Kalo items, blocks and resource pack with Geyser directly
-[Kalo] Registered and mapped 2 block(s) with Geyser natively
-[Kalo] Registered 8 item(s) with Geyser natively
-[Kalo] Registered generated.mcpack with Geyser
-```
-
-### Standalone Geyser
-
-If Geyser runs separately:
-
-1. Copy `plugins/Kalo/geyser/kalo-items.json` to Geyser's `custom_mappings/`
-2. Copy `plugins/Kalo/geyser/kalo-blocks.json` to Geyser's `custom_mappings/`
-3. Copy `plugins/Kalo/generated.mcpack` to Geyser's `packs/`
 
 ## Configuration
 
-```yaml
-# plugins/Kalo/config.yml
-bedrock: auto  # Options: auto, always, never
-```
+| Key | Default | Meaning |
+|---|---|---|
+| `bedrock` | `auto` | `auto` only when Geyser is on this server, `always`, or `never` |
+| `bedrock-standalone.directory` | empty | Standalone Geyser directory to sync into |
+| `bedrock-forms.enabled` | `false` | Convert eligible DeluxeMenus menus to Bedrock Forms (needs Floodgate) |
 
-- `auto` — Build Bedrock pack only if Geyser is present
-- `always` — Always build Bedrock pack
-- `never` — Never build Bedrock pack
+## Held 3D items
 
-## Supported Content
-
-| Content | Bedrock Status |
-|---------|----------------|
-| Items (2D sprites) | ✅ Works |
-| Items (3D models) | ⚠️ Geometry conversion |
-| Custom Blocks (native) | ✅ Works |
-| Custom Blocks (virtual) | ❌ Not supported |
-| Furniture (native) | ✅ Works |
-| Armor | ✅ Works |
-| Paintings | ⚠️ Basic support |
-| Music Discs | ⚠️ Basic support |
-| GUIs | ❌ Server-side only |
-| Glyphs | ✅ Works |
-
-## Virtual Blocks on Bedrock
-
-Virtual blocks use `ItemDisplay` entities, which Geyser cannot translate to Bedrock clients. On servers with Bedrock players, use native mode for content they need to see.
+Kalo turns the Java model's `firstperson_righthand` and `thirdperson_righthand` transforms into per-item hold animations. The conversion is an approximation not yet measured on a client. Vanilla parent models are not read, and only the main hand is posed.
 
 ## Troubleshooting
 
-### Blocks not rendering
-
-1. Check Kalo and Geyser logs for registration messages
-2. Ensure Geyser is loaded before Kalo registers
-3. Restart server after first installation
-
-### Items show as missing texture
-
-1. Verify textures exist in `assets/<pack>/textures/`
-2. Run `/kalo doctor` to check for broken references
-3. Regenerate pack with `/kalo reload`
+- Blocks not rendering: check the Kalo and Geyser logs, restart after the first install.
+- Missing texture: verify `assets/<pack>/textures/`, run `/kalo doctor`, then `/kalo reload`.
+- Virtual blocks invisible: structural; use native mode for content Bedrock players need.

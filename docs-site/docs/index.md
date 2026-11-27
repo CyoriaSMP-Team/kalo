@@ -54,7 +54,7 @@ Kalo is a free and open-source engine for building custom items, blocks, furnitu
 ```bash
 # Clone and build
 git clone https://github.com/CyoriaSMP-Team/kalo.git
-cd kalo/main
+cd kalo
 ./gradlew build
 
 # Install

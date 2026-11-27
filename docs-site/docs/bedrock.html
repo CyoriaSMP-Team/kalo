@@ -89,24 +89,48 @@
     <main class="main">
         <div class="content">
             <h1>Bedrock Support</h1>
-            <p>Kalo generates Bedrock packs and native Geyser mappings for supported content. Not every Java feature is available on Bedrock.</p>
+            <p>One YAML definition compiles to a Java pack and to Bedrock output. Kalo writes a <code>.mcpack</code> and registers it with Geyser. Not every Java feature has a Bedrock equivalent, and parts of this are still unverified.</p>
+            <p><strong>Pre-alpha:</strong> only the rows marked tested have been seen on a real Bedrock client. Everything else is covered by unit tests, which cannot prove how it looks in-game.</p>
             <table>
-                <tr><th>Feature</th><th>Status</th></tr>
-                <tr><td>Sprite item icons</td><td><span class="status status-supported">✓ Tested on a Bedrock client</span></td></tr>
-                <tr><td>Native blocks</td><td><span class="status status-supported">✓ Tested on a Bedrock client</span></td></tr>
-                <tr><td>Virtual ItemDisplay blocks</td><td><span class="status status-unsupported">Not supported</span></td></tr>
-                <tr><td>Worn armor</td><td><span class="status status-supported">✓ Tested on a Bedrock client</span></td></tr>
-                <tr><td>Furniture</td><td><span class="status status-unsupported">Verify with your content pack</span></td></tr>
-                <tr><td>Paintings</td><td><span class="status status-unsupported">Verify with your content pack</span></td></tr>
-                <tr><td>Sounds</td><td><span class="status status-unsupported">Verify with your content pack</span></td></tr>
+                <tr><th>Feature</th><th>Status</th><th>Notes</th></tr>
+                <tr><td>Sprite item icons</td><td><span class="status status-supported">✓ Tested on a Bedrock client</span></td><td>Derived from your Java pack</td></tr>
+                <tr><td>Native blocks</td><td><span class="status status-supported">✓ Tested on a Bedrock client</span></td><td>Placed and mined</td></tr>
+                <tr><td>Worn armor</td><td><span class="status status-supported">✓ Tested on a Bedrock client</span></td><td>Attachable with the vanilla layer hidden</td></tr>
+                <tr><td>3D item models</td><td><span class="status status-unsupported">Experimental, not client-verified</span></td><td>Static cuboid models, including multi-sheet textures</td></tr>
+                <tr><td>Held 3D item position</td><td><span class="status status-unsupported">Experimental, not client-verified</span></td><td>Generated from the model's <code>display</code> transforms; see below</td></tr>
+                <tr><td>Virtual ItemDisplay blocks</td><td><span class="status status-unsupported">Not supported</span></td><td>Geyser cannot show an <code>ItemDisplay</code> to Bedrock</td></tr>
+                <tr><td>Furniture, paintings, sounds</td><td><span class="status status-unsupported">Verify with your content pack</span></td><td>Block-backed or basic support</td></tr>
+                <tr><td>DeluxeMenus as Forms</td><td><span class="status status-unsupported">Experimental</span></td><td>Opt-in, needs Floodgate; see below</td></tr>
             </table>
             <h2>Setup</h2>
-            <pre><code># Install Geyser for Bedrock support
-# Kalo will auto-generate Bedrock packs
-
-# Check generated packs
-ls plugins/Kalo/geyser/
-ls plugins/Kalo/generated.mcpack</code></pre>
+            <h3>Geyser on the same server (recommended)</h3>
+            <p>Install Geyser, optionally Floodgate, then Kalo. Kalo registers items, blocks and the pack with Geyser directly. There is nothing to copy, and regenerating content cannot leave Bedrock on an old copy.</p>
+            <h3>Geyser as a separate process</h3>
+            <p>Kalo cannot detect a separate process, so set <code>bedrock: always</code>. Then either copy the generated files by hand, or let Kalo sync them:</p>
+            <pre><code># plugins/Kalo/config.yml
+bedrock: always
+bedrock-standalone:
+  directory: "/path/to/geyser"   # must contain Geyser's config.yml and packs/</code></pre>
+            <p>Kalo writes only <code>packs/kalo-generated.mcpack</code> and <code>custom_mappings/kalo-*.json</code>. Geyser may need a restart to load changed mappings.</p>
+            <h2>Configuration</h2>
+            <table>
+                <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>bedrock</code></td><td><code>auto</code></td><td><code>auto</code> builds Bedrock output only when Geyser is on this server; <code>always</code> always builds it; <code>never</code> skips it.</td></tr>
+                <tr><td><code>bedrock-standalone.directory</code></td><td>empty</td><td>Existing standalone Geyser directory to sync into. <code>bedrock: never</code> overrides it.</td></tr>
+                <tr><td><code>bedrock-forms.enabled</code></td><td><code>false</code></td><td>Convert eligible DeluxeMenus menus to Bedrock Forms through Floodgate.</td></tr>
+            </table>
+            <h2>Held 3D items</h2>
+            <p>Bedrock has no <code>display</code> block on models, so Kalo turns the Java model's <code>firstperson_righthand</code> and <code>thirdperson_righthand</code> transforms into per-item hold animations. An item with no <code>display</code> uses the Bedrock Wiki's bound-item pose. The conversion of axis signs and units is an approximation that has not been measured on a client, so an item may sit offset or rotated. Parent models from vanilla (for example <code>item/handheld</code>) are not read, and only the main hand is posed.</p>
+            <h2>DeluxeMenus as Forms</h2>
+            <p>With <code>bedrock-forms.enabled: true</code> and Floodgate installed, Bedrock players get a native form for menus Kalo can convert safely. Menus it cannot convert stay as normal DeluxeMenus inventories. Java players are unaffected. This is experimental.</p>
+            <h2>Existing Java packs</h2>
+            <p>Set <code>base-pack</code> to your Java resource pack, hold a custom item and run <code>/kalo learn-held</code>, then restart so Geyser registers it. Stored observations live in <code>plugins/Kalo/external-items.yml</code>. This is experimental.</p>
+            <h2>Troubleshooting</h2>
+            <ul>
+                <li><strong>Blocks not rendering:</strong> check the Kalo and Geyser logs for registration messages, and restart after the first install.</li>
+                <li><strong>Missing texture on an item:</strong> check the texture exists under <code>assets/&lt;pack&gt;/textures/</code>, run <code>/kalo doctor</code>, then <code>/kalo reload</code>.</li>
+                <li><strong>Virtual blocks invisible:</strong> this is structural. Use native mode for anything Bedrock players must see.</li>
+            </ul>
         </div>
     </main>
     <script src="assets/js/mobile-nav.js" defer></script>
