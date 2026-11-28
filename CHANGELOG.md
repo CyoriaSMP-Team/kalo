@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.2-prealpha.2
+## 0.2.2
 
 ### Added
 
