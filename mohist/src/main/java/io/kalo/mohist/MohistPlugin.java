@@ -42,7 +42,7 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
     public void onEnable() {
         saveDefaultConfig();
         if (!getServer().getBukkitVersion().startsWith("1.20.1-")) {
-            getLogger().severe("Kalo Mohist runtime targets Minecraft 1.20.1; detected "
+            getLogger().severe("Kalo-Mohist targets Minecraft 1.20.1; detected "
                     + getServer().getBukkitVersion());
             getServer().getPluginManager().disablePlugin(this);
             return;
@@ -51,7 +51,7 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
         this.root = getServer().getWorldContainer().toPath().toAbsolutePath().normalize();
         if (!root.resolve("plugins").toFile().isDirectory()) {
             // World containers can be a world subfolder. Bukkit usually exposes
-            // the server root via plugins/Kalo instead.
+            // the server root via plugins/Kalo-Mohist instead.
             this.root = getDataFolder().toPath().toAbsolutePath().normalize().getParent().getParent();
         }
         try {
@@ -60,17 +60,17 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
         } catch (IOException invalid) {
             getLogger().log(Level.SEVERE,
                     "Invalid existing item observations; auto-learning disabled until repaired", invalid);
-            getConfig().set("mohist.auto-learn", false);
+            getConfig().set("auto-learn", false);
         }
-        var command = getCommand("kalo");
+        var command = getCommand("kalomohist");
         if (command == null) {
-            getLogger().severe("Kalo command missing from plugin.yml");
+            getLogger().severe("kalomohist command missing from plugin.yml");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         command.setExecutor(this);
         getServer().getPluginManager().registerEvents(this,this);
-        if (getConfig().getBoolean("mohist.auto-catalog", true)) {
+        if (getConfig().getBoolean("auto-catalog", true)) {
             Bukkit.getScheduler().runTaskLater(this, () -> runCatalog(null), 100L);
         }
         getLogger().info("Kalo Mohist compatibility enabled on "+getServer().getVersion()
@@ -89,7 +89,7 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
             case "status" -> {
                 reply(sender, ChatColor.AQUA+"Kalo Mohist | "+getServer().getBukkitVersion()
                         +" | Java "+System.getProperty("java.version"));
-                reply(sender, "Auto-learn: "+getConfig().getBoolean("mohist.auto-learn",false)
+                reply(sender, "Auto-learn: "+getConfig().getBoolean("auto-learn",false)
                         +" | saved legacy items: "+learned.size()
                         +" | Geyser/Forge bridge: not installed by this plugin");
             }
@@ -105,24 +105,24 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
             case "scan" -> runScan(sender);
             case "catalog" -> runCatalog(sender);
             case "export" -> runExport(sender);
-            default -> reply(sender,ChatColor.YELLOW+"Usage: /kalo <status|scan|catalog|learn|export>");
+            default -> reply(sender,ChatColor.YELLOW+"Usage: /kalomohist <status|scan|catalog|learn|export>");
         }
         return true;
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        if (getConfig().getBoolean("mohist.auto-learn",false))
+        if (getConfig().getBoolean("auto-learn",false))
             Bukkit.getScheduler().runTaskLater(this,()->learnInventory(event.getPlayer()),20);
     }
     @EventHandler
     public void onSwitch(PlayerItemHeldEvent event) {
-        if (getConfig().getBoolean("mohist.auto-learn",false))
+        if (getConfig().getBoolean("auto-learn",false))
             Bukkit.getScheduler().runTaskLater(this,()->learnInventory(event.getPlayer()),2);
     }
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (!getConfig().getBoolean("mohist.auto-learn",false)) return;
+        if (!getConfig().getBoolean("auto-learn",false)) return;
         for (ItemStack item : event.getInventory().getContents()) learnSilently(item);
         if (event.getPlayer() instanceof Player player) learnInventory(player);
     }
@@ -188,7 +188,7 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
 
     /**
      * Collect Forge IDs on the server thread. Asset ZIP processing is entirely
-     * asynchronous and the handoff stays inside the Kalo data directory.
+     * asynchronous and the handoff stays inside the KaloMohist data directory.
      */
     private void runCatalog(CommandSender sender) {
         if (!busy.compareAndSet(false,true)) {
@@ -236,7 +236,7 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
                 PackSources.Report report=PackSources.discover(root);
                 if (report.uniquePack()==null) {
                     reply(sender,ChatColor.YELLOW+
-                            "Expected exactly one local Java resource pack; run /kalo scan");
+                            "Expected exactly one local Java resource pack; run /kalomohist scan");
                     return;
                 }
                 List<Path> input=new ArrayList<>();
@@ -246,7 +246,7 @@ public final class MohistPlugin extends JavaPlugin implements Listener, CommandE
                 report.mods().stream().map(PackSources.Source::path).sorted().forEach(input::add);
                 var observed=ObservedStore.load(observations);
                 if (observed.isEmpty()) {
-                    reply(sender,ChatColor.YELLOW+"No observed CMD items yet (auto-learn or /kalo learn)");
+                    reply(sender,ChatColor.YELLOW+"No observed CMD items yet (auto-learn or /kalomohist learn)");
                     return;
                 }
                 var result=LegacyBedrockExporter.convert(input,observed);

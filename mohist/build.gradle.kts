@@ -25,6 +25,12 @@ tasks.compileJava {
 tasks.test {
     useJUnitPlatform()
 }
+tasks.jar {
+    archiveBaseName.set("Kalo-Mohist")
+    archiveVersion.set(project.version.toString())
+    archiveClassifier.set("")
+}
+
 tasks.processResources {
     val pluginVersion = project.version.toString()
     inputs.property("pluginVersion", pluginVersion)

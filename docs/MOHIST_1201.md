@@ -1,44 +1,35 @@
 # Kalo Mohist Compatibility — DeadZone Minecraft 1.20.1
 
-The Mohist 1.20.1 runtime is embedded in the same `Kalo-<version>.jar` as
-Kalo's Paper/Folia runtime. The jar contains both descriptors:
+This is a separate, experimental Java 17-bytecode Bukkit plugin for Mohist
+1.20.1. DeadZone currently runs Java 21, which is compatible: Java 21 can
+execute Java 17 class files. No change to DeadZone's runtime is needed.
 
-- Paper/Folia selects `paper-plugin.yml` and starts the Java 21 Kalo engine.
-- Mohist 1.20.1 selects the legacy `plugin.yml` entry point
-  `io.kalo.mohist.MohistPlugin`, which is compiled to Java 17 bytecode.
+Build from the repo root:
 
-DeadZone's Java 21 runtime can execute Java 17 class files, so no Java runtime
-change is needed. Install only the main `Kalo-<version>.jar`; do not install a
-separate Mohist or Nexo compatibility jar.
+    ./gradlew :mohist:clean :mohist:test :mohist:jar
 
-Build and test from the repository root:
-
-    ./gradlew build
-
-The `mohist` source module remains separate inside the Gradle build so CI can
-verify its Java 17 bytecode independently. It is packaged into the main Kalo
-artifact and is not released as a second plugin.
+Output: mohist/build/libs/Kalo-Mohist-<version>.jar
+Do not install the Paper/Folia Kalo jar from build/libs/ into Mohist.
 
 ## Supported now
 
 - Read-only local resource-pack ZIP discovery (plugins/) and Forge JAR asset
   discovery (mods/), with archive and path safeguards.
 - Old-style CustomModelData observation on vanilla Bukkit carrier materials.
-- Configurable automatic observation from player inventories and GUIs
-  (`mohist.auto-learn` in the shared `plugins/Kalo/config.yml`).
+- Optional operator-enabled automatic observation from player inventories
+  and GUIs, disabled by default.
 - Experimental flat 2D Bedrock PNG atlas/pack + Geyser legacy item mapping
   export. Generated files are separate from the active bridge.
 
-Commands (OP permission `kalomohist.admin`):
-- `/kalo status` (aliases: `/kalomohist`, `/kalom`)
-- `/kalo scan`
-- `/kalo catalog`
-- `/kalo learn`
-- `/kalo export`
+Commands (OP permission kalomohist.admin):
+- /kalomohist status
+- /kalomohist scan
+- /kalomohist learn
+- /kalomohist export
 
 Output files when conversion succeeds:
-- plugins/Kalo/exports/kalo-mohist-generated.mcpack
-- plugins/Kalo/exports/kalo-mohist-items.json
+- plugins/KaloMohist/exports/kalo-mohist-generated.mcpack
+- plugins/KaloMohist/exports/kalo-mohist-items.json
 
 The running DeadZoneBridgeLauncher remains unchanged. All outputs need
 manual inspection before use with a compatible external Geyser proxy.
@@ -56,21 +47,15 @@ Exporting assets is not proof that a Bedrock client can enter the server.
 
 ## Compatibility and deployment
 
-CI builds on Java 21 and Java 25 and verifies that the Mohist entry point has
-class file major 61 (Java 17) inside the unified Kalo jar. Actual testing on
-Mohist 1.20.1 with DeadZone's Java 21 runtime and a real Bedrock client remains
-pending. The shared config is `plugins/Kalo/config.yml`; Mohist options are
-under `mohist:` (`auto-learn`, `auto-catalog`).
-
-When upgrading from the former standalone `Kalo-Mohist` plugin, stop the
-server and copy `legacy-observed.properties` and the `exports/` directory from
-`plugins/KaloMohist/` into `plugins/Kalo/`. Keep the existing Kalo config and
-merge the old `auto-learn` / `auto-catalog` values under the `mohist:` section.
+The CI must build on Java 21 and Java 25 and confirm class file major 61
+(Java 17). Actual testing on Mohist 1.20.1 with DeadZone's Java 21 runtime
+and a real Bedrock client remains pending. Production installation and
+restart are intentionally deferred until reviewed and authorized.
 
 ## Universal content adapters (experimental extension)
 
-The embedded Mohist runtime provides a **mod-neutral catalog**. It is not
-hardcoded to TaCZ or any other mod. On startup, `mohist.auto-catalog: true` (default)
+The separate Mohist module now provides a **mod-neutral catalog**. It is not
+hardcoded to TaCZ or any other mod. On startup, `auto-catalog: true` (default)
 inspects local plugin pack ZIPs and the assets inside installed Forge mod JARs
 in the background. On the server thread it also reads the **existing Forge
 registry identifiers** for items, blocks, entities, fluids and sounds through a
@@ -85,11 +70,11 @@ packaged on the plugin classpath via Java ServiceLoader; nothing is executed
 from scanned JARs.
 
 Commands:
-- `/kalo catalog` rebuilds the read-only index on demand.
-- `/kalo scan` continues to list candidate input archives.
-- `/kalo export` remains the operator-only Geyser legacy exporter.
+- `/kalomohist catalog` rebuilds the read-only index on demand.
+- `/kalomohist scan` continues to list candidate input archives.
+- `/kalomohist export` remains the operator-only Geyser legacy exporter.
 
-New files are placed only in `plugins/Kalo/exports/`:
+New files are placed only in `plugins/KaloMohist/exports/`:
 - `kalo-content-index.json` (`kalo.content-index/1`): provenance-tagged
   source assets and Forge IDs, including candidate item/block model matches.
 - `kalo-bridge-handoff.json` (`kalo.bridge-handoff/1`): opt-in format contract

@@ -8,7 +8,6 @@ plugins {
 
 dependencies {
     implementation(project(":core"))
-    implementation(project(":mohist"))
 }
 
 val groupString = group.toString()
