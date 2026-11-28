@@ -30,6 +30,8 @@ Javadoc, which could not be reached.
 | `getMap`, `getUnexcludedItems(File)` | Empty — Kalo does not group items by source file |
 | `loadItems` | No-op — Kalo owns loading |
 | `ItemBuilder` | Constructors for `Material` and `ItemStack`; type, amount, unbreakable, durability, item model, custom model data, item flags, enchants, custom tags, `hasLores`, `build`, `buildArray`, `getReferenceClone`, `clone`, `regen` |
+| `OraxenBlocks.getBlockIDs`, `isOraxenBlock(Block \| String)`, `place`, `getOraxenBlockData`, `remove(Location, Player[, boolean])` | Kalo blocks, placed and removed from code (no block events fire). `remove` drops the item when `forceDrop` is set or a non-creative player removes it; with no player it does not drop — a choice made here |
+| `OraxenFurniture.getFurnitureIDs`, `isFurniture(Block \| String)` | Kalo furniture, which is a block-backed piece, not an entity |
 | `OraxenItemsLoadedEvent` | Fired after all plugins enable and after each Kalo content load |
 
 Builders are copies: changing one never changes Kalo's registry.
@@ -51,7 +53,9 @@ deliberately:
 - `ItemBuilder` name and lore accessors: Oraxen's string encoding for them is not verified.
   Also components (food, tool, equippable), attributes, trims, rarity, potion/fish settings, and
   `getOraxenMeta`/`setOraxenMeta` (need Oraxen-only types).
-- `OraxenBlocks`, `OraxenFurniture`, `OraxenPack`, mechanics and their events.
+- `OraxenBlocks`: the mechanic accessors and `getOraxenBlock` (Kalo has no Oraxen mechanics), the note/string/chorus-specific ids and tests, and the `Drop` overload of `remove`.
+- `OraxenFurniture`: everything that takes or returns a furniture entity (`place`, `remove`, `isFurniture(Entity)`, the base/interaction/orphan entity tests, `getFurnitureMechanic`, `updateFurniture`), since Kalo furniture has no entity.
+- `OraxenPack`, mechanics and their events.
 
 ## Verified on a real server
 

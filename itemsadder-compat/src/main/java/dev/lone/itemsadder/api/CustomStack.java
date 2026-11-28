@@ -24,7 +24,7 @@ import java.util.Set;
 public class CustomStack {
     private final String namespacedId;
 
-    private CustomStack(String namespacedId) {
+    CustomStack(String namespacedId) {
         this.namespacedId = namespacedId;
     }
 

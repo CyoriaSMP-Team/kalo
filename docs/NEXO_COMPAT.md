@@ -11,7 +11,7 @@ Both providers use the `Nexo` identity; only one can satisfy that dependency.
 Kalo content is already importable from and exportable to Nexo (`/kalo import`,
 `/kalo export`). The embedded API adds runtime item-API compatibility.
 
-## What is supported (Phase 1: items)
+## What is supported (items, blocks, furniture)
 
 Written against Nexo's published Javadoc (API 1.8). `NexoApiSignatureTest`
 pins the signatures.
@@ -25,6 +25,15 @@ pins the signatures.
 | `NexoItems.loadItems`, `reloadItem` | No-op — Kalo owns loading |
 | `ItemBuilder` | Constructors for `Material`, `ItemStack`, `ItemBuilder`; amount, type, names, lore, durability, unbreakable, flags, custom model data, enchants, custom tags, `build`, `buildArray`, `referenceCopy`, `clone` |
 | `NexoItemsLoadedEvent` | Fired after all plugins enable and after each later Kalo content reload |
+| `NexoBlocks.blockIDs`, `isCustomBlock(Block \| ItemStack \| String)`, `place`, `blockData`, `remove(Location[, Player[, boolean]])` | Kalo blocks, placed and removed from code through `BlockWorld` (no block events fire). `remove` drops the item when `forceDrop` is set or a non-creative player removes it; with no player it does not drop — a choice made here, Nexo's own default is unverified |
+| `NexoFurniture.furnitureIDs`, `isFurniture(Location \| String \| ItemStack)` | Kalo furniture, which is a block-backed piece (see below) |
+
+### Furniture is a block here
+
+Kalo furniture is a static, block-backed piece, not an entity. Everything in Nexo's furniture API that
+returns or takes a furniture entity (`place`, `remove`, `baseEntity`, `furnitureMechanic`,
+`updateFurniture`, `findTargetFurniture`, `isFurniture(Entity)`) has nothing to work with and is not
+implemented. Plugins that depend on Nexo's furniture *entities* (seats, hitboxes, rotation) will not work.
 
 ### IDs
 
@@ -39,7 +48,7 @@ Kalo key. See `NexoIds`.
 Anything not in the table fails loudly with `NoSuchMethodError` at the call
 site rather than doing nothing. Not yet implemented:
 
-- `NexoBlocks`, `NexoFurniture`, `NexoPack`, `NexoMeta` and mechanic classes
+- `NexoPack`, `NexoMeta` and mechanic classes; in `NexoBlocks` the mechanic accessors, the per-kind (note/string/chorus) ids and tests, and the `Drop` overload of `remove`
 - Nexo's other events (for example `NexoMechanicsRegisteredEvent`)
 - `ItemBuilder` members for components (food, tool, equippable), attributes,
   potions and trims

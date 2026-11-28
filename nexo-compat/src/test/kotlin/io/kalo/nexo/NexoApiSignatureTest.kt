@@ -71,4 +71,27 @@ class NexoApiSignatureTest {
         val m = NexoItemsLoadedEvent::class.java.getMethod("getHandlerList")
         assertTrue(Modifier.isStatic(m.modifiers))
     }
+
+    @Test
+    fun nexoBlocksAndFurnitureMatchJavadoc() {
+        val blocks = com.nexomc.nexo.api.NexoBlocks::class.java
+        staticMethod(blocks, "blockIDs", Array<String>::class.java)
+        staticMethod(blocks, "isCustomBlock", java.lang.Boolean.TYPE, org.bukkit.block.Block::class.java)
+        staticMethod(blocks, "isCustomBlock", java.lang.Boolean.TYPE, ItemStack::class.java)
+        staticMethod(blocks, "isCustomBlock", java.lang.Boolean.TYPE, String::class.java)
+        staticMethod(blocks, "place", Void.TYPE, String::class.java, org.bukkit.Location::class.java)
+        staticMethod(blocks, "blockData", org.bukkit.block.data.BlockData::class.java, String::class.java)
+        staticMethod(blocks, "remove", java.lang.Boolean.TYPE, org.bukkit.Location::class.java,
+            org.bukkit.entity.Player::class.java, java.lang.Boolean.TYPE)
+        staticMethod(blocks, "remove", java.lang.Boolean.TYPE, org.bukkit.Location::class.java,
+            org.bukkit.entity.Player::class.java)
+        staticMethod(blocks, "remove", java.lang.Boolean.TYPE, org.bukkit.Location::class.java)
+
+        val furniture = com.nexomc.nexo.api.NexoFurniture::class.java
+        staticMethod(furniture, "furnitureIDs", Array<String>::class.java)
+        staticMethod(furniture, "isFurniture", java.lang.Boolean.TYPE, org.bukkit.Location::class.java)
+        staticMethod(furniture, "isFurniture", java.lang.Boolean.TYPE, String::class.java)
+        staticMethod(furniture, "isFurniture", java.lang.Boolean.TYPE, ItemStack::class.java)
+    }
 }
+

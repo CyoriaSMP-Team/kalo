@@ -149,8 +149,21 @@ public final class JavaBlockListener implements Listener {
 
         // applyPhysics=false: a physics pass here would immediately recompute the carrier's
         // state from its neighbours and undo the assignment.
-        event.getBlockPlaced().setBlockData(
-                blockDataFor(assignment.carrier(), assignment.state()), false);
+        BlockData placedData = blockDataFor(assignment.carrier(), assignment.state());
+        event.getBlockPlaced().setBlockData(placedData, false);
+        ensureIndexed(placedData);
+    }
+
+    /**
+     * States are allocated while the resource pack compiles, which is asynchronous and can finish
+     * after {@link #rebuildLookup()} ran. On the first start with a new pack that left the lookup
+     * without the state a block was just placed in, so the block was never recognised again until
+     * a reload or restart. Placement is where a new state first appears, so catch up here.
+     */
+    private void ensureIndexed(@NotNull BlockData data) {
+        if (!byBlockData.containsKey(data.getAsString(false))) {
+            rebuildLookup();
+        }
     }
 
     private void placeVirtual(@NotNull BlockPlaceEvent event, @NotNull Block block) {
@@ -338,6 +351,64 @@ public final class JavaBlockListener implements Listener {
         }
         virtualBlocks.remove(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
         removeVirtualDisplay(block);
+    }
+
+    /**
+     * Places content at a world block without a player or event, the same way {@link #onPlace}
+     * does. Caller must be on the thread that owns the block.
+     */
+    public boolean placeContent(@NotNull Block content, @NotNull org.bukkit.block.Block target) {
+        if (content.definition().java().mode() == JavaBlockMode.VIRTUAL) {
+            try {
+                target.setType(VIRTUAL_ANCHOR, false);
+                virtualBlocks.put(target.getWorld().getUID(), target.getX(), target.getY(), target.getZ(),
+                        content.key().asString());
+                spawnOrRefreshVirtualDisplay(target, content);
+                return true;
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Could not place virtual block " + content.key().asString(), e);
+                virtualBlocks.remove(target.getWorld().getUID(), target.getX(), target.getY(), target.getZ());
+                removeVirtualDisplay(target);
+                target.setType(Material.AIR, false);
+                return false;
+            }
+        }
+        BlockStateAllocator.Assignment assignment = allocator.assignmentOf(content.definition().key());
+        if (assignment == null) {
+            return false;
+        }
+        // applyPhysics=false for the same reason as onPlace: physics would recompute the carrier.
+        BlockData data = blockDataFor(assignment.carrier(), assignment.state());
+        target.setBlockData(data, false);
+        ensureIndexed(data);
+        return true;
+    }
+
+    /** Removes custom content at a world block, optionally dropping its item. False if there is none. */
+    public boolean removeContent(@NotNull org.bukkit.block.Block target, boolean dropItem) {
+        Block content = resolve(target);
+        if (content == null) {
+            return false;
+        }
+        if (virtualId(target) != null) {
+            virtualBlocks.remove(target.getWorld().getUID(), target.getX(), target.getY(), target.getZ());
+            removeVirtualDisplay(target);
+        }
+        target.setType(Material.AIR, false);
+        if (dropItem) {
+            target.getWorld().dropItemNaturally(target.getLocation().add(0.5, 0.5, 0.5),
+                    content.itemStack().get());
+        }
+        return true;
+    }
+
+    /** The vanilla state a native block is drawn with, or null for virtual or unassigned content. */
+    public @Nullable BlockData nativeBlockData(@NotNull Block content) {
+        if (content.definition().java().mode() == JavaBlockMode.VIRTUAL) {
+            return null;
+        }
+        BlockStateAllocator.Assignment assignment = allocator.assignmentOf(content.definition().key());
+        return assignment == null ? null : blockDataFor(assignment.carrier(), assignment.state());
     }
 
     /** Identifies custom content drawn at a world block, native or virtual. */

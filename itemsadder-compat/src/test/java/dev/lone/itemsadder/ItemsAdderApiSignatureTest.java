@@ -1,5 +1,7 @@
 package dev.lone.itemsadder;
 
+import dev.lone.itemsadder.api.CustomBlock;
+import dev.lone.itemsadder.api.CustomFurniture;
 import dev.lone.itemsadder.api.CustomStack;
 import dev.lone.itemsadder.api.Events.ItemsAdderLoadDataEvent;
 import dev.lone.itemsadder.api.ItemsAdder;
@@ -60,6 +62,40 @@ class ItemsAdderApiSignatureTest {
     }
 
     @Test
+    void customBlockMatchesVerifiedSignatures() {
+        assertEquals(set(
+                "static java.util.Set getNamespacedIdsInRegistry()",
+                "static boolean isInRegistry(java.lang.String)",
+                "static dev.lone.itemsadder.api.CustomBlock getInstance(java.lang.String)",
+                "static dev.lone.itemsadder.api.CustomBlock byItemStack(org.bukkit.inventory.ItemStack)",
+                "static dev.lone.itemsadder.api.CustomBlock place(java.lang.String,org.bukkit.Location)",
+                "static dev.lone.itemsadder.api.CustomBlock byAlreadyPlaced(org.bukkit.block.Block)",
+                "static boolean remove(org.bukkit.Location)",
+                "static org.bukkit.block.data.BlockData getBaseBlockData(java.lang.String)",
+                "org.bukkit.block.data.BlockData getBaseBlockData()",
+                "org.bukkit.block.Block getBlock()",
+                "boolean isPlaced()",
+                "dev.lone.itemsadder.api.CustomBlock place(org.bukkit.Location)",
+                "boolean remove()"
+        ), declared(CustomBlock.class));
+        assertEquals(CustomStack.class, CustomBlock.class.getSuperclass());
+    }
+
+    @Test
+    void customFurnitureMatchesVerifiedSignatures() {
+        assertEquals(set(
+                "static java.util.Set getNamespacedIdsInRegistry()",
+                "static dev.lone.itemsadder.api.CustomFurniture byAlreadySpawned(org.bukkit.entity.Entity)",
+                "static dev.lone.itemsadder.api.CustomFurniture byAlreadySpawned(org.bukkit.block.Block)",
+                "static dev.lone.itemsadder.api.CustomFurniture spawn(java.lang.String,org.bukkit.block.Block)",
+                "static void remove(org.bukkit.entity.Entity,boolean)",
+                "void remove(boolean)",
+                "org.bukkit.entity.Entity getEntity()"
+        ), declared(CustomFurniture.class));
+        assertEquals(CustomStack.class, CustomFurniture.class.getSuperclass());
+    }
+
+    @Test
     void itemsAdderMatchesVerifiedSignatures() {
         assertEquals(set(
                 "static java.util.List getAllItems()",
@@ -92,5 +128,7 @@ class ItemsAdderApiSignatureTest {
     void noPublicConstructorsOnTheApiClassesThatHaveNoneVerified() {
         assertEquals(0, CustomStack.class.getConstructors().length);
         assertEquals(0, ItemsAdder.class.getConstructors().length);
+        assertEquals(0, CustomBlock.class.getConstructors().length);
+        assertEquals(0, CustomFurniture.class.getConstructors().length);
     }
 }

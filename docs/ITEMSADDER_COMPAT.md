@@ -31,6 +31,9 @@ nothing is invented.
 | `CustomStack.isBlock(ItemStack)`, `isFurniture(ItemStack)`, `isBlock()` | From which Kalo registry the key is in: block or furniture (furniture is not reported as a block) |
 | `ItemsAdder.getAllItems()`, `(String namespace)`, `(Material)` | Every Kalo item, filtered |
 | `ItemsAdder.isCustomItem(ItemStack)`, `isCustomItem(String)`, `getCustomItem(String)`, `areItemsLoaded` | Deprecated in ItemsAdder but kept, since older plugins still call them |
+| `CustomBlock.getInstance`, `byItemStack`, `byAlreadyPlaced`, `place` (static and instance), `remove` (static and instance), `isInRegistry`, `getNamespacedIdsInRegistry`, `getBaseBlockData`, `getBlock`, `isPlaced` | Kalo blocks, placed and removed from code (no block events fire). Removal does not drop the item (ItemsAdder's default is unverified) |
+| `CustomFurniture.getNamespacedIdsInRegistry`, `byAlreadySpawned(Block)`, `spawn(String, Block)`, `remove(boolean)` | Kalo furniture, placed as a block |
+| `CustomFurniture.getEntity()`, `byAlreadySpawned(Entity)`, static `remove(Entity, boolean)` | The entity side answers "none": `null`, `null`, and a no-op, because no Kalo furniture is an entity |
 | `ItemsAdderLoadDataEvent` | Fired **asynchronously** (Bukkit refuses to call an async event from the main thread) after all plugins enable and after each Kalo content load |
 
 ## Not supported
@@ -40,17 +43,18 @@ Missing members fail with `NoSuchMethodError` at the call site rather than doing
 - `CustomStack` display name / item name (encoding unverified), model and config accessors,
   permission, durability, usages, cooldowns, stats, drop, and the complex-furniture, consumable,
   sittable, trade-machine and vehicle queries (Kalo has no equivalent).
-- `CustomBlock`, `CustomFurniture`, `CustomEntity`, `CustomCrop` and the other wrappers; their events.
+- `CustomBlock` break/place effects and sounds, loot and light levels; `CustomFurniture` precise placement, teleport, replace, colour, light level and the deprecated armor stand accessor; the nested `Advanced` classes.
+- `CustomEntity`, `CustomCrop` and the other wrappers; their events.
 - Resource-pack, recipe and totem methods on `ItemsAdder`.
 - The nested `ItemsAdderLoadDataEvent.Cause` enum (values not read); the event's flags are accepted
   and not stored because no accessor is verified.
 - The no-argument `public CustomStack()` constructor.
 
-**Blocks and furniture count as items.** As in ItemsAdder, Nexo and Oraxen, a block or furniture
-piece has an item form and an id, so the lookup spans Kalo's item, block and furniture registries
-(`KaloItemLookup`). `getItemStack` for such an id is the item players place it from. What this does
-**not** give is the block/furniture API itself (placing, removing, mechanics): `CustomBlock`,
-`CustomFurniture`, `NexoBlocks`, `OraxenBlocks` and their kin are still unimplemented.
+**Blocks and furniture count as items, and can be placed and removed.** As in ItemsAdder, Nexo and Oraxen, a block or
+furniture piece has an item form and an id, so the item lookup spans Kalo's item, block and furniture
+registries (`KaloItemLookup`). Placing and removing go through the `BlockWorld` service on `KaloPlugin`.
+Kalo furniture is block-backed, not an entity, so plugins that rely on furniture *entities* (seats,
+hitboxes, rotation) will not work.
 
 ## Verified on a real server
 

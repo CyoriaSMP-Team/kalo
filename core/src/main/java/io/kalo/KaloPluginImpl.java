@@ -44,6 +44,8 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, List
     private final CommandManager commandManager = new CommandManager();
     private final VirtualBlockStore virtualBlockStore = new VirtualBlockStore();
     private JavaBlockListener blockListener;
+    private final io.kalo.content.block.BlockWorld blockWorld =
+            new io.kalo.platform.java.BlockWorldImpl(() -> blockListener);
     private FurnitureListener furnitureListener;
     private GuiListener guiListener;
     private io.kalo.converter.ExternalItemObserver externalItemObserver;
@@ -161,6 +163,11 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, List
         // from the main thread. The async scheduler is also the Folia-safe way to get off it.
         getServer().getAsyncScheduler().runNow(this, task ->
                 getServer().getPluginManager().callEvent(new ItemsAdderLoadDataEvent(reload, false)));
+    }
+
+    @Override
+    public @org.jetbrains.annotations.NotNull io.kalo.content.block.BlockWorld blockWorld() {
+        return blockWorld;
     }
 
     @Override

@@ -1,5 +1,7 @@
 package io.th0rgal.oraxen;
 
+import io.th0rgal.oraxen.api.OraxenBlocks;
+import io.th0rgal.oraxen.api.OraxenFurniture;
 import io.th0rgal.oraxen.api.OraxenItems;
 import io.th0rgal.oraxen.api.events.OraxenItemsLoadedEvent;
 import io.th0rgal.oraxen.items.ItemBuilder;
@@ -97,6 +99,28 @@ class OraxenApiSignatureTest {
                 "org.bukkit.inventory.ItemStack[] buildArray(int)",
                 "org.bukkit.inventory.ItemStack build()"
         ), declared(ItemBuilder.class));
+    }
+
+    @Test
+    void oraxenBlocksMatchesVerifiedSignatures() {
+        assertEquals(set(
+                "static java.util.Set getBlockIDs()",
+                "static boolean isOraxenBlock(org.bukkit.block.Block)",
+                "static boolean isOraxenBlock(java.lang.String)",
+                "static void place(java.lang.String,org.bukkit.Location)",
+                "static org.bukkit.block.data.BlockData getOraxenBlockData(java.lang.String)",
+                "static boolean remove(org.bukkit.Location,org.bukkit.entity.Player)",
+                "static boolean remove(org.bukkit.Location,org.bukkit.entity.Player,boolean)"
+        ), declared(OraxenBlocks.class));
+    }
+
+    @Test
+    void oraxenFurnitureMatchesVerifiedSignatures() {
+        assertEquals(set(
+                "static java.util.Set getFurnitureIDs()",
+                "static boolean isFurniture(org.bukkit.block.Block)",
+                "static boolean isFurniture(java.lang.String)"
+        ), declared(OraxenFurniture.class));
     }
 
     @Test

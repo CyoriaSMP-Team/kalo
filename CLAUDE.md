@@ -110,6 +110,11 @@ stubbed. See `docs/ORAXEN_COMPAT.md`. `itemsadder-compat` does the same for the 
 (`docs/ITEMSADDER_COMPAT.md`); its load event is asynchronous, so it is fired through the async
 scheduler, never from the main thread.
 
+`KaloPlugin.blockWorld()` (`BlockWorld`, implemented by `BlockWorldImpl` over `JavaBlockListener`)
+is how code places, removes and identifies blocks and furniture without a player or event. The
+shims reach it only through `compat-core`'s `KaloBlocks`. Kalo furniture is block-backed, not an
+entity, so shim members that take or return a furniture entity are omitted, not stubbed.
+
 ### `mohist` — separate Mohist 1.20.1 plugin, Java 17
 
 Its own jar, `Kalo-Mohist-*.jar`, compiled with `--release 17` against Spigot 1.20.1. It is
