@@ -98,6 +98,16 @@ plugin beside Kalo. `KaloItems` is the only class that touches Kalo; `NexoIds` o
 Nexo-id to Kalo-key rule. Signatures are pinned by `NexoApiSignatureTest`. See
 `docs/NEXO_COMPAT.md` — unsupported members must fail with `NoSuchMethodError`, never no-op.
 
+### `compat-core` and `oraxen-compat` — Java
+
+`compat-core` holds what every shim must agree on: `CompatIds` (flat plugin id to namespaced
+Kalo key; first namespace wins so the result never depends on load order) and `KaloItemLookup`
+(the only code that touches Kalo's registries). `oraxen-compat` answers the Oraxen item API in
+plain Java, shaded into the main jar and claimed through `provides` like Nexo. Its
+`OraxenApiSignatureTest` checks equality against signatures read from Oraxen's source, so no
+member exists that was not verified. Members whose meaning is unverified are omitted, never
+stubbed. See `docs/ORAXEN_COMPAT.md`.
+
 ### `mohist` — separate Mohist 1.20.1 plugin, Java 17
 
 Its own jar, `Kalo-Mohist-*.jar`, compiled with `--release 17` against Spigot 1.20.1. It is

@@ -1,6 +1,7 @@
 package io.kalo;
 
 import com.nexomc.nexo.api.events.NexoItemsLoadedEvent;
+import io.th0rgal.oraxen.api.events.OraxenItemsLoadedEvent;
 import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.manager.CommandManager;
 import io.kalo.manager.ContentManagerImpl;
@@ -153,6 +154,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, List
 
     private void fireNexoItemsLoaded() {
         getServer().getPluginManager().callEvent(new NexoItemsLoadedEvent());
+        getServer().getPluginManager().callEvent(new OraxenItemsLoadedEvent());
     }
 
     @Override

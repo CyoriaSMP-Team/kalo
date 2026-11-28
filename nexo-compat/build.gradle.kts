@@ -6,10 +6,12 @@ plugins {
 // Embedded runtime component. Its classes and Kotlin runtime are shaded into Kalo's single jar.
 dependencies {
     compileOnly(project(":api"))
+    compileOnly(project(":compat-core"))
     implementation(kotlin("stdlib"))
     testImplementation(kotlin("test"))
     testImplementation(kotlin("stdlib"))
     testImplementation(project(":api"))
+    testImplementation(project(":compat-core"))
 }
 
 kotlin {

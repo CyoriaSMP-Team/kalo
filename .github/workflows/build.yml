@@ -65,6 +65,10 @@ jobs:
             echo "::error::Paper plugin descriptor must provide the Nexo identity"
             exit 1
           }
+          unzip -p "$jar" paper-plugin.yml | grep -A3 '^provides:' | grep -q 'Oraxen' || {
+            echo "::error::Paper plugin descriptor must provide the Oraxen identity"
+            exit 1
+          }
           if unzip -l "$jar" | grep -q 'io/kalo/mohist/'; then
             echo "::error::Mohist classes must not be inside the Paper/Folia jar; it ships as Kalo-Mohist"
             exit 1

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Oraxen item API answered from Kalo (`oraxen-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `Oraxen` plugin identity. Items only; a real Oraxen plugin always wins.
+- Shared `compat-core` module for the flat-id to Kalo-key rule and the Kalo item lookup used by the Nexo and Oraxen shims.
+
+### Limitations
+
+- Oraxen compatibility is items only (no blocks, furniture, pack or mechanics) and is verified against Oraxen's source signatures and a probe plugin, not a real Oraxen consumer.
+
 ### Changed
 
 - Embed the Nexo item API in the single `Kalo-<version>.jar`; the Paper descriptor provides the `Nexo` plugin identity.
