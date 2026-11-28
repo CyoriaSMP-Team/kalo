@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Bedrock Forms (the DeluxeMenus-to-Cumulus bridge) failed with `NoClassDefFoundError: org/geysermc/cumulus/form/Form` on servers that had Floodgate, because the Paper descriptor did not declare Floodgate as a dependency and Paper gives each plugin its own classloader: Kalo could not see Floodgate's Cumulus classes. The descriptor now declares `floodgate` (optional, `join-classpath`). Servers without Floodgate are unaffected. Regression in 0.2.2.
+
 ## 0.2.2
 
 ### Added
