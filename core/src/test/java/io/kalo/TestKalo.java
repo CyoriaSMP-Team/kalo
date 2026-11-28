@@ -38,6 +38,11 @@ public final class TestKalo {
             }
 
             @Override
+            public io.kalo.content.block.BlockWorld blockWorld() {
+                throw new UnsupportedOperationException("no world in unit tests");
+            }
+
+            @Override
             public PerformanceService performance() {
                 return new PerformanceService() {
                     @Override public PerformanceSnapshot snapshot() { return PerformanceSnapshot.initial(); }

@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Added
+
+- Oraxen item API answered from Kalo (`oraxen-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `Oraxen` plugin identity. Items only; a real Oraxen plugin always wins.
+- ItemsAdder item API answered from Kalo (`itemsadder-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `ItemsAdder` identity. Items only; `ItemsAdderLoadDataEvent` is fired asynchronously; a real ItemsAdder plugin always wins.
+- Block and furniture APIs for the shims: `NexoBlocks`/`NexoFurniture`, `OraxenBlocks`/`OraxenFurniture` and ItemsAdder `CustomBlock`/`CustomFurniture` (placing, removing, detecting), backed by a new `KaloPlugin.blockWorld()` service. No block events fire for placements made through it.
+- The Nexo, Oraxen and ItemsAdder shims now see Kalo blocks and furniture as items, not just the item registry; ItemsAdder `CustomStack.isBlock`/`isFurniture` tell them apart.
+- CraftEngine API subset answered from Kalo (`craftengine-compat`): `CraftEngineItems.isCustomItem`, `CraftEngineBlocks.isCustomBlock`/`remove`, the `CraftEngineFurniture` entity tests, and `CraftEngineReloadEvent`; the Paper descriptor now also provides the `CraftEngine` identity. Only members with plain Bukkit types; anything using CraftEngine's own types (`Key`, definitions, block states) is not implemented. Signatures read from CraftEngine's `dev` branch.
+- Shared `compat-core` module for the flat-id to Kalo-key rule and the Kalo item lookup used by the Nexo and Oraxen shims.
+
+### Limitations
+
+- Kalo furniture is block-backed, not an entity, so shim members that need a furniture entity (Nexo/Oraxen `place`/`baseEntity`, ItemsAdder `CustomFurniture` entity methods) are not implemented or answer "none". Block break/place effects, loot and light levels are not implemented.
+- Oraxen compatibility is items only (no blocks, furniture, pack or mechanics) and is verified against Oraxen's source signatures and a probe plugin, not a real Oraxen consumer.
+
+### Fixed
+
+- A block placed on the first start with a new pack was not recognised afterwards (not dropped, not broken as custom content) until a reload or restart: block states are allocated while the pack compiles asynchronously, after the lookup was built. Placement now rebuilds the lookup if it does not know the state it just used.
+
 ### Changed
 
 - Embed the Nexo item API in the single `Kalo-<version>.jar`; the Paper descriptor provides the `Nexo` plugin identity.

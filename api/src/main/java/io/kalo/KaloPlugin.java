@@ -11,6 +11,9 @@ public interface KaloPlugin {
 
     @NotNull ContentManager contentManager();
 
+    /** Places, removes and identifies blocks and furniture in the world from code. */
+    @NotNull io.kalo.content.block.BlockWorld blockWorld();
+
     @NotNull ResourcePackManager resourcePackManager();
 
     /** Runtime pressure/health sampler shared by Kalo and performance-aware add-ons. */

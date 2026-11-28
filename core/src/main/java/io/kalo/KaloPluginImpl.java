@@ -1,6 +1,9 @@
 package io.kalo;
 
 import com.nexomc.nexo.api.events.NexoItemsLoadedEvent;
+import dev.lone.itemsadder.api.Events.ItemsAdderLoadDataEvent;
+import net.momirealms.craftengine.bukkit.api.event.CraftEngineReloadEvents;
+import io.th0rgal.oraxen.api.events.OraxenItemsLoadedEvent;
 import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.manager.CommandManager;
 import io.kalo.manager.ContentManagerImpl;
@@ -42,6 +45,8 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, List
     private final CommandManager commandManager = new CommandManager();
     private final VirtualBlockStore virtualBlockStore = new VirtualBlockStore();
     private JavaBlockListener blockListener;
+    private final io.kalo.content.block.BlockWorld blockWorld =
+            new io.kalo.platform.java.BlockWorldImpl(() -> blockListener);
     private FurnitureListener furnitureListener;
     private GuiListener guiListener;
     private io.kalo.converter.ExternalItemObserver externalItemObserver;
@@ -140,19 +145,31 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, List
     @EventHandler
     public void onServerLoad(ServerLoadEvent event) {
         serverLoadComplete = true;
-        fireNexoItemsLoaded();
+        fireCompatLoaded(false);
     }
 
     /** Notify Nexo consumers again after later Kalo content reloads, not during initial startup. */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onRegistryInitialize(RegistryInitializeEvent event) {
         if (serverLoadComplete) {
-            fireNexoItemsLoaded();
+            fireCompatLoaded(true);
         }
     }
 
-    private void fireNexoItemsLoaded() {
+    /** Tell every embedded compatibility API that Kalo's content is ready. */
+    private void fireCompatLoaded(boolean reload) {
         getServer().getPluginManager().callEvent(new NexoItemsLoadedEvent());
+        getServer().getPluginManager().callEvent(new OraxenItemsLoadedEvent());
+        getServer().getPluginManager().callEvent(CraftEngineReloadEvents.create(!reload));
+        // ItemsAdder's load event is asynchronous, and Bukkit refuses to call an async event
+        // from the main thread. The async scheduler is also the Folia-safe way to get off it.
+        getServer().getAsyncScheduler().runNow(this, task ->
+                getServer().getPluginManager().callEvent(new ItemsAdderLoadDataEvent(reload, false)));
+    }
+
+    @Override
+    public @org.jetbrains.annotations.NotNull io.kalo.content.block.BlockWorld blockWorld() {
+        return blockWorld;
     }
 
     @Override
