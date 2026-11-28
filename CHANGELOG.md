@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 ### Added
 
@@ -9,12 +9,14 @@
 - Block and furniture APIs for the shims: `NexoBlocks`/`NexoFurniture`, `OraxenBlocks`/`OraxenFurniture` and ItemsAdder `CustomBlock`/`CustomFurniture` (placing, removing, detecting), backed by a new `KaloPlugin.blockWorld()` service. No block events fire for placements made through it.
 - The Nexo, Oraxen and ItemsAdder shims now see Kalo blocks and furniture as items, not just the item registry; ItemsAdder `CustomStack.isBlock`/`isFurniture` tell them apart.
 - CraftEngine API subset answered from Kalo (`craftengine-compat`): `CraftEngineItems.isCustomItem`, `CraftEngineBlocks.isCustomBlock`/`remove`, the `CraftEngineFurniture` entity tests, and `CraftEngineReloadEvent`; the Paper descriptor now also provides the `CraftEngine` identity. Only members with plain Bukkit types; anything using CraftEngine's own types (`Key`, definitions, block states) is not implemented. Signatures read from CraftEngine's `dev` branch.
-- Shared `compat-core` module for the flat-id to Kalo-key rule and the Kalo item lookup used by the Nexo and Oraxen shims.
+- Shared `compat-core` module for the flat-id to Kalo-key rule and the Kalo item/block lookup used by every shim (Nexo, Oraxen, ItemsAdder, CraftEngine).
 
 ### Limitations
 
 - Kalo furniture is block-backed, not an entity, so shim members that need a furniture entity (Nexo/Oraxen `place`/`baseEntity`, ItemsAdder `CustomFurniture` entity methods) are not implemented or answer "none". Block break/place effects, loot and light levels are not implemented.
-- Oraxen compatibility is items only (no blocks, furniture, pack or mechanics) and is verified against Oraxen's source signatures and a probe plugin, not a real Oraxen consumer.
+- Not implemented: `NexoPack`, `OraxenPack`, mechanics, and every member that needs a furniture entity or one of CraftEngine's own types. Anything missing fails with `NoSuchMethodError`.
+- Verified on a real Paper 1.21.4 server with probe plugins that call each API, and against signatures read from each plugin's published source or Javadoc. **Not** verified on Paper 26.x or Folia, or against any real third-party plugin that uses these APIs. Oraxen's and CraftEngine's plugin names come from their documentation, not their descriptors; CraftEngine's signatures come from its `dev` branch.
+- Licensing of reimplementing these APIs has not been reviewed by a lawyer: Oraxen forbids redistributing its package in part, CraftEngine is GPL-3.0, and the ItemsAdder terms were not read.
 
 ### Fixed
 
