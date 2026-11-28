@@ -28,6 +28,7 @@ nothing is invented.
 |---|---|
 | `CustomStack.getInstance`, `byItemStack`, `isInRegistry`, `getNamespacedIdsInRegistry` | Answered from Kalo's item registry; a missing id gives `null` / `false` |
 | `CustomStack.getNamespace`, `getId`, `getNamespacedID`, `matchNamespacedID`, `getItemStack` | From the Kalo key; `getItemStack` is a fresh copy |
+| `CustomStack.isBlock(ItemStack)`, `isFurniture(ItemStack)`, `isBlock()` | From which Kalo registry the key is in: block or furniture (furniture is not reported as a block) |
 | `ItemsAdder.getAllItems()`, `(String namespace)`, `(Material)` | Every Kalo item, filtered |
 | `ItemsAdder.isCustomItem(ItemStack)`, `isCustomItem(String)`, `getCustomItem(String)`, `areItemsLoaded` | Deprecated in ItemsAdder but kept, since older plugins still call them |
 | `ItemsAdderLoadDataEvent` | Fired **asynchronously** (Bukkit refuses to call an async event from the main thread) after all plugins enable and after each Kalo content load |
@@ -37,23 +38,25 @@ nothing is invented.
 Missing members fail with `NoSuchMethodError` at the call site rather than doing nothing.
 
 - `CustomStack` display name / item name (encoding unverified), model and config accessors,
-  permission, durability, usages, cooldowns, stats, drop, and the `isBlock` / `isFurniture` /
-  `isVehicle` queries.
+  permission, durability, usages, cooldowns, stats, drop, and the complex-furniture, consumable,
+  sittable, trade-machine and vehicle queries (Kalo has no equivalent).
 - `CustomBlock`, `CustomFurniture`, `CustomEntity`, `CustomCrop` and the other wrappers; their events.
 - Resource-pack, recipe and totem methods on `ItemsAdder`.
 - The nested `ItemsAdderLoadDataEvent.Cause` enum (values not read); the event's flags are accepted
   and not stored because no accessor is verified.
 - The no-argument `public CustomStack()` constructor.
 
-**Blocks and furniture are not in any shim's item lookup yet.** Kalo's blocks and furniture live in
-separate registries and their item stacks are not stamped with the item id the lookup reads, so a
-block or furniture id is "not found" through the Nexo, Oraxen and ItemsAdder shims alike.
+**Blocks and furniture count as items.** As in ItemsAdder, Nexo and Oraxen, a block or furniture
+piece has an item form and an id, so the lookup spans Kalo's item, block and furniture registries
+(`KaloItemLookup`). `getItemStack` for such an id is the item players place it from. What this does
+**not** give is the block/furniture API itself (placing, removing, mechanics): `CustomBlock`,
+`CustomFurniture`, `NexoBlocks`, `OraxenBlocks` and their kin are still unimplemented.
 
 ## Verified on a real server
 
 Paper 1.21.4, Java 21, built jar, `examples/testpack`, a probe with `depend: [ItemsAdder]`
 alongside Nexo and Oraxen probes: `getPlugin("ItemsAdder")` is Kalo; the registry lists the pack's
-items; `getInstance` then `getItemStack` then `byItemStack` returns the original id; the load event
+items, blocks and furniture; `getInstance` then `getItemStack` then `byItemStack` returns the original id; the load event
 arrives with `isAsynchronous() == true` and off the main thread.
 
 **Not verified:** the plugin name (`ItemsAdder`, from common usage; the pages read did not state it),

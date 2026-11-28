@@ -17,8 +17,9 @@ import java.util.Set;
  * meaning is unambiguous exist; the rest fail with {@code NoSuchMethodError}. Left out because
  * Kalo has no equivalent or the meaning is unverified: display name and item name (encoding),
  * model, config and permission accessors, durability and usages, cooldowns and stats, and the
- * block, furniture and vehicle queries (Kalo blocks and furniture are not in the item registry).
- * Pinned by {@code ItemsAdderApiSignatureTest}; see {@code docs/ITEMSADDER_COMPAT.md}.</p>
+ * complex-furniture, consumable, sittable, trade-machine and vehicle queries (Kalo has no equivalent).
+ * Blocks and furniture count as items here too, as in ItemsAdder; {@code isBlock} and
+ * {@code isFurniture} tell them apart. Pinned by {@code ItemsAdderApiSignatureTest}; see {@code docs/ITEMSADDER_COMPAT.md}.</p>
  */
 public class CustomStack {
     private final String namespacedId;
@@ -45,6 +46,23 @@ public class CustomStack {
     public static CustomStack getInstance(String namespacedID) {
         String key = CompatIds.resolve(namespacedID, KaloItemLookup.keys());
         return key == null ? null : new CustomStack(key);
+    }
+
+    public static boolean isBlock(ItemStack itemStack) {
+        return kindOf(itemStack) == KaloItemLookup.Kind.BLOCK;
+    }
+
+    public static boolean isFurniture(ItemStack itemStack) {
+        return kindOf(itemStack) == KaloItemLookup.Kind.FURNITURE;
+    }
+
+    public boolean isBlock() {
+        return KaloItemLookup.kindOf(namespacedId) == KaloItemLookup.Kind.BLOCK;
+    }
+
+    private static KaloItemLookup.Kind kindOf(ItemStack itemStack) {
+        String key = KaloItemLookup.keyOf(itemStack);
+        return key == null ? null : KaloItemLookup.kindOf(key);
     }
 
     public String getNamespace() {

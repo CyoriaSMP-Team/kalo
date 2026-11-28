@@ -6,11 +6,12 @@
 
 - Oraxen item API answered from Kalo (`oraxen-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `Oraxen` plugin identity. Items only; a real Oraxen plugin always wins.
 - ItemsAdder item API answered from Kalo (`itemsadder-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `ItemsAdder` identity. Items only; `ItemsAdderLoadDataEvent` is fired asynchronously; a real ItemsAdder plugin always wins.
+- The Nexo, Oraxen and ItemsAdder shims now see Kalo blocks and furniture as items, not just the item registry; ItemsAdder `CustomStack.isBlock`/`isFurniture` tell them apart.
 - Shared `compat-core` module for the flat-id to Kalo-key rule and the Kalo item lookup used by the Nexo and Oraxen shims.
 
 ### Limitations
 
-- ItemsAdder compatibility is items only, and none of the Nexo, Oraxen or ItemsAdder shims see Kalo blocks or furniture yet (they are not in the item registry).
+- ItemsAdder compatibility is items only: no `CustomBlock`/`CustomFurniture`, and likewise no `NexoBlocks`/`OraxenBlocks`. Blocks and furniture are visible only as items (an id and an item form).
 - Oraxen compatibility is items only (no blocks, furniture, pack or mechanics) and is verified against Oraxen's source signatures and a probe plugin, not a real Oraxen consumer.
 
 ### Changed

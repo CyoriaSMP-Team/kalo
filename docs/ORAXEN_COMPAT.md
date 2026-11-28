@@ -25,7 +25,7 @@ Javadoc, which could not be reached.
 | API | Behaviour |
 |---|---|
 | `OraxenItems.getItemById`, `getOptionalItemById`, `exists`, `getIdByItem`, `getBuilderByItem` | Answered from Kalo's item registry; a missing id gives `null` / `false` |
-| `getNames`, `nameArray`, `nameStream`, `getItemNames`, `getItems`, `itemStream`, `getEntries`, `getEntriesAsMap`, `entryStream`, `getUnexcludedItems()` | Every Kalo item |
+| `getNames`, `nameArray`, `nameStream`, `getItemNames`, `getItems`, `itemStream`, `getEntries`, `getEntriesAsMap`, `entryStream`, `getUnexcludedItems()` | Every Kalo item, block and furniture piece (as items, by their item form) |
 | `hasMechanic` | Always `false` — Kalo has no Oraxen mechanics |
 | `getMap`, `getUnexcludedItems(File)` | Empty — Kalo does not group items by source file |
 | `loadItems` | No-op — Kalo owns loading |
