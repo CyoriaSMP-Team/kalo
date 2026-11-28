@@ -84,6 +84,13 @@ paperPluginYaml {
         // NoClassDefFoundError on every server that actually had PlaceholderAPI.
         server("PlaceholderAPI", PaperPluginYaml.Load.BEFORE, false, true)
 
+        // Floodgate carries the Cumulus form classes (org.geysermc.cumulus.form.*) that
+        // DeluxeMenuFormBridge names directly. Without this edge Kalo cannot see them even with
+        // Floodgate installed and enabled, and the Bedrock Forms bridge dies with
+        // NoClassDefFoundError: org/geysermc/cumulus/form/Form. The plugin's name is lower case.
+        // required = false: servers without Floodgate are unaffected.
+        server("floodgate", PaperPluginYaml.Load.BEFORE, false, true)
+
         // MythicMobs and ModelEngine deliberately have no entry: those hooks reach their
         // plugins through reflection and never name a class, so they need no edge.
     }
