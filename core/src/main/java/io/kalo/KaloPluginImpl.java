@@ -2,6 +2,7 @@ package io.kalo;
 
 import com.nexomc.nexo.api.events.NexoItemsLoadedEvent;
 import dev.lone.itemsadder.api.Events.ItemsAdderLoadDataEvent;
+import net.momirealms.craftengine.bukkit.api.event.CraftEngineReloadEvents;
 import io.th0rgal.oraxen.api.events.OraxenItemsLoadedEvent;
 import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.manager.CommandManager;
@@ -159,6 +160,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, List
     private void fireCompatLoaded(boolean reload) {
         getServer().getPluginManager().callEvent(new NexoItemsLoadedEvent());
         getServer().getPluginManager().callEvent(new OraxenItemsLoadedEvent());
+        getServer().getPluginManager().callEvent(CraftEngineReloadEvents.create(!reload));
         // ItemsAdder's load event is asynchronous, and Bukkit refuses to call an async event
         // from the main thread. The async scheduler is also the Folia-safe way to get off it.
         getServer().getAsyncScheduler().runNow(this, task ->

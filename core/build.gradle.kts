@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":nexo-compat"))
     implementation(project(":oraxen-compat"))
     implementation(project(":itemsadder-compat"))
+    implementation(project(":craftengine-compat"))
     compileOnly("com.github.bindglam:ConfigLib:1.0.0")
     compileOnly("org.incendo:cloud-paper:2.0.0")
     // Soft dependency: the hook is only touched when the plugin is installed.
@@ -65,6 +66,7 @@ paperPluginYaml {
     provides.add("Nexo")
     provides.add("Oraxen")
     provides.add("ItemsAdder")
+    provides.add("CraftEngine")
     dependencies {
         // Paper plugins get isolated classloaders, unlike legacy Bukkit ones: without
         // joinClasspath a soft-depended plugin's classes are simply not visible, and the

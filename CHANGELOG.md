@@ -8,6 +8,7 @@
 - ItemsAdder item API answered from Kalo (`itemsadder-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `ItemsAdder` identity. Items only; `ItemsAdderLoadDataEvent` is fired asynchronously; a real ItemsAdder plugin always wins.
 - Block and furniture APIs for the shims: `NexoBlocks`/`NexoFurniture`, `OraxenBlocks`/`OraxenFurniture` and ItemsAdder `CustomBlock`/`CustomFurniture` (placing, removing, detecting), backed by a new `KaloPlugin.blockWorld()` service. No block events fire for placements made through it.
 - The Nexo, Oraxen and ItemsAdder shims now see Kalo blocks and furniture as items, not just the item registry; ItemsAdder `CustomStack.isBlock`/`isFurniture` tell them apart.
+- CraftEngine API subset answered from Kalo (`craftengine-compat`): `CraftEngineItems.isCustomItem`, `CraftEngineBlocks.isCustomBlock`/`remove`, the `CraftEngineFurniture` entity tests, and `CraftEngineReloadEvent`; the Paper descriptor now also provides the `CraftEngine` identity. Only members with plain Bukkit types; anything using CraftEngine's own types (`Key`, definitions, block states) is not implemented. Signatures read from CraftEngine's `dev` branch.
 - Shared `compat-core` module for the flat-id to Kalo-key rule and the Kalo item lookup used by the Nexo and Oraxen shims.
 
 ### Limitations

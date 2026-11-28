@@ -69,8 +69,12 @@ jobs:
             echo "::error::Paper plugin descriptor must provide the Oraxen identity"
             exit 1
           }
-          unzip -p "$jar" paper-plugin.yml | grep -A4 '^provides:' | grep -q 'ItemsAdder' || {
+          unzip -p "$jar" paper-plugin.yml | grep -A5 '^provides:' | grep -q 'ItemsAdder' || {
             echo "::error::Paper plugin descriptor must provide the ItemsAdder identity"
+            exit 1
+          }
+          unzip -p "$jar" paper-plugin.yml | grep -A5 '^provides:' | grep -q 'CraftEngine' || {
+            echo "::error::Paper plugin descriptor must provide the CraftEngine identity"
             exit 1
           }
           if unzip -l "$jar" | grep -q 'io/kalo/mohist/'; then
