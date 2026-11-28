@@ -93,6 +93,20 @@ jobs:
             exit 1
           fi
 
+      # The Nexo compatibility shim is a separate optional plugin, not part of the main jar.
+      - name: Verify the Nexo compatibility jar targets Java 21
+        run: |
+          jar="nexo-compat/build/libs/Kalo-NexoCompat-${{ steps.version.outputs.plugin_version }}.jar"
+          if [ ! -s "$jar" ]; then
+            echo "::error::Missing Nexo compatibility jar $jar"
+            exit 1
+          fi
+          major=$(unzip -p "$jar" com/nexomc/nexo/NexoCompatPlugin.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          if [ "$major" != "65" ]; then
+            echo "::error::Expected Nexo compatibility Java 21 bytecode (major 65); got $major"
+            exit 1
+          fi
+
       # Mohist 1.20.1 compatibility remains a distinct experimental Java 17 jar.
       # Do not publish it into the Paper/Folia Modrinth/Hangar channels.
       - name: Verify the Mohist 1.20.1 jar targets Java 17
@@ -155,7 +169,8 @@ jobs:
             --generate-notes \
             --target "${{ github.sha }}" \
             build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar \
-            mohist/build/libs/Kalo-Mohist-${{ steps.version.outputs.plugin_version }}.jar
+            mohist/build/libs/Kalo-Mohist-${{ steps.version.outputs.plugin_version }}.jar \
+            nexo-compat/build/libs/Kalo-NexoCompat-${{ steps.version.outputs.plugin_version }}.jar
 
       # Modrinth, Hangar, and MCMall are skipped rather than failed when their credentials
       # are absent, so the release workflow remains usable before every channel is configured.
