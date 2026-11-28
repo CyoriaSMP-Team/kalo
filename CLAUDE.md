@@ -98,7 +98,7 @@ plugin beside Kalo. `KaloItems` is the only class that touches Kalo; `NexoIds` o
 Nexo-id to Kalo-key rule. Signatures are pinned by `NexoApiSignatureTest`. See
 `docs/NEXO_COMPAT.md` — unsupported members must fail with `NoSuchMethodError`, never no-op.
 
-### `compat-core` and `oraxen-compat` — Java
+### `compat-core`, `oraxen-compat` and `itemsadder-compat` — Java
 
 `compat-core` holds what every shim must agree on: `CompatIds` (flat plugin id to namespaced
 Kalo key; first namespace wins so the result never depends on load order) and `KaloItemLookup`
@@ -106,7 +106,9 @@ Kalo key; first namespace wins so the result never depends on load order) and `K
 plain Java, shaded into the main jar and claimed through `provides` like Nexo. Its
 `OraxenApiSignatureTest` checks equality against signatures read from Oraxen's source, so no
 member exists that was not verified. Members whose meaning is unverified are omitted, never
-stubbed. See `docs/ORAXEN_COMPAT.md`.
+stubbed. See `docs/ORAXEN_COMPAT.md`. `itemsadder-compat` does the same for the ItemsAdder API
+(`docs/ITEMSADDER_COMPAT.md`); its load event is asynchronous, so it is fired through the async
+scheduler, never from the main thread.
 
 ### `mohist` — separate Mohist 1.20.1 plugin, Java 17
 

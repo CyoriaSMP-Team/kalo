@@ -65,8 +65,12 @@ jobs:
             echo "::error::Paper plugin descriptor must provide the Nexo identity"
             exit 1
           }
-          unzip -p "$jar" paper-plugin.yml | grep -A3 '^provides:' | grep -q 'Oraxen' || {
+          unzip -p "$jar" paper-plugin.yml | grep -A4 '^provides:' | grep -q 'Oraxen' || {
             echo "::error::Paper plugin descriptor must provide the Oraxen identity"
+            exit 1
+          }
+          unzip -p "$jar" paper-plugin.yml | grep -A4 '^provides:' | grep -q 'ItemsAdder' || {
+            echo "::error::Paper plugin descriptor must provide the ItemsAdder identity"
             exit 1
           }
           if unzip -l "$jar" | grep -q 'io/kalo/mohist/'; then
