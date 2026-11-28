@@ -90,7 +90,7 @@ public final class PackSources {
             if (List.of("backup","backups","cache","old","tmp","temp","archive",".git").contains(name))
                 return true;
         }
-        return path.getNameCount() == 2 && path.getName(0).toString().equalsIgnoreCase("Kalo-Mohist")
+        return path.getNameCount() == 2 && path.getName(0).toString().equalsIgnoreCase("Kalo")
                 && path.getFileName().toString().startsWith("generated");
     }
 

@@ -1,15 +1,15 @@
-name: KaloMohist
+name: Kalo
 version: ${version}
 main: io.kalo.mohist.MohistPlugin
 api-version: '1.20'
 load: POSTWORLD
 author: CyoriaSMP-Team
-description: Lightweight Kalo Java 17 compatibility bridge for Mohist 1.20.1
+description: Kalo's experimental Java 17 compatibility runtime for Mohist 1.20.1
 commands:
-  kalomohist:
-    description: Mohist 1.20.1 pack discovery and legacy CMD export
-    usage: /kalomohist <status|scan|catalog|learn|export>
-    aliases: [kalom]
+  kalo:
+    description: Kalo Mohist 1.20.1 pack discovery and legacy CMD export
+    usage: /kalo <status|scan|catalog|learn|export>
+    aliases: [kalomohist, kalom]
 permissions:
   kalomohist.admin:
     description: Inspect packs and export Bedrock resources

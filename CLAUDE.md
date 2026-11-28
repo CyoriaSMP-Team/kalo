@@ -89,13 +89,22 @@ Output: `build/libs/Kalo-{version}.jar`
 - `migration` — `OraxenImporter`, `ItemsAdderImporter`, `ImportReport`
 - `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
 
-### `nexo-compat` — optional add-on, Kotlin
+### `nexo-compat` — embedded Nexo API, Kotlin
 
-`Kalo-NexoCompat-*.jar`: a separate plugin named `Nexo` that answers the Nexo API
-(`com.nexomc.nexo.api.*`) from Kalo's registries. It is **not** in the main jar and never
-installed beside real Nexo. `KaloItems` is the only class that touches Kalo; `NexoIds` owns the
+The Nexo API compatibility classes (`com.nexomc.nexo.api.*`) and Kotlin runtime are shaded
+into the single Kalo jar. Paper metadata provides the `Nexo` plugin identity; there is no
+second plugin entry point or standalone compatibility artifact. Do not install the real Nexo
+plugin beside Kalo. `KaloItems` is the only class that touches Kalo; `NexoIds` owns the
 Nexo-id to Kalo-key rule. Signatures are pinned by `NexoApiSignatureTest`. See
 `docs/NEXO_COMPAT.md` — unsupported members must fail with `NoSuchMethodError`, never no-op.
+
+### `mohist` — embedded Mohist 1.20.1 runtime, Java 17
+
+The `mohist` module compiles the legacy Bukkit entry point and its dependency tree with
+`--release 17`. The resulting classes are shaded into the same Kalo jar. Mohist selects the
+legacy `plugin.yml`; Paper/Folia selects `paper-plugin.yml` and does not load the Mohist entry
+point. Keep this module independent of Paper 1.21+ classes and Java 21-only APIs. CI checks
+that `io.kalo.mohist.MohistPlugin` remains class-file major 61. See `docs/MOHIST_1201.md`.
 
 ## Architecture
 

@@ -99,36 +99,37 @@ jobs:
             exit 1
           fi
 
-      # The Nexo compatibility shim is a separate optional plugin, not part of the main jar.
-      - name: Verify the Nexo compatibility jar targets Java 21
+      - name: Verify embedded Nexo API targets Java 21
         run: |
-          jar="nexo-compat/build/libs/Kalo-NexoCompat-${{ steps.version.outputs.plugin_version }}.jar"
-          if [ ! -s "$jar" ]; then
-            echo "::error::Missing Nexo compatibility jar $jar"
-            exit 1
-          fi
-          major=$(unzip -p "$jar" com/nexomc/nexo/NexoCompatPlugin.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          jar="build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar"
+          major=$(unzip -p "$jar" com/nexomc/nexo/api/NexoItems.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
           if [ "$major" != "65" ]; then
-            echo "::error::Expected Nexo compatibility Java 21 bytecode (major 65); got $major"
+            echo "::error::Expected embedded Nexo API major 65 (Java 21); got $major"
             exit 1
           fi
+          unzip -l "$jar" | grep -q 'kotlin/Unit.class' || {
+            echo "::error::Kotlin runtime missing from the unified Kalo jar"
+            exit 1
+          }
 
-      # Mohist 1.20.1 compatibility remains a distinct experimental Java 17 jar.
-      # Do not publish it into the Paper/Folia Modrinth/Hangar channels.
-      - name: Verify the Mohist 1.20.1 jar targets Java 17
+      - name: Verify embedded Mohist 1.20.1 entry point targets Java 17
         run: |
-          jar="mohist/build/libs/Kalo-Mohist-${{ steps.version.outputs.plugin_version }}.jar"
-          if [ ! -s "$jar" ]; then
-            echo "::error::Missing Mohist compatibility jar $jar"
-            exit 1
-          fi
+          jar="build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar"
           major=$(unzip -p "$jar" io/kalo/mohist/MohistPlugin.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
           if [ "$major" != "61" ]; then
-            echo "::error::Expected Mohist Java 17 bytecode (major 61); got $major"
+            echo "::error::Expected embedded Mohist class major 61 (Java 17); got $major"
             exit 1
           fi
+          unzip -p "$jar" plugin.yml | grep -q '^name: Kalo$' || {
+            echo "::error::Mohist fallback descriptor does not identify as Kalo"
+            exit 1
+          }
           unzip -p "$jar" plugin.yml | grep -q 'main: io.kalo.mohist.MohistPlugin' || {
-            echo "::error::Mohist plugin.yml missing or incorrect"
+            echo "::error::Mohist fallback entry point missing"
+            exit 1
+          }
+          unzip -p "$jar" paper-plugin.yml | grep -A2 '^provides:' | grep -q 'Nexo' || {
+            echo "::error::Paper descriptor must provide Nexo"
             exit 1
           }
 
@@ -175,9 +176,7 @@ jobs:
             --notes-file release-notes.md \
             --generate-notes \
             --target "${{ github.sha }}" \
-            build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar \
-            mohist/build/libs/Kalo-Mohist-${{ steps.version.outputs.plugin_version }}.jar \
-            nexo-compat/build/libs/Kalo-NexoCompat-${{ steps.version.outputs.plugin_version }}.jar
+            build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar
 
       # Modrinth, Hangar, and MCMall are skipped rather than failed when their credentials
       # are absent, so the release workflow remains usable before every channel is configured.

@@ -266,16 +266,17 @@ model:
 
 ## Mohist / DeadZone compatibility (experimental)
 
-A separate Java-17-bytecode Bukkit 1.20.1 compatibility module is located
-in mohist/ and builds Kalo-Mohist-<version>.jar. It is suitable for a Java 21
-runtime, such as the current DeadZone server, without changing its Java version.
+The single `Kalo-<version>.jar` contains both platform runtimes and the embedded
+Nexo item API. Paper/Folia selects `paper-plugin.yml` and runs the Java 21 Kalo
+engine; the descriptor also provides the `Nexo` plugin identity. Mohist 1.20.1
+selects the legacy `plugin.yml` entry point, which is kept at Java 17 bytecode
+and is suitable for a Java 21 runtime without changing its Java version.
 
-It discovers Java resource packs and mod asset jars, catalogs Minecraft
-namespace-based models/textures/animation metadata and Forge registry IDs,
-observes legacy CustomModelData on vanilla carrier items, and exports
-experimental 2D plus limited single-sheet static 3D Bedrock assets and
-Geyser legacy mappings. A versioned JSON inventory and handoff allows
-additional bridge or mod adapters without hardcoding TaCZ. It does not port the native
+On Mohist, the experimental compatibility runtime discovers Java resource
+packs and mod asset jars, catalogs Minecraft namespace-based models/textures/
+animation metadata and Forge registry IDs, observes legacy CustomModelData
+on vanilla carrier items, and exports experimental 2D plus limited single-sheet
+static 3D Bedrock assets and Geyser legacy mappings. It does not port the native
 Kalo content engine or bridge Forge/TaCZ gameplay. See docs/MOHIST_1201.md.
 
 ## External Java resource packs (experimental)
@@ -465,6 +466,8 @@ Output: `build/libs/Kalo-<version>.jar`
 
 - **`api`** — public API: content model, definitions, registries, features, pack model
 - **`core`** — implementation: managers, compilers, pack writer, commands, Geyser bridge
+- **`nexo-compat`** — embedded Nexo item API and lifecycle event (shaded into Kalo)
+- **`mohist`** — embedded Mohist 1.20.1 compatibility entry point, compiled to Java 17 (shaded into Kalo)
 
 ## Migrating from another plugin
 

@@ -112,7 +112,7 @@ class MohistCompatibilityTest {
     }
 
     @Test void persistsAndDeduplicatesObservedCmd() throws IOException {
-        Path store=temp.resolve("Kalo-Mohist/legacy-observed.properties");
+        Path store=temp.resolve("Kalo/legacy-observed.properties");
         var item=new LegacyBedrockExporter.Observed("paper",42);
         assertTrue(ObservedStore.load(store).isEmpty());
         assertTrue(ObservedStore.remember(store,item));

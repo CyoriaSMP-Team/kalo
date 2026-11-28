@@ -1,5 +1,7 @@
 package io.kalo;
 
+import com.nexomc.nexo.api.events.NexoItemsLoadedEvent;
+import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.manager.CommandManager;
 import io.kalo.manager.ContentManagerImpl;
 import io.kalo.manager.Context;
@@ -15,7 +17,11 @@ import io.kalo.platform.java.VirtualBlockStore;
 import io.kalo.performance.PerformanceManager;
 import lombok.Getter;
 import lombok.experimental.Accessors;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.ServerLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -23,7 +29,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.logging.Level;
 
-public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
+public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, Listener {
     @Getter @Accessors(fluent = true)
     private final RegistryManagerImpl registryManager = new RegistryManagerImpl();
     @Getter @Accessors(fluent = true)
@@ -39,6 +45,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
     private FurnitureListener furnitureListener;
     private GuiListener guiListener;
     private io.kalo.converter.ExternalItemObserver externalItemObserver;
+    private boolean serverLoadComplete;
 
     private final List<Managerial> managers = List.of(
             registryManager,
@@ -67,6 +74,9 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+        // Register the Nexo-compatible API lifecycle before Kalo emits its first registry event.
+        getServer().getPluginManager().registerEvents(this, this);
 
         Context context = new Context(this);
         managers.forEach(manager -> manager.preload(context));
@@ -124,6 +134,25 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         io.kalo.integration.PlaceholderApiIntegration.initialize(this);
         io.kalo.integration.MythicMobsIntegration.initialize(this);
         io.kalo.integration.ModelEngineIntegration.initialize(this);
+    }
+
+    /** Nexo consumers expect their items to be ready after every plugin has enabled. */
+    @EventHandler
+    public void onServerLoad(ServerLoadEvent event) {
+        serverLoadComplete = true;
+        fireNexoItemsLoaded();
+    }
+
+    /** Notify Nexo consumers again after later Kalo content reloads, not during initial startup. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRegistryInitialize(RegistryInitializeEvent event) {
+        if (serverLoadComplete) {
+            fireNexoItemsLoaded();
+        }
+    }
+
+    private void fireNexoItemsLoaded() {
+        getServer().getPluginManager().callEvent(new NexoItemsLoadedEvent());
     }
 
     @Override
