@@ -18,7 +18,7 @@ Kalo is pre-alpha. Successful compilation does not establish Bedrock compatibili
 - [ ] Native Bedrock UI/HUD, fallback to translated Java inventory GUI
 - [ ] Full Folia safety audit of feature tasks, particularly cooldown/mana
 - [ ] Complete semantic third-party import/export with real-world fixtures
-- [ ] Mohist/Forge compatibility runtime embedded in the Kalo distribution (experimental)
+- [ ] Optional Mohist/Forge adapters, separate from Paper/Folia core
 
 ## P2: Creator experience
 - [ ] Browser-based editor, previews, resource inspectors and diagnostics

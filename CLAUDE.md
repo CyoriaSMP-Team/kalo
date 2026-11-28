@@ -98,13 +98,13 @@ plugin beside Kalo. `KaloItems` is the only class that touches Kalo; `NexoIds` o
 Nexo-id to Kalo-key rule. Signatures are pinned by `NexoApiSignatureTest`. See
 `docs/NEXO_COMPAT.md` — unsupported members must fail with `NoSuchMethodError`, never no-op.
 
-### `mohist` — embedded Mohist 1.20.1 runtime, Java 17
+### `mohist` — separate Mohist 1.20.1 plugin, Java 17
 
-The `mohist` module compiles the legacy Bukkit entry point and its dependency tree with
-`--release 17`. The resulting classes are shaded into the same Kalo jar. Mohist selects the
-legacy `plugin.yml`; Paper/Folia selects `paper-plugin.yml` and does not load the Mohist entry
-point. Keep this module independent of Paper 1.21+ classes and Java 21-only APIs. CI checks
-that `io.kalo.mohist.MohistPlugin` remains class-file major 61. See `docs/MOHIST_1201.md`.
+Its own jar, `Kalo-Mohist-*.jar`, compiled with `--release 17` against Spigot 1.20.1. It is
+**not** shaded into the Paper/Folia jar: that jar is Java 21 and needs the Paper 1.21.4 API, so
+the two cannot be one artifact. Keep this module independent of Paper 1.21+ classes and Java
+21-only APIs. CI checks that `io.kalo.mohist.MohistPlugin` stays class-file major 61, and that
+no Mohist class appears in the main jar. See `docs/MOHIST_1201.md`.
 
 ## Architecture
 

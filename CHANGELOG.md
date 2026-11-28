@@ -4,13 +4,12 @@
 
 ### Changed
 
-- Embed the Nexo item API and the Mohist 1.20.1 Java 17 compatibility runtime in the single `Kalo-<version>.jar`.
-- Keep separate platform entry points: Paper/Folia uses `paper-plugin.yml`; Mohist uses the legacy `plugin.yml` fallback.
-- Move Mohist settings under the shared `mohist:` section in `plugins/Kalo/config.yml` and expose its commands through `/kalo`.
+- Embed the Nexo item API in the single `Kalo-<version>.jar`; the Paper descriptor provides the `Nexo` plugin identity.
+- Keep the Mohist 1.20.1 Java 17 runtime as its own `Kalo-Mohist-<version>.jar`. It is not part of the Paper/Folia jar, which needs Java 21 and the Paper 1.21.4 API.
 
 ### Removed
 
-- Stop publishing/installing standalone `Kalo-NexoCompat` and `Kalo-Mohist` plugin jars.
+- Stop publishing a standalone `Kalo-NexoCompat` plugin jar.
 
 ## 0.2.2-prealpha.1
 
