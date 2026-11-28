@@ -89,6 +89,14 @@ Output: `build/libs/Kalo-{version}.jar`
 - `migration` — `OraxenImporter`, `ItemsAdderImporter`, `ImportReport`
 - `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
 
+### `nexo-compat` — optional add-on, Kotlin
+
+`Kalo-NexoCompat-*.jar`: a separate plugin named `Nexo` that answers the Nexo API
+(`com.nexomc.nexo.api.*`) from Kalo's registries. It is **not** in the main jar and never
+installed beside real Nexo. `KaloItems` is the only class that touches Kalo; `NexoIds` owns the
+Nexo-id to Kalo-key rule. Signatures are pinned by `NexoApiSignatureTest`. See
+`docs/NEXO_COMPAT.md` — unsupported members must fail with `NoSuchMethodError`, never no-op.
+
 ## Architecture
 
 ### The IR is the load-bearing decision
