@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Bedrock held-item pose is derived from first principles instead of a Wiki sample pose: the model centre is placed on the hand anchor (the documented 24-unit bound-bone offset undone), rotation and scale act about the model centre, and a view the Java model does not author is neutral (no rotation, scale 1).
+
+### Added
+
+- `bedrock.hold.first_person` / `bedrock.hold.third_person` in item YAML (`position`, `rotation`, `scale`) adjust the held pose per item, added on top of the derived pose. See `docs/BEDROCK_HOLD_POSE.md`.
+
+### Limitations
+
+- **Not measured on a Bedrock client.** The default pose is derived from documentation, not photographed. Expect some items to need a `bedrock.hold` correction. The calibration pack used to measure it is not part of the repo.
+
 ## 0.2.3
 
 ### Fixed

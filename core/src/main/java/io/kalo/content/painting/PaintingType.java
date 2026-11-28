@@ -1,5 +1,6 @@
 package io.kalo.content.painting;
 
+import io.kalo.content.BedrockOptionsParser;
 import com.google.gson.JsonObject;
 import io.kalo.content.ContentType;
 import io.kalo.content.PackContext;
@@ -108,9 +109,7 @@ public final class PaintingType implements ContentType<Painting> {
 
         ConfigurationSection bedrock = config.getConfigurationSection("bedrock");
         if (bedrock != null) {
-            builder.bedrock(new BedrockOptions(
-                    bedrock.getBoolean("enabled", true),
-                    bedrock.getString("icon")));
+            builder.bedrock(BedrockOptionsParser.parse(bedrock));
         }
 
         return builder.build();

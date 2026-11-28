@@ -317,7 +317,8 @@ public final class BedrockPackCompiler {
             pack.file("attachables/" + shorthand + ".json",
                     Json.writable(BedrockAttachable.heldItem(key, geometryId, modelTexture, shorthand)));
             pack.file(BedrockItemDisplay.animationPath(shorthand), Json.writable(
-                    BedrockItemDisplay.animations(shorthand, javaModel, bone.get("name").getAsString(), center)));
+                    BedrockItemDisplay.animations(shorthand, javaModel, bone.get("name").getAsString(), center,
+                            definition.bedrock().holdPose())));
             registerItemTexture(icon, texture);
             registerItem(definition, icon);
             // armorCount is the number of wearable armor pieces, not all attachables.

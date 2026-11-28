@@ -1,5 +1,6 @@
 package io.kalo.content.furniture;
 
+import io.kalo.content.BedrockOptionsParser;
 import io.kalo.config.ConfigSchema;
 import io.kalo.content.ContentType;
 import io.kalo.content.PackContext;
@@ -156,9 +157,7 @@ public final class FurnitureType implements ContentType<Furniture> {
         BedrockOptions bedrockOptions = BedrockOptions.defaults();
         ConfigurationSection bedrock = config.getConfigurationSection("bedrock");
         if (bedrock != null) {
-            bedrockOptions = new BedrockOptions(
-                    bedrock.getBoolean("enabled", true),
-                    bedrock.getString("icon"));
+            bedrockOptions = BedrockOptionsParser.parse(bedrock);
         }
 
         // Parse display transform
