@@ -1,5 +1,6 @@
 package io.kalo.content.item;
 
+import io.kalo.content.BedrockOptionsParser;
 import io.kalo.config.ConfigSchema;
 import io.kalo.content.ContentType;
 import io.kalo.content.PackContext;
@@ -125,9 +126,7 @@ public final class ItemType implements ContentType<Item> {
 
         ConfigurationSection bedrock = config.getConfigurationSection("bedrock");
         if (bedrock != null) {
-            builder.bedrock(new BedrockOptions(
-                    bedrock.getBoolean("enabled", true),
-                    bedrock.getString("icon")));
+            builder.bedrock(BedrockOptionsParser.parse(bedrock));
         }
 
         return builder.build();

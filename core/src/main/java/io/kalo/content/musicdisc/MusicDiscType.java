@@ -1,5 +1,6 @@
 package io.kalo.content.musicdisc;
 
+import io.kalo.content.BedrockOptionsParser;
 import com.google.gson.JsonObject;
 import io.kalo.content.ContentType;
 import io.kalo.content.PackContext;
@@ -89,9 +90,7 @@ public final class MusicDiscType implements ContentType<MusicDisc> {
 
         ConfigurationSection bedrock = config.getConfigurationSection("bedrock");
         if (bedrock != null) {
-            builder.bedrock(new BedrockOptions(
-                    bedrock.getBoolean("enabled", true),
-                    bedrock.getString("icon")));
+            builder.bedrock(BedrockOptionsParser.parse(bedrock));
         }
 
         return builder.build();
