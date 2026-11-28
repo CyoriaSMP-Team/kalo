@@ -575,6 +575,11 @@ class BedrockPackCompilerTest {
                 description.getAsJsonObject("animations").get("hold_first_person").getAsString());
         assertEquals("animation.kalo.testpack_wrench.hold_third_person",
                 description.getAsJsonObject("animations").get("hold_third_person").getAsString());
+        // The attachable may only name animations the pack really contains.
+        JsonObject defined = json(result.pack().file("animations/testpack_wrench.animation.json"))
+                .getAsJsonObject("animations");
+        assertTrue(defined.has("animation.kalo.testpack_wrench.hold_first_person"));
+        assertTrue(defined.has("animation.kalo.testpack_wrench.hold_third_person"));
         assertEquals(2, description.getAsJsonObject("scripts").getAsJsonArray("animate").size());
 
         JsonObject animations = json(result.pack().file(

@@ -70,10 +70,35 @@ class GuiHeadIconsTest {
         ResourcePack output = new ResourcePackImpl(PackMeta.of(0,"Bedrock GUI"));
         int count=GuiHeadIcons.addToPack(output,root,Logger.getLogger("test"));
         assertEquals(1,count);
-        assertEquals("textures/ui/kalo_gui_heads/"+HASH,
+        assertEquals("textures/ui/kalo_gui_heads/" + HASH.substring(0, 40),
                 GuiHeadIcons.iconPathForMaterial(material(HASH)));
+        assertTrue((GuiHeadIcons.iconPath(HASH) + ".png").length() < 80,
+                "Geyser rejects resource-pack paths with 80 or more characters");
         assertNotNull(output.file(GuiHeadIcons.iconPath(HASH)+".png"));
-        assertTrue(Files.isRegularFile(root.resolve("Kalo/gui-icons/"+HASH+".png")));
+        assertTrue(Files.isRegularFile(root.resolve("Kalo/gui-icons/"
+                + HASH.substring(0, 40) + ".png")));
         assertEquals(0,GuiHeadIcons.addToPack(output,root,Logger.getLogger("test")) - 1);
+    }
+
+    @Test
+    void reusesExistingFullHashIconWithoutDownloadingOrChangingPixels() throws Exception {
+        Path menuDir = Files.createDirectories(root.resolve("DeluxeMenus/gui_menus/PORTAL"));
+        Files.writeString(menuDir.resolve("Portal.yml"),
+                "items:\n  'head':\n    material: " + material(HASH) + "\n");
+        Path cacheDir = Files.createDirectories(root.resolve("Kalo/gui-icons"));
+        BufferedImage portrait = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+        portrait.setRGB(0, 0, 0xff123456);
+        Path oldCache = cacheDir.resolve(HASH + ".png");
+        ImageIO.write(portrait, "PNG", oldCache.toFile());
+        byte[] original = Files.readAllBytes(oldCache);
+
+        ResourcePack output = new ResourcePackImpl(PackMeta.of(0, "Bedrock GUI"));
+        assertEquals(1, GuiHeadIcons.addToPack(output, root, Logger.getLogger("test")));
+        Path compactCache = cacheDir.resolve(HASH.substring(0, 40) + ".png");
+        assertArrayEquals(original, Files.readAllBytes(compactCache));
+        assertArrayEquals(original, Files.readAllBytes(oldCache),
+                "Keep old cache intact so rollback works");
+        assertNotNull(output.file(GuiHeadIcons.iconPath(HASH) + ".png"));
+        assertTrue((GuiHeadIcons.iconPath(HASH) + ".png").length() < 80);
     }
 }

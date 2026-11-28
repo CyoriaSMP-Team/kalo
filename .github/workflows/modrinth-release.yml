@@ -1,0 +1,115 @@
+name: Modrinth Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag (for example v0.2.1-prealpha.15)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modrinth-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish to Modrinth
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Validate release version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          PROJECT_VERSION="$(sed -n 's/^plugin_version=//p' gradle.properties | head -n1)"
+          if [[ -z "$VERSION" || "$VERSION" != "$PROJECT_VERSION" ]]; then
+            echo "::error::Tag version ($VERSION) must match plugin_version ($PROJECT_VERSION) in gradle.properties."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon clean build
+
+      - name: Locate release JAR
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="build/libs/Kalo-${{ steps.release.outputs.version }}.jar"
+          if [[ ! -s "$JAR" ]]; then
+            echo "::error::Expected release artifact not found: $JAR"
+            find . -path '*/build/libs/*.jar' -type f -print
+            exit 1
+          fi
+          echo "path=$JAR" >> "$GITHUB_OUTPUT"
+
+      - name: Publish version to Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_FILE: ${{ steps.artifact.outputs.path }}
+          TAG_NAME: ${{ github.event.inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${MODRINTH_TOKEN:-}" ]]; then
+            echo "::error::Add the MODRINTH_TOKEN repository secret."
+            exit 1
+          fi
+          if [[ -z "${MODRINTH_PROJECT_ID:-}" ]]; then
+            echo "::error::Add the MODRINTH_PROJECT_ID repository variable."
+            exit 1
+          fi
+
+          CHANGELOG="$(git log -1 --pretty=format:'%s%n%n%b' "$TAG_NAME")"
+          jq -n \
+            --arg project_id "$MODRINTH_PROJECT_ID" \
+            --arg name "Kalo $RELEASE_VERSION" \
+            --arg version_number "$RELEASE_VERSION" \
+            --arg changelog "$CHANGELOG" \
+            '{
+              project_id: $project_id,
+              name: $name,
+              version_number: $version_number,
+              changelog: $changelog,
+              version_type: "alpha",
+              status: "listed",
+              loaders: ["paper", "folia"],
+              game_versions: ["1.21.4", "1.21.11", "26.2"],
+              environment: "dedicated_server_only",
+              featured: false,
+              dependencies: [],
+              file_parts: ["release"],
+              primary_file: "release"
+            }' > modrinth-version.json
+
+          curl --fail-with-body --silent --show-error \
+            -X POST "https://api.modrinth.com/v2/version" \
+            -H "Authorization: $MODRINTH_TOKEN" \
+            -F "data=@modrinth-version.json;type=application/json" \
+            -F "release=@$RELEASE_FILE;filename=$(basename "$RELEASE_FILE")"

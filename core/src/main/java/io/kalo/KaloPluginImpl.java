@@ -1,5 +1,10 @@
 package io.kalo;
 
+import com.nexomc.nexo.api.events.NexoItemsLoadedEvent;
+import dev.lone.itemsadder.api.Events.ItemsAdderLoadDataEvent;
+import net.momirealms.craftengine.bukkit.api.event.CraftEngineReloadEvents;
+import io.th0rgal.oraxen.api.events.OraxenItemsLoadedEvent;
+import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.manager.CommandManager;
 import io.kalo.manager.ContentManagerImpl;
 import io.kalo.manager.Context;
@@ -15,7 +20,11 @@ import io.kalo.platform.java.VirtualBlockStore;
 import io.kalo.performance.PerformanceManager;
 import lombok.Getter;
 import lombok.experimental.Accessors;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.ServerLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -23,7 +32,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.logging.Level;
 
-public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
+public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin, Listener {
     @Getter @Accessors(fluent = true)
     private final RegistryManagerImpl registryManager = new RegistryManagerImpl();
     @Getter @Accessors(fluent = true)
@@ -53,6 +62,8 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
     private final CommandManager commandManager = new CommandManager();
     private final VirtualBlockStore virtualBlockStore = new VirtualBlockStore();
     private JavaBlockListener blockListener;
+    private final io.kalo.content.block.BlockWorld blockWorld =
+            new io.kalo.platform.java.BlockWorldImpl(() -> blockListener);
     private FurnitureListener furnitureListener;
     private GuiListener guiListener;
     private io.kalo.platform.java.PlacedModelListener placedModelListener;
@@ -66,6 +77,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
     private io.kalo.platform.java.VfxRuntime vfxRuntime;
     private io.kalo.platform.java.LiquidRuntime liquidRuntime;
     private io.kalo.converter.ExternalItemObserver externalItemObserver;
+    private boolean serverLoadComplete;
 
     private final List<Managerial> managers = List.of(
             registryManager,
@@ -96,6 +108,9 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+        // Register the Nexo-compatible API lifecycle before Kalo emits its first registry event.
+        getServer().getPluginManager().registerEvents(this, this);
 
         Context context = new Context(this);
         managers.forEach(manager -> manager.preload(context));
@@ -191,6 +206,37 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         io.kalo.integration.PlaceholderApiIntegration.initialize(this);
         io.kalo.integration.MythicMobsIntegration.initialize(this);
         io.kalo.integration.ModelEngineIntegration.initialize(this);
+    }
+
+    /** Nexo consumers expect their items to be ready after every plugin has enabled. */
+    @EventHandler
+    public void onServerLoad(ServerLoadEvent event) {
+        serverLoadComplete = true;
+        fireCompatLoaded(false);
+    }
+
+    /** Notify Nexo consumers again after later Kalo content reloads, not during initial startup. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRegistryInitialize(RegistryInitializeEvent event) {
+        if (serverLoadComplete) {
+            fireCompatLoaded(true);
+        }
+    }
+
+    /** Tell every embedded compatibility API that Kalo's content is ready. */
+    private void fireCompatLoaded(boolean reload) {
+        getServer().getPluginManager().callEvent(new NexoItemsLoadedEvent());
+        getServer().getPluginManager().callEvent(new OraxenItemsLoadedEvent());
+        getServer().getPluginManager().callEvent(CraftEngineReloadEvents.create(!reload));
+        // ItemsAdder's load event is asynchronous, and Bukkit refuses to call an async event
+        // from the main thread. The async scheduler is also the Folia-safe way to get off it.
+        getServer().getAsyncScheduler().runNow(this, task ->
+                getServer().getPluginManager().callEvent(new ItemsAdderLoadDataEvent(reload, false)));
+    }
+
+    @Override
+    public @org.jetbrains.annotations.NotNull io.kalo.content.block.BlockWorld blockWorld() {
+        return blockWorld;
     }
 
     @Override

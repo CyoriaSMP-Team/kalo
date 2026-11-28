@@ -326,6 +326,8 @@ in [`docs/BLOCKBENCH.md`](docs/BLOCKBENCH.md).
 A separate Java-17-bytecode Bukkit 1.20.1 compatibility module is located
 in mohist/ and builds Kalo-Mohist-<version>.jar. It is suitable for a Java 21
 runtime, such as the current DeadZone server, without changing its Java version.
+It is a separate jar from the Paper/Folia `Kalo-<version>.jar`: install only the
+one that matches your server.
 
 It discovers Java resource packs and mod asset jars, catalogs Minecraft
 namespace-based models/textures/animation metadata and Forge registry IDs,
@@ -526,6 +528,8 @@ Output: `build/libs/Kalo-<version>.jar`
 
 - **`api`** — public API: content model, definitions, registries, features, pack model
 - **`core`** — implementation: managers, compilers, pack writer, commands, Geyser bridge
+- **`nexo-compat`** — embedded Nexo item API and lifecycle event (shaded into Kalo)
+- **`mohist`** — separate Mohist 1.20.1 compatibility plugin, compiled to Java 17 (`Kalo-Mohist-<version>.jar`, not part of the main jar)
 
 ## Migrating from another plugin
 

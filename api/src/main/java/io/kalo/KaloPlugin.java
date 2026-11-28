@@ -14,6 +14,8 @@ public interface KaloPlugin {
 
     /** Stable item identity contract shared by Kalo and every consumer plugin. */
     @NotNull ItemIdentity items();
+    /** Places, removes and identifies blocks and furniture in the world from code. */
+    @NotNull io.kalo.content.block.BlockWorld blockWorld();
 
     @NotNull ResourcePackManager resourcePackManager();
 

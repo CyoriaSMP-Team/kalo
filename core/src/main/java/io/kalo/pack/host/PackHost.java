@@ -287,6 +287,10 @@ public final class PackHost {
             }
 
             exchange.getResponseHeaders().add("Content-Type", "application/zip");
+            // Resource packs are immutable per token. Long-lived caching makes repeat
+            // downloads and reconnects cheap while a changed pack receives a new token.
+            exchange.getResponseHeaders().add("Cache-Control", "public, max-age=31536000, immutable");
+            exchange.getResponseHeaders().add("X-Content-Type-Options", "nosniff");
             exchange.sendResponseHeaders(200, bytes.length);
             try (OutputStream out = exchange.getResponseBody()) {
                 out.write(bytes);

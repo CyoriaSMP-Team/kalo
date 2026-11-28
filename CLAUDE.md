@@ -89,6 +89,42 @@ Output: `build/libs/Kalo-{version}.jar`
 - `migration` — `OraxenImporter`, `ItemsAdderImporter`, `ImportReport`
 - `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
 
+### `nexo-compat` — embedded Nexo API, Kotlin
+
+The Nexo API compatibility classes (`com.nexomc.nexo.api.*`) and Kotlin runtime are shaded
+into the single Kalo jar. Paper metadata provides the `Nexo` plugin identity; there is no
+second plugin entry point or standalone compatibility artifact. Do not install the real Nexo
+plugin beside Kalo. `KaloItems` is the only class that touches Kalo; `NexoIds` owns the
+Nexo-id to Kalo-key rule. Signatures are pinned by `NexoApiSignatureTest`. See
+`docs/NEXO_COMPAT.md` — unsupported members must fail with `NoSuchMethodError`, never no-op.
+
+### `compat-core`, `oraxen-compat`, `itemsadder-compat` and `craftengine-compat` — Java
+
+`compat-core` holds what every shim must agree on: `CompatIds` (flat plugin id to namespaced
+Kalo key; first namespace wins so the result never depends on load order) and `KaloItemLookup`
+(the only code that touches Kalo's registries). `oraxen-compat` answers the Oraxen item API in
+plain Java, shaded into the main jar and claimed through `provides` like Nexo. Its
+`OraxenApiSignatureTest` checks equality against signatures read from Oraxen's source, so no
+member exists that was not verified. Members whose meaning is unverified are omitted, never
+stubbed. See `docs/ORAXEN_COMPAT.md`. `itemsadder-compat` does the same for the ItemsAdder API
+(`docs/ITEMSADDER_COMPAT.md`); its load event is asynchronous, so it is fired through the async
+scheduler, never from the main thread. `craftengine-compat` is deliberately small: CraftEngine's API
+passes its own types (`Key`, definitions, block states) that callers then use, so only members
+with plain Bukkit types are provided (`docs/CRAFTENGINE_COMPAT.md`).
+
+`KaloPlugin.blockWorld()` (`BlockWorld`, implemented by `BlockWorldImpl` over `JavaBlockListener`)
+is how code places, removes and identifies blocks and furniture without a player or event. The
+shims reach it only through `compat-core`'s `KaloBlocks`. Kalo furniture is block-backed, not an
+entity, so shim members that take or return a furniture entity are omitted, not stubbed.
+
+### `mohist` — separate Mohist 1.20.1 plugin, Java 17
+
+Its own jar, `Kalo-Mohist-*.jar`, compiled with `--release 17` against Spigot 1.20.1. It is
+**not** shaded into the Paper/Folia jar: that jar is Java 21 and needs the Paper 1.21.4 API, so
+the two cannot be one artifact. Keep this module independent of Paper 1.21+ classes and Java
+21-only APIs. CI checks that `io.kalo.mohist.MohistPlugin` stays class-file major 61, and that
+no Mohist class appears in the main jar. See `docs/MOHIST_1201.md`.
+
 ## Architecture
 
 ### The IR is the load-bearing decision

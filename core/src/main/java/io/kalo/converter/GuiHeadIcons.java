@@ -34,12 +34,17 @@ public final class GuiHeadIcons {
     private static final int MAX_DOWNLOAD_BYTES = 512 * 1024;
     private static final int MAX_NEW_FETCHES_PER_BUILD = 16;
     private static final String ICON_DIR = "textures/ui/kalo_gui_heads/";
+    // Bedrock resource packs warn at 80+ characters per path. The 40-digit
+    // prefix keeps the full path (including .png) at 71 characters while
+    // retaining 160 bits of skin-hash identity. Cache source lookups still
+    // use the original complete Minecraft texture hash.
+    private static final int PACK_HASH_LENGTH = 40;
 
     private GuiHeadIcons() {}
 
     public static String iconPath(String hash) {
         if (hash == null || !hash.matches("[a-f0-9]{40,128}")) return null;
-        return ICON_DIR + hash;
+        return ICON_DIR + hash.substring(0, PACK_HASH_LENGTH);
     }
 
     public static String iconPathForMaterial(String material) {
@@ -60,14 +65,13 @@ public final class GuiHeadIcons {
             int attemptedDownloads = 0;
             for (String hash : scan.skinHashes()) {
                 try {
-                    Path savedIcon = outputDir.resolve(hash + ".png");
-                    byte[] icon = null;
-                    if (Files.isRegularFile(savedIcon) && Files.size(savedIcon) < 128 * 1024) {
-                        icon = Files.readAllBytes(savedIcon);
-                        // Cached icon is valid only when it can be decoded.
-                        BufferedImage cached = ImageIO.read(new ByteArrayInputStream(icon));
-                        if (cached == null || cached.getWidth() != ICON_SIZE
-                                || cached.getHeight() != ICON_SIZE) icon = null;
+                    Path savedIcon = outputDir.resolve(hash.substring(0, PACK_HASH_LENGTH) + ".png");
+                    byte[] icon = readCachedIcon(savedIcon);
+                    if (icon == null) {
+                        // Migrate the full-hash cache written by previous Kalo
+                        // versions so existing Java-matched head portraits
+                        // survive without a network fetch or any visual change.
+                        icon = readCachedIcon(outputDir.resolve(hash + ".png"));
                     }
                     if (icon == null) {
                         Path cachedAtlas = geyserCache.resolve(hash + ".png");
@@ -81,6 +85,11 @@ public final class GuiHeadIcons {
                         if (source == null) continue;
                         icon = renderPortrait(source);
                         if (icon == null) continue;
+                    }
+                    // The Bedrock Form checks for this same short filename.
+                    // Keep old full-hash cache files untouched for rollback.
+                    if (!Files.isRegularFile(savedIcon)
+                            || !java.util.Arrays.equals(Files.readAllBytes(savedIcon), icon)) {
                         Files.write(savedIcon, icon);
                     }
                     pack.file(iconPath(hash) + ".png", Writable.bytes(icon));
@@ -95,6 +104,14 @@ public final class GuiHeadIcons {
             logger.log(Level.WARNING, "Could not generate Bedrock Form head icons", scanFailure);
             return 0;
         }
+    }
+
+    private static byte[] readCachedIcon(Path file) throws IOException {
+        if (!Files.isRegularFile(file) || Files.size(file) >= 128 * 1024) return null;
+        byte[] bytes = Files.readAllBytes(file);
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
+        return image != null && image.getWidth() == ICON_SIZE
+                && image.getHeight() == ICON_SIZE ? bytes : null;
     }
 
     private static BufferedImage downloadSkin(String hash) throws IOException {

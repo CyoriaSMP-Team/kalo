@@ -8,6 +8,12 @@ on:
       tag:
         description: 'Tag to release (e.g. v0.0.1). Created from the current ref if missing.'
         required: true
+        type: string
+      skip_github_release:
+        description: 'Skip GitHub release creation when rerunning external publishers for an existing release'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -94,7 +100,44 @@ jobs:
             exit 1
           fi
 
-      # Mohist 1.20.1 compatibility remains a distinct experimental Java 17 jar.
+      - name: Verify embedded Nexo API targets Java 21
+        run: |
+          jar="build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar"
+          major=$(unzip -p "$jar" com/nexomc/nexo/api/NexoItems.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          if [ "$major" != "65" ]; then
+            echo "::error::Expected embedded Nexo API major 65 (Java 21); got $major"
+            exit 1
+          fi
+          unzip -l "$jar" | grep -q 'kotlin/Unit.class' || {
+            echo "::error::Kotlin runtime missing from the unified Kalo jar"
+            exit 1
+          }
+
+      - name: Verify the Paper descriptor provides Nexo and carries no Mohist classes
+        run: |
+          jar="build/libs/Kalo-${{ steps.version.outputs.plugin_version }}.jar"
+          unzip -p "$jar" paper-plugin.yml | grep -A2 '^provides:' | grep -q 'Nexo' || {
+            echo "::error::Paper descriptor must provide Nexo"
+            exit 1
+          }
+          unzip -p "$jar" paper-plugin.yml | grep -A4 '^provides:' | grep -q 'Oraxen' || {
+            echo "::error::Paper plugin descriptor must provide the Oraxen identity"
+            exit 1
+          }
+          unzip -p "$jar" paper-plugin.yml | grep -A5 '^provides:' | grep -q 'ItemsAdder' || {
+            echo "::error::Paper plugin descriptor must provide the ItemsAdder identity"
+            exit 1
+          }
+          unzip -p "$jar" paper-plugin.yml | grep -A5 '^provides:' | grep -q 'CraftEngine' || {
+            echo "::error::Paper plugin descriptor must provide the CraftEngine identity"
+            exit 1
+          }
+          if unzip -l "$jar" | grep -q 'io/kalo/mohist/'; then
+            echo "::error::Mohist classes must not be inside the Paper/Folia jar"
+            exit 1
+          fi
+
+      # Mohist 1.20.1 compatibility is a distinct experimental Java 17 jar.
       # Do not publish it into the Paper/Folia Modrinth/Hangar channels.
       - name: Verify the Mohist 1.20.1 jar targets Java 17
         run: |
@@ -145,6 +188,7 @@ jobs:
       # read. --generate-notes alone published a commit list and left the written notes for
       # Modrinth and Hangar only.
       - name: Publish GitHub release
+        if: ${{ !inputs.skip_github_release }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -166,7 +210,7 @@ jobs:
       # Modrinth, Hangar, and MCMall are skipped rather than failed when their credentials
       # are absent, so the release workflow remains usable before every channel is configured.
       - name: Publish to Modrinth
-        if: ${{ env.MODRINTH_TOKEN != '' }}
+        if: ${{ env.MODRINTH_TOKEN != '' && vars.MODRINTH_PROJECT_ID != '' && vars.SUPPORTED_GAME_VERSIONS != '' }}
         env:
           MODRINTH_PROJECT: ${{ vars.MODRINTH_PROJECT_ID }}
           GAME_VERSIONS: ${{ vars.SUPPORTED_GAME_VERSIONS }}
@@ -193,7 +237,7 @@ jobs:
             -F "file=@$jar"
 
       - name: Publish to Hangar
-        if: ${{ env.HANGAR_TOKEN != '' }}
+        if: ${{ env.HANGAR_TOKEN != '' && vars.HANGAR_SLUG != '' }}
         env:
           HANGAR_SLUG: ${{ vars.HANGAR_SLUG }}
           GAME_VERSIONS: ${{ vars.SUPPORTED_GAME_VERSIONS }}

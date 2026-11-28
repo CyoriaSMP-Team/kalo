@@ -17,6 +17,8 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Resolve a real item_model component to the authored Java pack's plain model.
@@ -47,14 +49,13 @@ public final class ExternalItemModelResolver {
             if (model == null) return null;
 
             ModelDefinition converted;
-            JsonElement elements = model.get("elements");
             String parent = string(model, "parent");
             boolean flatParent = "minecraft:item/generated".equals(parent)
                     || "minecraft:item/handheld".equals(parent)
                     || "item/generated".equals(parent)
                     || "item/handheld".equals(parent);
-            if (elements != null && elements.isJsonArray() && !elements.getAsJsonArray().isEmpty()
-                    || (!flatParent && parent != null)) {
+            if (hasElements(model) || (!flatParent && parent != null
+                    && hasResolvableGeometry(source, modelKey))) {
                 // The existing Bedrock 3D compiler resolves authored model parents
                 // and checks for cycles; keep that logic in one place.
                 converted = new ModelDefinition.Custom(modelKey, Map.of());
@@ -88,13 +89,12 @@ public final class ExternalItemModelResolver {
                     + "/models/" + modelKey.value() + ".json");
             if (model == null) return null;
             ModelDefinition converted;
-            JsonElement elements = model.get("elements");
             String parent = string(model, "parent");
             boolean flat = "minecraft:item/generated".equals(parent)
                     || "minecraft:item/handheld".equals(parent)
                     || "item/generated".equals(parent) || "item/handheld".equals(parent);
-            if ((elements != null && elements.isJsonArray() && !elements.getAsJsonArray().isEmpty())
-                    || (!flat && parent != null)) {
+            if (hasElements(model) || (!flat && parent != null
+                    && hasResolvableGeometry(source, modelKey))) {
                 converted = new ModelDefinition.Custom(modelKey, Map.of());
             } else {
                 if (!flat) return null;
@@ -113,6 +113,41 @@ public final class ExternalItemModelResolver {
         } catch (RuntimeException bad) {
             return null;
         }
+    }
+
+    /**
+     * Do not register a Java vanilla fallback as a custom Bedrock 3D item.
+     * Packs sometimes include a model such as minecraft:item/fishing_rod with
+     * only a built-in parent (item/handheld_rod) and no local geometry. The
+     * selector may resolve, but the Bedrock compiler has no cubes to emit.
+     *
+     * Authored inherited 3D models remain eligible when an actual parent in
+     * the pack provides their geometry. A cycle or missing parent fails closed.
+     */
+    private static boolean hasResolvableGeometry(ResourcePack source, Key modelKey) {
+        Set<Key> visited = new HashSet<>();
+        Key current = modelKey;
+        for (int depth = 0; depth < 16 && visited.add(current); depth++) {
+            JsonObject model = json(source, "assets/" + current.namespace()
+                    + "/models/" + current.value() + ".json");
+            if (model == null) return false;
+            if (model.has("elements")) return hasElements(model);
+            String parent = string(model, "parent");
+            if (parent == null || parent.startsWith("builtin/")
+                    || parent.startsWith("minecraft:builtin/")) return false;
+            try {
+                current = Key.key(parent.contains(":") ? parent
+                        : current.namespace() + ":" + parent);
+            } catch (IllegalArgumentException invalid) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasElements(JsonObject model) {
+        JsonElement elements = model.get("elements");
+        return elements != null && elements.isJsonArray() && !elements.getAsJsonArray().isEmpty();
     }
 
     private static @Nullable JsonObject json(ResourcePack pack, String path) {

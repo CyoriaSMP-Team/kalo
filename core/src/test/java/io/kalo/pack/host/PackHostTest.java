@@ -80,6 +80,22 @@ class PackHostTest {
     }
 
     @Test
+    void immutablePackResponsesIncludeLongLivedCacheHeaders(@TempDir Path dir) throws IOException {
+        Path pack = dir.resolve("generated.zip");
+        Files.write(pack, "cacheable content".getBytes());
+        PackHost host = hostFor(pack);
+        HttpURLConnection connection = (HttpURLConnection) URI.create(host.url()).toURL().openConnection();
+        try {
+            assertEquals(200, connection.getResponseCode());
+            assertEquals("public, max-age=31536000, immutable",
+                    connection.getHeaderField("Cache-Control"));
+            assertEquals("nosniff", connection.getHeaderField("X-Content-Type-Options"));
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    @Test
     void regeneratingRotatesTheUrlSoClientsDoNotServeAStaleCachedPack(@TempDir Path dir) throws IOException {
         // Minecraft caches a pack by URL. Reusing it after a content change strands every
         // player on the old pack with nothing to indicate anything is wrong.

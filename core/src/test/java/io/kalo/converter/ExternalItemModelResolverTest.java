@@ -87,6 +87,31 @@ class ExternalItemModelResolverTest {
     }
 
     @Test
+    void refusesNonRenderableVanillaParentButAllowsAuthoredInheritedGeometry() {
+        ResourcePack java = javaPack();
+        java.file("assets/demo/models/item/vanilla_rod.json", Writable.string("""
+                {"parent":"item/handheld_rod","overrides":[{"predicate":{"cast":1},
+                  "model":"demo:item/other"}]}
+                """));
+        java.file("assets/demo/items/vanilla_rod.json", Writable.string("""
+                {"model":{"type":"minecraft:model","model":"demo:item/vanilla_rod"}}
+                """));
+        assertNull(ExternalItemModelResolver.resolve(java,
+                new ExternalItemBindings.Binding(Key.key("demo:vanilla_rod"), Material.FISHING_ROD, 1)));
+
+        java.file("assets/demo/models/item/wrench_child.json", Writable.string("""
+                {"parent":"demo:item/wrench","textures":{"0":"demo:item/wrench"}}
+                """));
+        java.file("assets/demo/items/wrench_child.json", Writable.string("""
+                {"model":{"type":"minecraft:model","model":"demo:item/wrench_child"}}
+                """));
+        var inherited = ExternalItemModelResolver.resolve(java,
+                new ExternalItemBindings.Binding(Key.key("demo:wrench_child"), Material.STICK, 1));
+        assertNotNull(inherited);
+        assertInstanceOf(ModelDefinition.Custom.class, inherited.model());
+    }
+
+    @Test
     void refusesPredicatesMissingTexturesAndUnknownModels() {
         var java = javaPack();
         assertNull(ExternalItemModelResolver.resolve(java,

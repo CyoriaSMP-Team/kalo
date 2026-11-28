@@ -1,11 +1,133 @@
 # Changelog
 
+## 0.2.4-prealpha.1 (unreleased)
+
+### Changed
+
+- Merge the CyoriaSMP line `0.2.1-prealpha.8` to `0.2.1-prealpha.17` into the 0.2.3 release
+  line. That work was developed outside git and is described by the `0.2.1-prealpha.16`
+  entry below; it never shipped as a GitHub release.
+- The standalone `compat/nexo` module from that line is dropped in favour of the embedded
+  `nexo-compat` shim that 0.2.2 introduced.
+- Where both lines changed the same code: Bedrock Forms keep the CyoriaSMP classloader
+  guard (`BedrockFormsIntegration`, `GeyserAccess`) plus its diagnostics counters and its
+  rule to leave commands that another plugin registered alone; held 3D items keep the
+  generated `BedrockHoldAnimations` instead of `BedrockItemDisplay`; GUI head icons,
+  the descriptor-type report and the per-context `display` inheritance come from the
+  release line.
+
+## 0.2.3
+
+### Fixed
+
+- Bedrock Forms (the DeluxeMenus-to-Cumulus bridge) failed with `NoClassDefFoundError: org/geysermc/cumulus/form/Form` on servers that had Floodgate, because the Paper descriptor did not declare Floodgate as a dependency and Paper gives each plugin its own classloader: Kalo could not see Floodgate's Cumulus classes. The descriptor now declares `floodgate` (optional, `join-classpath`). Servers without Floodgate are unaffected. Regression in 0.2.2.
+
+### Limitations
+
+- Only class visibility was verified for the Floodgate fix (a stand-in plugin on Paper 1.21.4). The Forms themselves have not been tried with a real Floodgate, DeluxeMenus and a Bedrock player.
+
+## 0.2.2
+
+### Added
+
+- Oraxen item API answered from Kalo (`oraxen-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `Oraxen` plugin identity. Items only; a real Oraxen plugin always wins.
+- ItemsAdder item API answered from Kalo (`itemsadder-compat`), embedded in the Kalo jar; the Paper descriptor now also provides the `ItemsAdder` identity. Items only; `ItemsAdderLoadDataEvent` is fired asynchronously; a real ItemsAdder plugin always wins.
+- Block and furniture APIs for the shims: `NexoBlocks`/`NexoFurniture`, `OraxenBlocks`/`OraxenFurniture` and ItemsAdder `CustomBlock`/`CustomFurniture` (placing, removing, detecting), backed by a new `KaloPlugin.blockWorld()` service. No block events fire for placements made through it.
+- The Nexo, Oraxen and ItemsAdder shims now see Kalo blocks and furniture as items, not just the item registry; ItemsAdder `CustomStack.isBlock`/`isFurniture` tell them apart.
+- CraftEngine API subset answered from Kalo (`craftengine-compat`): `CraftEngineItems.isCustomItem`, `CraftEngineBlocks.isCustomBlock`/`remove`, the `CraftEngineFurniture` entity tests, and `CraftEngineReloadEvent`; the Paper descriptor now also provides the `CraftEngine` identity. Only members with plain Bukkit types; anything using CraftEngine's own types (`Key`, definitions, block states) is not implemented. Signatures read from CraftEngine's `dev` branch.
+- Shared `compat-core` module for the flat-id to Kalo-key rule and the Kalo item/block lookup used by every shim (Nexo, Oraxen, ItemsAdder, CraftEngine).
+
+### Limitations
+
+- Kalo furniture is block-backed, not an entity, so shim members that need a furniture entity (Nexo/Oraxen `place`/`baseEntity`, ItemsAdder `CustomFurniture` entity methods) are not implemented or answer "none". Block break/place effects, loot and light levels are not implemented.
+- Not implemented: `NexoPack`, `OraxenPack`, mechanics, and every member that needs a furniture entity or one of CraftEngine's own types. Anything missing fails with `NoSuchMethodError`.
+- Verified on a real Paper 1.21.4 server with probe plugins that call each API, and against signatures read from each plugin's published source or Javadoc. **Not** verified on Paper 26.x or Folia, or against any real third-party plugin that uses these APIs. Oraxen's and CraftEngine's plugin names come from their documentation, not their descriptors; CraftEngine's signatures come from its `dev` branch.
+- Licensing of reimplementing these APIs has not been reviewed by a lawyer: Oraxen forbids redistributing its package in part, CraftEngine is GPL-3.0, and the ItemsAdder terms were not read.
+
+### Fixed
+
+- A block placed on the first start with a new pack was not recognised afterwards (not dropped, not broken as custom content) until a reload or restart: block states are allocated while the pack compiles asynchronously, after the lookup was built. Placement now rebuilds the lookup if it does not know the state it just used.
+
+### Changed
+
+- Embed the Nexo item API in the single `Kalo-<version>.jar`; the Paper descriptor provides the `Nexo` plugin identity.
+- Keep the Mohist 1.20.1 Java 17 runtime as its own `Kalo-Mohist-<version>.jar`. It is not part of the Paper/Folia jar, which needs Java 21 and the Paper 1.21.4 API.
+
+### Removed
+
+- Stop publishing a standalone `Kalo-NexoCompat` plugin jar.
+
+## 0.2.2-prealpha.1
+
+## 0.2.2-prealpha.1
+
+### Added
+
+- Optional Nexo compatibility add-on (`Kalo-NexoCompat`): exposes Kalo items through
+  the Phase 1 Nexo item API, including item lookup, ID conversion, item builders,
+  and `NexoItemsLoadedEvent`.
+- Deterministic resolution of flat Nexo item IDs to namespaced Kalo keys.
+- Signature and ID-resolution regression tests based on Nexo API 1.8.
+
+### Limitations
+
+- Nexo compatibility currently covers items only. Nexo blocks, furniture, packs,
+  mechanics, additional events, and several advanced `ItemBuilder` members are not
+  implemented; unsupported API calls fail explicitly.
+- The compatibility add-on has passed automated build and tests, but has not yet
+  been verified against a live Paper server or a real third-party Nexo consumer.
+- Do not install `Kalo-NexoCompat` alongside the real Nexo plugin because both
+  register under the plugin name `Nexo`.
+
+
 Kalo is distributed through multiple channels, each of which wants its own release notes.
 This file is the one place they are written; the release workflow reads the section for
 the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## 0.2.1
+
+Rolls up everything since 0.2.1-prealpha.7.
+
+### Added
+
+- Native clickable ESC pause menu, server-side dialogs and configurable pause-menu
+  branding, with a Kalo-native named glyph registry and a safe logo atlas.
+- Bedrock: translation of Java resource-pack assets into Bedrock resources, custom item
+  images derived from the Java pack, and content-addressed Bedrock packs with safe
+  manifest versions.
+- Bedrock: Kalo-native DeluxeMenus Forms conversion routed through Floodgate, automatic
+  DeluxeMenus GUI skull mapping with Geyser, and Java GUI head portraits in the Forms pack.
+- Bedrock: held 3D items now get per-item first- and third-person hold animations
+  generated from the Java model's `display` transforms, with the pivot at the model
+  centre. Items without `display` use the Bedrock Wiki's bound-item pose.
+- Pack host: HTTPS proxy public URL and loopback bind support; direct Kalo to Relay
+  publishing without a timer or watcher; immutable resource-pack HTTP caching.
+- Tag-based Modrinth publishing workflow.
+
+### Fixed
+
+- Bedrock: shorter GUI head paths with migration of the existing icon cache, limited
+  generated texture paths for all clients, original Java texture pixels kept in 3D
+  atlases, Java resource-pack icon used by default, bow/shield idle models and Java
+  crossbow thresholds preserved, custom shield images kept, parent-only vanilla item
+  fallbacks skipped with clearer descriptor warnings, and the Forms toggle separated
+  from Kalo pack mode.
+- Java pack: modern 1.21.11 pack metadata so clients no longer reject the pack,
+  automatic resizing of oversize bitmap logo glyphs, bitmap logo seams removed with
+  per-slice kerning, and the validator now ignores vanilla fallbacks and model
+  texture variables.
+- Modrinth multipart version upload in CI.
+
+### Limitations
+
+- Bedrock output has not been verified on a real Bedrock client. In particular the
+  Java-to-Bedrock conversion of held-item `display` transforms (axis signs, units and
+  position offset) is an unmeasured approximation; items may render offset or rotated.
+- Vanilla parent models (for example `item/handheld`) are not read for `display`, so
+  those items get the default hold pose. Only the main (right) hand is posed.
+- No production deployment has been performed.
 ## 0.2.1-prealpha.16
 
 ### Added
