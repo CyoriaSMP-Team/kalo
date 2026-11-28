@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.2-prealpha.1
+
+### Added
+
+- Optional Nexo compatibility add-on (`Kalo-NexoCompat`): exposes Kalo items through
+  the Phase 1 Nexo item API, including item lookup, ID conversion, item builders,
+  and `NexoItemsLoadedEvent`.
+- Deterministic resolution of flat Nexo item IDs to namespaced Kalo keys.
+- Signature and ID-resolution regression tests based on Nexo API 1.8.
+
+### Limitations
+
+- Nexo compatibility currently covers items only. Nexo blocks, furniture, packs,
+  mechanics, additional events, and several advanced `ItemBuilder` members are not
+  implemented; unsupported API calls fail explicitly.
+- The compatibility add-on has passed automated build and tests, but has not yet
+  been verified against a live Paper server or a real third-party Nexo consumer.
+- Do not install `Kalo-NexoCompat` alongside the real Nexo plugin because both
+  register under the plugin name `Nexo`.
+
+
 Kalo is distributed through multiple channels, each of which wants its own release notes.
 This file is the one place they are written; the release workflow reads the section for
 the version being tagged and hands it to every channel.
