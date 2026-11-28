@@ -145,3 +145,10 @@ pack-host:
   # true kicks players who decline or fail to download. Leave false unless the content is
   # essential to play — a failed download then only means missing textures, not no access.
   required: false
+
+# Experimental compatibility runtime for Mohist 1.20.1. Ignored by Paper/Folia.
+mohist:
+  # Observe legacy CustomModelData items in player inventories and GUIs.
+  auto-learn: true
+  # Build a read-only catalog of installed resource packs and Forge mod assets.
+  auto-catalog: true

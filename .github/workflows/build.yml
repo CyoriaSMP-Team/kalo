@@ -44,23 +44,41 @@ jobs:
             exit 1
           fi
 
-      - name: Verify Mohist 1.20.1 jar targets Java 17
+      - name: Verify embedded Nexo API targets Java 21
         run: |
-          jar=$(ls mohist/build/libs/Kalo-Mohist-*.jar)
+          jar=$(ls build/libs/Kalo-*.jar)
+          major=$(unzip -p "$jar" com/nexomc/nexo/api/NexoItems.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
+          echo "Nexo API in $jar reports class file major version $major"
+          if [ "$major" != "65" ]; then
+            echo "::error::Expected major 65 (Java 21) for embedded Nexo API; got $major."
+            exit 1
+          fi
+          unzip -l "$jar" | grep -q 'kotlin/Unit.class' || {
+            echo "::error::Kotlin runtime missing from the unified Kalo jar"
+            exit 1
+          }
+
+      - name: Verify embedded Mohist 1.20.1 entry point targets Java 17
+        run: |
+          jar=$(ls build/libs/Kalo-*.jar)
           major=$(unzip -p "$jar" io/kalo/mohist/MohistPlugin.class | od -An -t u1 -j 7 -N 1 | tr -d ' ')
-          echo "$jar reports class file major version $major"
+          echo "Mohist entry point in $jar reports class file major version $major"
           if [ "$major" != "61" ]; then
             echo "::error::Expected major 61 (Java 17) for Mohist 1.20.1; got $major."
             exit 1
           fi
-
-      - name: Upload experimental Mohist compatibility jar
-        if: matrix.java == '21'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kalo-Mohist-1.20.1-Experimental
-          path: mohist/build/libs/Kalo-Mohist-*.jar
-          if-no-files-found: error
+          unzip -p "$jar" plugin.yml | grep -q '^name: Kalo$' || {
+            echo "::error::Legacy Mohist plugin.yml must identify the unified plugin as Kalo"
+            exit 1
+          }
+          unzip -p "$jar" plugin.yml | grep -q 'main: io.kalo.mohist.MohistPlugin' || {
+            echo "::error::Legacy Mohist plugin.yml is missing its Java 17 entry point"
+            exit 1
+          }
+          unzip -p "$jar" paper-plugin.yml | grep -A2 '^provides:' | grep -q 'Nexo' || {
+            echo "::error::Paper plugin descriptor must provide the Nexo identity"
+            exit 1
+          }
 
       - name: Run performance macro benchmark
         run: ./gradlew :core:performanceBenchmark --stacktrace

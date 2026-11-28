@@ -1,22 +1,20 @@
-# Nexo compatibility (`nexo-compat`)
+# Nexo API compatibility
 
-An optional jar, `Kalo-NexoCompat-<version>.jar`, that answers as the plugin named **Nexo** so
-a plugin written against the Nexo API uses Kalo as the backend. It is a separate module on
-purpose: it is not in the main Kalo jar, and it is opt-in.
+Kalo embeds a compatibility surface for the Nexo **item API** in the main
+`Kalo-<version>.jar`. There is no second plugin to install. On Paper, the
+`paper-plugin.yml` metadata declares `Nexo` as a provided plugin name, so a
+plugin dependency on `Nexo` resolves to Kalo.
 
-Kalo content is already importable from and exportable to Nexo (`/kalo import`, `/kalo export`).
-This is the third leg: **impersonation** at runtime.
+**Do not install the real Nexo plugin alongside Kalo's compatibility API.**
+Both providers use the `Nexo` identity; only one can satisfy that dependency.
 
-## Install
-
-1. Install Kalo, then drop `Kalo-NexoCompat-<version>.jar` into `plugins/`.
-2. Plugins that `depend`/`softdepend` on `Nexo` now find it.
-3. **Never install it beside the real Nexo.** Two plugins cannot share a name; the server will
-   refuse the second. Remove one.
+Kalo content is already importable from and exportable to Nexo (`/kalo import`,
+`/kalo export`). The embedded API adds runtime item-API compatibility.
 
 ## What is supported (Phase 1: items)
 
-Written against Nexo's published Javadoc (API 1.8). `NexoApiSignatureTest` pins the signatures.
+Written against Nexo's published Javadoc (API 1.8). `NexoApiSignatureTest`
+pins the signatures.
 
 | API | Behaviour |
 |---|---|
@@ -26,32 +24,39 @@ Written against Nexo's published Javadoc (API 1.8). `NexoApiSignatureTest` pins 
 | `NexoItems.itemMap`, `unexcludedItems` | Empty — Kalo does not group items by source file |
 | `NexoItems.loadItems`, `reloadItem` | No-op — Kalo owns loading |
 | `ItemBuilder` | Constructors for `Material`, `ItemStack`, `ItemBuilder`; amount, type, names, lore, durability, unbreakable, flags, custom model data, enchants, custom tags, `build`, `buildArray`, `referenceCopy`, `clone` |
-| `NexoItemsLoadedEvent` | Fired after all plugins enable and after each Kalo content load |
+| `NexoItemsLoadedEvent` | Fired after all plugins enable and after each later Kalo content reload |
 
-### Ids
+### IDs
 
-Nexo ids are flat (`ruby_sword`); Kalo keys are namespaced (`mypack:ruby_sword`). A bare id
-matches the Kalo key with that value; if several packs define it, the first namespace
-alphabetically wins, so the result does not depend on load order. An id with a colon is taken
-as a full Kalo key. See `NexoIds`.
+Nexo ids are flat (`ruby_sword`); Kalo keys are namespaced
+(`mypack:ruby_sword`). A bare id matches the Kalo key with that value; if
+several packs define it, the first namespace alphabetically wins, so the
+result does not depend on load order. An id with a colon is taken as a full
+Kalo key. See `NexoIds`.
 
 ## Not supported yet
 
-Anything not in the table fails loudly with `NoSuchMethodError` at the call site rather than
-doing nothing: a silent stub would hand players wrong items. Not yet implemented:
+Anything not in the table fails loudly with `NoSuchMethodError` at the call
+site rather than doing nothing. Not yet implemented:
 
-- `NexoBlocks`, `NexoFurniture`, `NexoPack`, `NexoMeta` and the mechanic classes
+- `NexoBlocks`, `NexoFurniture`, `NexoPack`, `NexoMeta` and mechanic classes
 - Nexo's other events (for example `NexoMechanicsRegisteredEvent`)
-- `ItemBuilder` members for components (food, tool, equippable), attributes, potions, trims
+- `ItemBuilder` members for components (food, tool, equippable), attributes,
+  potions and trims
 
-## Known risks — not verified on a server
+## Compatibility notes
 
-- **Class visibility.** Kalo is a Paper plugin with an isolated classloader; this jar is a
-  legacy-descriptor plugin. Whether a third-party plugin's loader can see `com.nexomc.nexo.*`
-  and whether this jar can see `io.kalo.*` has been checked only by compiling and by
-  reflection tests, not by running Paper. Test on a real server before relying on it.
-- **Binary compatibility with Kotlin callers.** Members are `@JvmStatic` on an `object`, as in
-  Nexo, so both Java (static) and Kotlin (`INSTANCE`) callers should link. Unconfirmed against
-  a real Kotlin-built Nexo consumer.
-- Written from the public Javadoc only. No Nexo code is copied; review Nexo's license before
-  distributing.
+- The compatibility API is compiled into the Kalo artifact, and Paper metadata
+  advertises the `Nexo` alias. Paper plugins use isolated classloaders: a third-party
+  plugin that is itself a Paper plugin must declare `Nexo` as a server dependency
+  with `join-classpath: true` to access these classes. A live test with real Nexo
+  consumers is still required. Legacy Bukkit plugin classloading should also be
+  tested against the actual consumer plugins.
+- The Nexo API is a Paper/Folia compatibility surface. The Mohist 1.20.1 fallback
+  intentionally does not advertise Nexo because these API classes target Java 21
+  and the modern Paper API.
+- Kotlin callers use the same `INSTANCE`/static entry points exposed by the
+  compatibility classes. A real Kotlin-built Nexo consumer has not yet been
+  verified.
+- The API surface is based on public Nexo Javadocs. No Nexo implementation
+  code is copied.
