@@ -12,6 +12,7 @@ import io.kalo.content.item.definition.ItemBehaviour;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.JavaOptions;
 import io.kalo.content.item.definition.ModelDefinition;
+import io.kalo.content.liquid.LiquidBucketRegistry;
 import io.kalo.manager.RegistryManager;
 import io.kalo.pack.ResourcePack;
 import io.kalo.platform.java.JavaPackCompiler;
@@ -76,6 +77,24 @@ public final class ItemType implements ContentType<Item> {
 
         try {
             ItemDefinition definition = parseDefinition(key, config);
+            Key liquid = null;
+            String liquidId = config.getString("liquid");
+            if (liquidId != null && !liquidId.isBlank()) {
+                if (definition.java().baseMaterial() != Material.BUCKET) {
+                    throw new IllegalArgumentException(
+                            "liquid: requires material: BUCKET");
+                }
+                liquid = liquidId.indexOf(':') >= 0
+                        ? Key.key(liquidId)
+                        : pack.key(liquidId);
+            }
+            if (definition.model() instanceof ModelDefinition.Blockbench blockbench) {
+                io.kalo.model.ModelIR imported = io.kalo.model.ModelRegistry.load(
+                        pack.folder().toPath(), blockbench.source());
+                io.kalo.model.ModelDiagnostics.log(logger,
+                        "Blockbench model " + blockbench.source().asString(),
+                        imported.diagnostics());
+            }
             List<FeatureBuilder> features = parseFeatures(key, config.getConfigurationSection("features"));
 
             registries.item().register(key, entry -> {
@@ -83,6 +102,9 @@ public final class ItemType implements ContentType<Item> {
                 entry.definition(definition);
                 entry.features(features);
             });
+            if (liquid != null) {
+                LiquidBucketRegistry.register(key, liquid);
+            }
             return true;
         } catch (Exception e) {
             // Swallowing this was the single worst thing for pack authors: a typo in a
@@ -94,7 +116,14 @@ public final class ItemType implements ContentType<Item> {
 
     @Override
     public void compilePack(@NotNull ResourcePack resourcePack, @NotNull Iterable<Item> contents) {
-        JavaPackCompiler.compileItems(resourcePack, contents);
+        uncompilable = JavaPackCompiler.compileItems(resourcePack, contents);
+    }
+
+    /** Items the Java compiler could not emit, so Bedrock must skip them too. */
+    private volatile java.util.Set<String> uncompilable = java.util.Set.of();
+
+    public @NotNull java.util.Set<String> uncompilable() {
+        return uncompilable;
     }
 
     public static @NotNull ItemDefinition parseDefinition(@NotNull Key key, @NotNull ConfigurationSection config) {
@@ -127,10 +156,81 @@ public final class ItemType implements ContentType<Item> {
         if (bedrock != null) {
             builder.bedrock(new BedrockOptions(
                     bedrock.getBoolean("enabled", true),
-                    bedrock.getString("icon")));
+                    bedrock.getString("icon"),
+                    bedrock.isSet("scale") ? bedrock.getDouble("scale") : null,
+                    bedrock.isSet("rotation") ? bedrock.getDoubleList("rotation") : null));
         }
 
-        return builder.build();
+        ConfigurationSection place = config.getConfigurationSection("place");
+        if (place != null) {
+            builder.placement(parsePlacement(place, key.namespace()));
+        }
+
+        ItemDefinition definition = builder.build();
+        if (definition.placement() != null
+                && !(definition.model() instanceof ModelDefinition.Blockbench)) {
+            throw new IllegalArgumentException(
+                    "place: requires a 'blockbench' model; a placed model needs bones and"
+                            + " animations, which the legacy Java-JSON path does not carry");
+        }
+        return definition;
+    }
+
+    private static @NotNull io.kalo.content.item.definition.PlacementDefinition parsePlacement(
+            @NotNull ConfigurationSection config, @NotNull String namespace) {
+        double seatValue = config.getDouble("seat", 0);
+        Double seat = config.contains("seat") ? seatValue : null;
+        String idle = config.getString("idle");
+        String interact = config.getString("interact");
+        if (idle == null) {
+            idle = config.getString("animation");
+        }
+
+        io.kalo.content.item.definition.PlacementDefinition.Storage storage = null;
+        ConfigurationSection storageSection = config.getConfigurationSection("storage");
+        if (storageSection != null) {
+            storage = new io.kalo.content.item.definition.PlacementDefinition.Storage(
+                    storageSection.getInt("rows", 3), storageSection.getString("title"));
+        }
+
+        java.util.List<io.kalo.content.item.definition.PlacementDefinition.State> states =
+                new java.util.ArrayList<>();
+        for (java.util.Map<?, ?> raw : config.getMapList("states")) {
+            Double scale = number(raw.get("scale"));
+            Integer light = integer(raw.get("light"));
+            Boolean solid = bool(raw.get("solid"));
+            String model = raw.get("model") == null ? null : raw.get("model").toString();
+            String sound = raw.get("sound") == null ? null : raw.get("sound").toString();
+            states.add(new io.kalo.content.item.definition.PlacementDefinition.State(
+                    scale, light, solid,
+                    model == null ? null : resolveKey(namespace, model), sound));
+        }
+
+        return new io.kalo.content.item.definition.PlacementDefinition(
+                config.getDouble("scale", 1.0),
+                config.getDouble("width", 1.0),
+                config.getDouble("height", 1.0),
+                seat,
+                config.getInt("light", 0),
+                idle,
+                interact,
+                storage,
+                states);
+    }
+
+    private static @org.jetbrains.annotations.Nullable Double number(
+            @org.jetbrains.annotations.Nullable Object value) {
+        return value instanceof Number number ? number.doubleValue() : null;
+    }
+
+    private static @org.jetbrains.annotations.Nullable Integer integer(
+            @org.jetbrains.annotations.Nullable Object value) {
+        return value instanceof Number number ? number.intValue() : null;
+    }
+
+    private static @org.jetbrains.annotations.Nullable Boolean bool(
+            @org.jetbrains.annotations.Nullable Object value) {
+        return value instanceof Boolean bool ? bool : null;
     }
 
     private static @NotNull DisplayProperties parseDisplay(@NotNull ConfigurationSection config) {
@@ -154,21 +254,37 @@ public final class ItemType implements ContentType<Item> {
 
         String custom = config.getString("custom");
         if (custom != null) {
-            Map<String, Key> textures = new HashMap<>();
-            ConfigurationSection texturesSection = config.getConfigurationSection("textures");
-            if (texturesSection != null) {
-                for (String slot : texturesSection.getKeys(false)) {
-                    String texture = texturesSection.getString(slot);
-                    if (texture != null) {
-                        textures.put(slot, resolveKey(key.namespace(), texture));
-                    }
-                }
+            return new ModelDefinition.Custom(resolveKey(key.namespace(), custom),
+                    parseTextures(key, config));
+        }
+
+        String blockbench = config.getString("blockbench");
+        if (blockbench != null) {
+            if (!blockbench.endsWith(".bbmodel")) {
+                throw new IllegalArgumentException(
+                        "blockbench model path must end in .bbmodel");
             }
-            return new ModelDefinition.Custom(resolveKey(key.namespace(), custom), textures);
+            return new ModelDefinition.Blockbench(resolveKey(key.namespace(), blockbench),
+                    parseTextures(key, config));
         }
 
         throw new IllegalArgumentException(
-                "model section must declare one of 'sprite', 'vanilla' or 'custom'");
+                "model section must declare one of 'sprite', 'vanilla', 'custom' or 'blockbench'");
+    }
+
+    private static @NotNull Map<String, Key> parseTextures(@NotNull Key key,
+                                                            @NotNull ConfigurationSection config) {
+        Map<String, Key> textures = new HashMap<>();
+        ConfigurationSection texturesSection = config.getConfigurationSection("textures");
+        if (texturesSection != null) {
+            for (String slot : texturesSection.getKeys(false)) {
+                String texture = texturesSection.getString(slot);
+                if (texture != null) {
+                    textures.put(slot, resolveKey(key.namespace(), texture));
+                }
+            }
+        }
+        return textures;
     }
 
     private static @NotNull ItemBehaviour parseBehaviour(@NotNull ConfigurationSection config) {

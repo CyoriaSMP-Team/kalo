@@ -62,4 +62,17 @@ public sealed interface BlockModelDefinition {
             textures = Map.copyOf(textures);
         }
     }
+
+    /**
+     * A Blockbench {@code .bbmodel} source compiled through Kalo's shared model IR.
+     *
+     * @param source   pack-relative source under {@code assets/<namespace>/}
+     * @param textures optional Kalo texture overrides keyed by Blockbench texture id,
+     *                 name or path
+     */
+    record Blockbench(@NotNull Key source, @NotNull @Unmodifiable Map<String, Key> textures) implements BlockModelDefinition {
+        public Blockbench {
+            textures = Map.copyOf(textures);
+        }
+    }
 }

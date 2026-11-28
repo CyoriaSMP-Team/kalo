@@ -16,15 +16,23 @@ public final class BlockConfigSchema implements ConfigSchema {
         if (model == null) {
             // Unlike an item there is no vanilla appearance to fall back on, so a block
             // without a model would render as missing texture in the world.
-            result.failed("Missing model section — declare 'cube_all', 'cube' or 'custom'");
+            result.failed("Missing model section — declare 'cube_all', 'cube', 'custom'"
+                    + " or 'blockbench'");
         } else {
             int sources = (model.contains("cube_all") ? 1 : 0)
                     + (model.contains("cube") ? 1 : 0)
-                    + (model.contains("custom") ? 1 : 0);
+                    + (model.contains("custom") ? 1 : 0)
+                    + (model.contains("blockbench") ? 1 : 0);
             if (sources == 0) {
-                result.failed("model section must declare one of 'cube_all', 'cube' or 'custom'");
+                result.failed("model section must declare one of 'cube_all', 'cube',"
+                        + " 'custom' or 'blockbench'");
             } else if (sources > 1) {
-                result.failed("model section must declare exactly one of 'cube_all', 'cube' or 'custom'");
+                result.failed("model section must declare exactly one of 'cube_all',"
+                        + " 'cube', 'custom' or 'blockbench'");
+            }
+            if (model.contains("textures")
+                    && !model.contains("custom") && !model.contains("blockbench")) {
+                result.failed("'textures' only applies to a 'custom' or 'blockbench' model");
             }
         }
 

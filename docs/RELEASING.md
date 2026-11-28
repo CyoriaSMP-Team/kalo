@@ -5,9 +5,9 @@ upload.
 
 ## Before tagging
 
-1. Rename the `## Unreleased` heading in `CHANGELOG.md` to the version being released.
-   The release workflow **fails** if that section is missing or empty — four channels each
-   render release notes, and a blank box on Modrinth cannot be taken back.
+1. Make sure `CHANGELOG.md` has a `## <plugin_version>` section for the version being
+   released. The release workflow **fails** if that section is missing or empty — four
+   channels each render release notes, and a blank box on Modrinth cannot be taken back.
 2. Set `plugin_version` in `gradle.properties` to the same number. The tag must be
    `v<plugin_version>`; the workflow refuses a mismatch rather than shipping a jar whose
    name contradicts its release.
@@ -32,7 +32,8 @@ ship unmerged draft-PR features or describe unverified crossplay as complete.
 ## Tagging
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag "v$(sed -n 's/^plugin_version=//p' gradle.properties)"
+git push origin "v$(sed -n 's/^plugin_version=//p' gradle.properties)"
 ```
 
 That runs `.github/workflows/release.yml`, which builds and tests, checks the jar is still
@@ -48,8 +49,10 @@ Java 21 bytecode, then publishes to:
 
 Modrinth, Hangar and MCMall are **skipped, not failed**, when their required credentials or variables are absent, so the
 workflow is useful before either account exists. Both read the supported Minecraft
-versions from the repository variable `SUPPORTED_GAME_VERSIONS`, a JSON array — for
-example `["1.21.4","26.1","26.2"]`. Keep it in step with the README's badge.
+versions from the repository variable `SUPPORTED_GAME_VERSIONS`, a JSON array. List only
+versions that have actually been verified, for example `["1.21.11","26.2"]`; add
+`1.21.4` only after the 1.21.4 floor has been run. Keep the variable in step with
+the README's verified-runtime wording, not its compile API baseline.
 
 ## The Java 21 check
 

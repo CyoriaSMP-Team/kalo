@@ -82,11 +82,35 @@ public final class BlockType implements ContentType<Block> {
 
         try {
             BlockDefinition definition = parseDefinition(key, config);
+            if (definition.model() instanceof BlockModelDefinition.Blockbench blockbench) {
+                io.kalo.model.ModelIR imported = io.kalo.model.ModelRegistry.load(
+                        pack.folder().toPath(), blockbench.source());
+                io.kalo.model.ModelDiagnostics.log(logger,
+                        "Blockbench block model " + blockbench.source().asString(),
+                        imported.diagnostics());
+                if (!io.kalo.model.animation.ModelAnimations.loops(imported).isEmpty()
+                        && definition.java().mode() != JavaBlockMode.VIRTUAL) {
+                    if (config.contains("java.mode")) {
+                        logger.warning("Block '" + key.asString() + "' declares loop"
+                                + " animations but java.mode is not virtual; Java will show"
+                                + " the static rest pose. Remove java.mode or set it to"
+                                + " 'virtual' to let Java play the animation.");
+                    } else {
+                        definition = new BlockDefinition(definition.key(),
+                                definition.display(), definition.model(),
+                                definition.behaviour(), JavaBlockOptions.virtual(),
+                                definition.bedrock(), definition.animation());
+                        logger.info("Block '" + key.asString() + "' is animated; using"
+                                + " virtual display mode so Java can play its animation");
+                    }
+                }
+            }
+            final BlockDefinition resolved = definition;
             List<FeatureBuilder> features = parseFeatures(key, config.getConfigurationSection("features"));
 
             registries.block().register(key, entry -> {
                 entry.key(key);
-                entry.definition(definition);
+                entry.definition(resolved);
                 entry.features(features);
             });
             return true;
@@ -155,6 +179,12 @@ public final class BlockType implements ContentType<Block> {
                     bedrock.getString("icon")));
         }
 
+        ConfigurationSection animation = config.getConfigurationSection("animation");
+        if (animation != null) {
+            builder.animation(new io.kalo.content.block.definition.BlockAnimation(
+                    animation.getString("idle"), animation.getString("interact")));
+        }
+
         return builder.build();
     }
 
@@ -192,20 +222,37 @@ public final class BlockType implements ContentType<Block> {
 
         String custom = config.getString("custom");
         if (custom != null) {
-            Map<String, Key> textures = new HashMap<>();
-            ConfigurationSection texturesSection = config.getConfigurationSection("textures");
-            if (texturesSection != null) {
-                for (String slot : texturesSection.getKeys(false)) {
-                    String texture = texturesSection.getString(slot);
-                    if (texture != null) {
-                        textures.put(slot, resolveKey(key.namespace(), texture));
-                    }
-                }
-            }
-            return new BlockModelDefinition.Custom(resolveKey(key.namespace(), custom), textures);
+            return new BlockModelDefinition.Custom(resolveKey(key.namespace(), custom),
+                    parseTextures(key, config));
         }
 
-        throw new IllegalArgumentException("model section must declare one of 'cube_all', 'cube' or 'custom'");
+        String blockbench = config.getString("blockbench");
+        if (blockbench != null) {
+            if (!blockbench.endsWith(".bbmodel")) {
+                throw new IllegalArgumentException(
+                        "blockbench model path must end in .bbmodel");
+            }
+            return new BlockModelDefinition.Blockbench(resolveKey(key.namespace(), blockbench),
+                    parseTextures(key, config));
+        }
+
+        throw new IllegalArgumentException(
+                "model section must declare one of 'cube_all', 'cube', 'custom' or 'blockbench'");
+    }
+
+    private static @NotNull Map<String, Key> parseTextures(@NotNull Key key,
+                                                            @NotNull ConfigurationSection config) {
+        Map<String, Key> textures = new HashMap<>();
+        ConfigurationSection texturesSection = config.getConfigurationSection("textures");
+        if (texturesSection != null) {
+            for (String slot : texturesSection.getKeys(false)) {
+                String texture = texturesSection.getString(slot);
+                if (texture != null) {
+                    textures.put(slot, resolveKey(key.namespace(), texture));
+                }
+            }
+        }
+        return textures;
     }
 
     public static @NotNull List<FeatureBuilder> parseFeatures(@NotNull Key key, @Nullable ConfigurationSection config) {

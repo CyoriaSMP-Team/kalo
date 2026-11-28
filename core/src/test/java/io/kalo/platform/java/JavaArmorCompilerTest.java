@@ -65,6 +65,20 @@ class JavaArmorCompilerTest {
     }
 
     @Test
+    void aWornModelMakesTheFlatEquipmentLayerTransparent() {
+        Key key = Key.key("testpack", "ruby_helmet");
+        ArmorDefinition definition = new ArmorDefinition(
+                ItemDefinition.builder(key).build(), ArmorSlot.HEAD, null,
+                new ArmorDefinition.ArmorModel(
+                        Key.key("testpack", "models/armor/ruby_helmet.bbmodel"),
+                        java.util.Map.of()));
+
+        JsonObject asset = JavaArmorCompiler.equipmentAsset(definition, null);
+
+        assertEquals("kalo:armor_invisible", textureOf(asset, "humanoid"));
+    }
+
+    @Test
     void equipmentAssetLandsWhereTheClientLooksForIt() {
         assertEquals("assets/testpack/equipment/ruby_helmet.json",
                 JavaArmorCompiler.equipmentPath(Key.key("testpack", "ruby_helmet")));

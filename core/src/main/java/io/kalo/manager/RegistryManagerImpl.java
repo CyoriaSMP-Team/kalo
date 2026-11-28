@@ -6,12 +6,20 @@ import io.kalo.content.item.ItemType;
 import io.kalo.content.block.BlockType;
 import io.kalo.content.furniture.FurnitureType;
 import io.kalo.content.armor.ArmorType;
+import io.kalo.content.mob.MobType;
+import io.kalo.content.emote.EmoteType;
+import io.kalo.content.vehicle.VehicleType;
 import io.kalo.content.painting.PaintingType;
 import io.kalo.content.musicdisc.MusicDiscType;
 import io.kalo.content.gui.GuiType;
 import io.kalo.content.recipe.RecipeType;
 import io.kalo.content.sound.SoundType;
 import io.kalo.content.glyph.GlyphType;
+import io.kalo.content.hud.HudType;
+import io.kalo.content.dialog.DialogType;
+import io.kalo.content.liquid.LiquidBucketRegistry;
+import io.kalo.content.liquid.LiquidType;
+import io.kalo.content.vfx.VfxType;
 import io.kalo.content.feature.FeatureFactory;
 import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.registry.DirectScalableRegistry;
@@ -39,7 +47,13 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
     private final RecipeType recipeType = new RecipeType();
     private final SoundType soundType = new SoundType();
     private final GlyphType glyphType = new GlyphType();
-    private final GlobalRegistries globalRegistries = new GlobalRegistriesImpl(blockStateAllocator, recipeType, soundType, glyphType);
+    private final HudType hudType = new HudType();
+    private final DialogType dialogType = new DialogType();
+    private final VfxType vfxType = new VfxType();
+    private final LiquidType liquidType = new LiquidType();
+    private final GlobalRegistries globalRegistries = new GlobalRegistriesImpl(
+            blockStateAllocator, recipeType, soundType, glyphType, hudType, dialogType,
+            vfxType, liquidType);
 
     @Override
     public void preload(@NotNull Context context) {
@@ -52,6 +66,7 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
                 new File(context.plugin().getDataFolder(), "block-states.json").toPath();
         loadBlockStateAssignments(blockStateAllocator, stateFile);
 
+        LiquidBucketRegistry.clear();
         globalRegistries.unlockAll();
         globalRegistries.clearAll();
         // clearAll() empties the type registry as well, so the built-ins go back in
@@ -59,6 +74,10 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
         ((GlobalRegistriesImpl) globalRegistries).registerBuiltinTypes();
         soundType.clear();
         glyphType.clear();
+        hudType.clear();
+        dialogType.clear();
+        vfxType.clear();
+        liquidType.clear();
     }
 
     @Override
@@ -96,6 +115,22 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
 
     public @NotNull GlyphType glyphType() {
         return glyphType;
+    }
+
+    public @NotNull HudType hudType() {
+        return hudType;
+    }
+
+    public @NotNull DialogType dialogType() {
+        return dialogType;
+    }
+
+    public @NotNull VfxType vfxType() {
+        return vfxType;
+    }
+
+    public @NotNull LiquidType liquidType() {
+        return liquidType;
     }
 
     public @NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator() {
@@ -136,11 +171,19 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
         private final RecipeType recipeType;
         private final SoundType soundType;
         private final GlyphType glyphType;
+        private final HudType hudType;
+        private final DialogType dialogType;
+        private final VfxType vfxType;
+        private final LiquidType liquidType;
 
         private GlobalRegistriesImpl(@NotNull io.kalo.platform.java.BlockStateAllocator blockStateAllocator,
                                     @NotNull RecipeType recipeType,
                                     @NotNull SoundType soundType,
-                                    @NotNull GlyphType glyphType) {
+                                    @NotNull GlyphType glyphType,
+                                    @NotNull HudType hudType,
+                                    @NotNull DialogType dialogType,
+                                    @NotNull VfxType vfxType,
+                                    @NotNull LiquidType liquidType) {
             // Writable rather than a fixed map: add-ons register their own content types
             // during RegistryInitializeEvent, before packs are read.
             this.types = create(new DirectScalableRegistry<>());
@@ -148,6 +191,10 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
             this.recipeType = recipeType;
             this.soundType = soundType;
             this.glyphType = glyphType;
+            this.hudType = hudType;
+            this.dialogType = dialogType;
+            this.vfxType = vfxType;
+            this.liquidType = liquidType;
             registerBuiltinTypes();
             this.features = create(new DirectScalableRegistry<>());
             this.contentsPacks = create(new DirectScalableRegistry<>());
@@ -165,12 +212,19 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
             types.register(BlockType.KEY, new BlockType(blockStateAllocator));
             types.register(FurnitureType.KEY, new FurnitureType(blockStateAllocator));
             types.register(ArmorType.KEY, new ArmorType());
+            types.register(MobType.KEY, new MobType());
+            types.register(EmoteType.KEY, new EmoteType());
+            types.register(VehicleType.KEY, new VehicleType());
             types.register(PaintingType.KEY, new PaintingType());
             types.register(MusicDiscType.KEY, new MusicDiscType());
             types.register(GuiType.KEY, new GuiType());
             types.register(RecipeType.KEY, recipeType);
             types.register(SoundType.KEY, soundType);
             types.register(GlyphType.KEY, glyphType);
+            types.register(HudType.KEY, hudType);
+            types.register(DialogType.KEY, dialogType);
+            types.register(VfxType.KEY, vfxType);
+            types.register(LiquidType.KEY, liquidType);
         }
 
         @Override
@@ -179,6 +233,9 @@ public final class RegistryManagerImpl implements RegistryManager, Managerial, R
             block().merge(registries.block());
             furniture().merge(registries.furniture());
             armor().merge(registries.armor());
+            mob().merge(registries.mob());
+            emote().merge(registries.emote());
+            vehicle().merge(registries.vehicle());
             painting().merge(registries.painting());
             musicDisc().merge(registries.musicDisc());
             gui().merge(registries.gui());

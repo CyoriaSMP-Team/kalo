@@ -5,7 +5,7 @@
 # Example: ./update-version.sh 0.2.0 "Now Available"
 # Example: ./update-version.sh 0.3.0-beta "Beta Release"
 
-VERSION=${1:-"0.1.0"}
+VERSION=${1:-"0.2.1-prealpha.16"}
 STATUS=${2:-"Now Available"}
 DATE=$(date +%Y-%m-%d)
 

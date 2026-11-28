@@ -10,7 +10,10 @@ import io.kalo.content.block.definition.JavaBlockMode;
 import io.kalo.content.item.Item;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
+import io.kalo.content.vfx.definition.VfxDefinition;
+import io.kalo.model.ModelTextureResolver;
 import io.kalo.pack.Json;
+import io.kalo.pack.PackMeta;
 import io.kalo.platform.java.BlockStateAllocator;
 import io.kalo.pack.ResourcePack;
 import io.kalo.pack.Writable;
@@ -22,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.List;
@@ -48,7 +52,8 @@ public final class BedrockPackCompiler {
     private static final Logger LOGGER = Logger.getLogger(BedrockPackCompiler.class.getName());
 
     private final ResourcePack javaSource;
-    private final ResourcePack pack;
+    private final ResourcePack target;
+    private final TrackedPack pack;
     private final BedrockRegistrationSnapshot.Generation generation;
 
     private final JsonObject textureData = new JsonObject();
@@ -59,24 +64,58 @@ public final class BedrockPackCompiler {
     private final JsonArray mappedBlocks = new JsonArray();
     /** java content key -> Bedrock geometry identifier, for the extension to apply. */
     private final JsonObject geometries = new JsonObject();
+    /** Compiled Blockbench block assets, keyed by the Java content key. */
+    private final Map<String, BlockbenchBlockAssets> blockbenchBlocks = new TreeMap<>();
+    /** Animated blocks rendered through a Bedrock client entity. */
+    private final List<BedrockAnimatedBlockRegistration> animatedBlocks = new ArrayList<>();
+    /** Custom mobs rendered through a Bedrock client entity. */
+    private final List<BedrockMobRegistration> mobs = new ArrayList<>();
+    /** Vehicles and emote props rendered through a Bedrock client entity. */
+    private final List<BedrockRigRegistration> rigs = new ArrayList<>();
+    /** All items seen in this compiler pass, for state-model references. */
+    private final Map<Key, Item> itemIndex = new TreeMap<>();
+    /** Embedded first-texture bytes for block inventory icons, keyed by block shorthand. */
+    private final Map<String, byte[]> embeddedBlockIcons = new TreeMap<>();
+    /** Rendered isometric previews for Blockbench block item icons. */
+    private final Map<String, byte[]> renderedBlockIcons = new TreeMap<>();
     private final List<BedrockBlockRegistration> blockRegistrations = new ArrayList<>();
     private final List<BedrockItemRegistration> itemRegistrations = new ArrayList<>();
+    private final List<BedrockPlacedModelRegistration> placedModels = new ArrayList<>();
     private int attachables;
 
     private int skipped;
 
     public BedrockPackCompiler(@NotNull ResourcePack javaSource, @NotNull ResourcePack pack) {
         this.javaSource = javaSource;
-        this.pack = pack;
+        this.target = pack;
+        this.pack = new TrackedPack(pack);
         this.generation = BedrockRegistrationSnapshot.beginGeneration();
+        BedrockVfxRegistry.clear();
     }
 
     /** Adds one content type's items to the mapping. Safe to call repeatedly. */
     public void add(@NotNull Iterable<? extends Item> items) {
-        for (Item item : items) {
+        add(items, Set.of());
+    }
+
+    /**
+     * @param skip Java content keys that did not compile on the Java side. Bedrock must
+     *             not publish an item the Java player standing next to them cannot see.
+     */
+    public void add(@NotNull Iterable<? extends Item> items, @NotNull Set<String> skip) {
+        List<Item> indexed = new ArrayList<>();
+        items.forEach(indexed::add);
+        for (Item item : indexed) {
+            itemIndex.put(item.key(), item);
+        }
+        for (Item item : indexed) {
             ItemDefinition definition = item.definition();
 
             if (!definition.bedrock().enabled()) {
+                continue;
+            }
+            if (skip.contains(definition.key().asString())) {
+                skipped++;
                 continue;
             }
             if (definition.model() instanceof ModelDefinition.Vanilla) {
@@ -84,16 +123,28 @@ public final class BedrockPackCompiler {
                 // correctly with no custom item at all.
                 continue;
             }
-            switch (definition.model()) {
-                case ModelDefinition.Sprite sprite -> addSpriteItem(definition, sprite);
-                case ModelDefinition.Custom custom -> {
-                    if (!addCustomItem(definition, custom)) {
-                        skipped++;
-                        LOGGER.warning("Skipped Bedrock 3D item " + definition.key()
-                                + ": missing geometry/texture or unsupported texture layout");
+            Key previousOwner = pack.owner(definition.key());
+            try {
+                switch (definition.model()) {
+                    case ModelDefinition.Sprite sprite -> addSpriteItem(definition, sprite);
+                    case ModelDefinition.Custom custom -> {
+                        if (!addCustomItem(definition, custom)) {
+                            skipped++;
+                            LOGGER.warning("Skipped Bedrock 3D item " + definition.key()
+                                    + ": missing geometry/texture or unsupported texture layout");
+                        }
                     }
+                    case ModelDefinition.Blockbench blockbench -> {
+                        if (!addBlockbenchItem(definition, blockbench)) {
+                            skipped++;
+                            LOGGER.warning("Skipped Bedrock Blockbench item " + definition.key()
+                                    + ": missing geometry/texture or unsupported construct");
+                        }
+                    }
+                    case ModelDefinition.Vanilla ignored -> { /* already handled above */ }
                 }
-                case ModelDefinition.Vanilla ignored -> { /* already handled above */ }
+            } finally {
+                pack.owner(previousOwner);
             }
         }
     }
@@ -110,17 +161,23 @@ public final class BedrockPackCompiler {
                         || item.bedrockIdentifier().equals(definition.key().asString()))) {
             return false;
         }
-        return switch (definition.model()) {
-            case ModelDefinition.Sprite sprite -> {
-                String path = "assets/" + sprite.texture().namespace()
-                        + "/textures/" + sprite.texture().value() + ".png";
-                if (javaSource.file(path) == null) yield false;
-                addSpriteItem(definition, sprite);
-                yield true;
-            }
-            case ModelDefinition.Custom custom -> addCustomItem(definition, custom);
-            case ModelDefinition.Vanilla ignored -> false;
-        };
+        Key previousOwner = pack.owner(definition.key());
+        try {
+            return switch (definition.model()) {
+                case ModelDefinition.Sprite sprite -> {
+                    String path = "assets/" + sprite.texture().namespace()
+                            + "/textures/" + sprite.texture().value() + ".png";
+                    if (javaSource.file(path) == null) yield false;
+                    addSpriteItem(definition, sprite);
+                    yield true;
+                }
+                case ModelDefinition.Custom custom -> addCustomItem(definition, custom);
+                case ModelDefinition.Blockbench blockbench -> addBlockbenchItem(definition, blockbench);
+                case ModelDefinition.Vanilla ignored -> false;
+            };
+        } finally {
+            pack.owner(previousOwner);
+        }
     }
 
     /**
@@ -226,7 +283,13 @@ public final class BedrockPackCompiler {
         }
 
         JsonObject components = new JsonObject();
-        components.addProperty("minecraft:max_stack_size", definition.behaviour().maxStackSize());
+        // Bedrock rejects a durable item that also stacks: "Stack size must be 1 when max
+        // damage is above 0". A bow declares max stack 1 on Java, but a pack that leaves
+        // the default 64 still produces a mapping Geyser throws away at startup.
+        int stackSize = definition.behaviour().maxDurability() != null
+                || definition.java().baseMaterial().getMaxDurability() > 0
+                ? 1 : definition.behaviour().maxStackSize();
+        components.addProperty("minecraft:max_stack_size", stackSize);
         if (definition.behaviour().maxDurability() != null) {
             // This section describes the Java component patch Geyser matches, not the
             // Bedrock component it eventually synthesises. `minecraft:durability` is
@@ -302,15 +365,47 @@ public final class BedrockPackCompiler {
             String icon = definition.bedrock().iconOverride() != null
                     ? definition.bedrock().iconOverride() : shorthand;
 
-            String modelTexture = "textures/items/" + icon;
+            // The model texture and the inventory icon are two different images: the model
+            // samples UV islands out of the sheet, the icon shows the whole object. They
+            // must never share a path — doing so made the rendered icon overwrite the
+            // texture the held attachable reads, so the item rendered broken in hand.
+            String modelTexture = "textures/models/items/" + shorthand;
             if (atlas != null) {
-                modelTexture = "textures/models/items/" + shorthand;
                 pack.file(modelTexture + ".png", Writable.bytes(atlas.image()));
+            } else {
+                copyTexture(texture, modelTexture + ".png");
             }
+
+            // Bound geometry needs its own hold animations; vanilla player-skeleton holds
+            // do not position a custom model and leave it at raw scale/orientation.
+            String rootBone = bone.get("name").getAsString();
+            io.kalo.model.bedrock.BedrockHoldAnimations.Result hold =
+                    io.kalo.model.bedrock.BedrockHoldAnimations.build(rootBone,
+                            io.kalo.model.bedrock.BedrockHoldAnimations.parse(
+                                    javaModel, "firstperson_righthand"),
+                            io.kalo.model.bedrock.BedrockHoldAnimations.parse(
+                                    javaModel, "thirdperson_righthand"),
+                            shorthand,
+                            definition.bedrock().scale() != null
+                                    ? definition.bedrock().scale()
+                                    : autoHandScale(javaModel),
+                            definition.bedrock().rotation());
+            pack.file("animations/" + shorthand + ".animation.json",
+                    Json.writable(hold.json()));
             pack.file("models/entity/" + shorthand + ".geo.json", Json.writable(geometry));
-            pack.file("attachables/" + shorthand + ".json",
-                    Json.writable(BedrockAttachable.heldItem(key, geometryId, modelTexture)));
-            registerItemTexture(icon, texture);
+            pack.file("attachables/" + shorthand + ".json", Json.writable(
+                    BedrockAttachable.heldItem(key, geometryId, modelTexture, Map.of(),
+                            hold.ids(), List.of())));
+            // The model's texture is a sheet of UV islands, not an icon. Copying it made
+            // every 3D item look like a circuit board in the Bedrock hotbar, so render the
+            // authored cubes instead and fall back to the sheet only if that fails.
+            byte[] rendered = JavaModelIcon.render(javaModel, custom, javaSource);
+            if (rendered != null) {
+                pack.file("textures/items/" + icon + ".png", Writable.bytes(rendered));
+                registerItemAtlas(icon);
+            } else {
+                registerItemTexture(icon, texture);
+            }
             registerItem(definition, icon);
             // armorCount is the number of wearable armor pieces, not all attachables.
             return true;
@@ -322,11 +417,270 @@ public final class BedrockPackCompiler {
     }
 
     /**
+     * Compiles the Blockbench models named by `place.states[].model`. Each state is a
+     * normal Kalo item key; Java swaps the display stack and Bedrock swaps to the
+     * matching client entity.
+     */
+    private void addStateVariants(@NotNull ItemDefinition definition,
+                                  @NotNull String baseShorthand) {
+        if (definition.placement() == null || definition.placement().states().isEmpty()) {
+            return;
+        }
+        int index = 0;
+        for (var state : definition.placement().states()) {
+            index++;
+            if (state.model() == null || state.model().equals(definition.key())) {
+                continue;
+            }
+            Item variant = itemIndex.get(state.model());
+            if (variant == null
+                    || !(variant.definition().model() instanceof ModelDefinition.Blockbench blockbench)) {
+                LOGGER.warning("Placed model " + definition.key() + " state " + index
+                        + " names " + state.model() + ", which is not a registered Blockbench item");
+                continue;
+            }
+            try {
+                io.kalo.model.ModelIR model = io.kalo.model.ModelRegistry.load(javaSource,
+                        blockbench.source());
+                String stem = baseShorthand + "_state" + index;
+                String entityId = "kalo:model_" + sanitize(stem);
+                String geometryId = "geometry.kalo." + sanitize(stem) + ".placed";
+                io.kalo.model.bedrock.BedrockModelCompiler.Result compiled =
+                        io.kalo.model.bedrock.BedrockModelCompiler.compile(model, geometryId,
+                                blockbench.textures(), variant.key().namespace(), stem);
+                if (!compiled.compiled()) {
+                    LOGGER.warning("Could not compile placed-model state " + state.model()
+                            + ": " + compiled.errorSummary());
+                    continue;
+                }
+                boolean missing = false;
+                for (ModelTextureResolver.ResolvedTexture texture : compiled.textures()) {
+                    if (texture.embeddedPng() == null
+                            && javaSource.file(texturePath(texture.key())) == null) {
+                        missing = true;
+                        break;
+                    }
+                }
+                if (missing) {
+                    continue;
+                }
+
+                Map<String, String> materials = new TreeMap<>();
+                for (ModelTextureResolver.ResolvedTexture texture : compiled.textures()) {
+                    String destination = "textures/items/" + stem + "_" + texture.material();
+                    materials.put(texture.material(), destination);
+                    if (texture.embeddedPng() != null) {
+                        pack.file(destination + ".png", Writable.bytes(texture.embeddedPng()));
+                    } else {
+                        copyTexture(texture.key(), destination + ".png");
+                    }
+                }
+                if (materials.isEmpty()) {
+                    continue;
+                }
+                String defaultTexture = materials.values().iterator().next();
+
+                pack.file("models/entity/" + stem + "_placed.geo.json",
+                        Json.writable(compiled.geometry()));
+                if (compiled.animations() != null) {
+                    pack.file("animations/" + stem + ".animation.json",
+                            Json.writable(compiled.animations()));
+                }
+                Map<String, String> animations = new TreeMap<>();
+                compiled.animationIds().forEach((name, id) -> {
+                    if (!name.startsWith("hold_")) {
+                        animations.put(name, id);
+                    }
+                });
+                List<String> loops = new ArrayList<>(compiled.loopAnimations());
+                loops.removeIf(name -> name.startsWith("hold_"));
+                writeControllers(stem, compiled, loops);
+                JsonObject entity = placedEntity(entityId, geometryId, defaultTexture,
+                        materials, animations, loops);
+                pack.file("entity/" + stem + ".entity.json", Json.writable(entity));
+                placedModels.add(new BedrockPlacedModelRegistration(variant.key(), entityId,
+                        geometryId, defaultTexture, animations, loops,
+                        state.scale() != null ? state.scale() : definition.placement().scale()));
+            } catch (Exception error) {
+                LOGGER.warning("Could not compile placed-model state " + state.model()
+                        + ": " + error.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Compiles a Blockbench source directly from the shared IR. The outliner becomes
+     * Bedrock bones; unlike {@link #addCustomItem}, this path never flattens the hierarchy
+     * through a Java model first.
+     */
+    private boolean addBlockbenchItem(@NotNull ItemDefinition definition,
+                                      @NotNull ModelDefinition.Blockbench blockbench) {
+        Key key = definition.key();
+        String shorthand = key.namespace() + "_" + key.value();
+        try {
+            io.kalo.model.ModelIR model = io.kalo.model.ModelRegistry.load(javaSource,
+                    blockbench.source());
+            String geometryId = BedrockGeometry.identifierFor(key.namespace(), key.value());
+            io.kalo.model.bedrock.BedrockModelCompiler.Result compiled =
+                    io.kalo.model.bedrock.BedrockModelCompiler.compile(model, geometryId,
+                            blockbench.textures(), key.namespace(), shorthand);
+            io.kalo.model.ModelDiagnostics.log(LOGGER,
+                    "Bedrock Blockbench model for " + key.asString(), compiled.diagnostics());
+            if (!compiled.compiled()) {
+                return false;
+            }
+
+            // Preflight every source image before writing geometry or publishing a mapping.
+            for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                    : compiled.textures()) {
+                if (texture.embeddedPng() == null
+                        && javaSource.file(texturePath(texture.key())) == null) {
+                    return false;
+                }
+            }
+
+            String icon = definition.bedrock().iconOverride() != null
+                    ? definition.bedrock().iconOverride() : shorthand;
+            Map<String, String> materialPaths = new TreeMap<>();
+            Set<Key> written = new HashSet<>();
+            String firstTexturePath = null;
+            for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                    : compiled.textures()) {
+                String destination = "textures/items/" + shorthand + "_" + texture.material();
+                materialPaths.put(texture.material(), destination);
+                if (firstTexturePath == null) {
+                    firstTexturePath = destination;
+                }
+                if (written.add(texture.key())) {
+                    if (texture.embeddedPng() != null) {
+                        pack.file(destination + ".png", Writable.bytes(texture.embeddedPng()));
+                    } else {
+                        copyTexture(texture.key(), destination + ".png");
+                    }
+                }
+            }
+            if (materialPaths.isEmpty()) {
+                return false;
+            }
+            if (!materialPaths.containsKey("default")) {
+                materialPaths.put("default", firstTexturePath);
+            }
+
+            // A 3D item uses a rendered isometric preview, not its first texture, for the
+            // flat Bedrock inventory icon. The model's own material paths stay separate.
+            byte[] renderedIcon = BedrockModelIcon.render(model, compiled.textures(),
+                    javaSource);
+            if (renderedIcon != null) {
+                pack.file("textures/items/" + icon + ".png", Writable.bytes(renderedIcon));
+            } else {
+                ModelTextureResolver.ResolvedTexture first = compiled.textures().getFirst();
+                if (first.embeddedPng() != null) {
+                    pack.file("textures/items/" + icon + ".png",
+                            Writable.bytes(first.embeddedPng()));
+                } else {
+                    copyTexture(first.key(), "textures/items/" + icon + ".png");
+                }
+            }
+
+            JsonObject geometry = compiled.geometry().deepCopy();
+            addItemBinding(geometry);
+            pack.file("models/entity/" + shorthand + ".geo.json", Json.writable(geometry));
+            if (compiled.animations() != null) {
+                pack.file("animations/" + shorthand + ".animation.json",
+                        Json.writable(compiled.animations()));
+            }
+            List<String> heldLoops = new ArrayList<>(compiled.loopAnimations());
+            writeControllers(shorthand, compiled, heldLoops);
+            pack.file("attachables/" + shorthand + ".json", Json.writable(
+                    BedrockAttachable.heldItem(key, geometryId,
+                            materialPaths.get("default"), materialPaths,
+                            compiled.animationIds(), heldLoops)));
+
+            registerItemAtlas(icon);
+            registerItem(definition, icon);
+            addStateVariants(definition, shorthand);
+
+            if (definition.placement() != null) {
+                String placedGeometryId = geometryId + ".placed";
+                JsonObject placedGeometry = compiled.geometry().deepCopy();
+                placedGeometry.getAsJsonArray("minecraft:geometry").get(0)
+                        .getAsJsonObject().getAsJsonObject("description")
+                        .addProperty("identifier", placedGeometryId);
+                pack.file("models/entity/" + shorthand + "_placed.geo.json",
+                        Json.writable(placedGeometry));
+
+                Map<String, String> animations = new TreeMap<>();
+                compiled.animationIds().forEach((name, id) -> {
+                    if (!name.startsWith("hold_")) {
+                        animations.put(name, id);
+                    }
+                });
+                List<String> loops = new ArrayList<>(compiled.loopAnimations());
+                loops.removeIf(name -> name.startsWith("hold_"));
+                writeControllers(shorthand, compiled, loops);
+                String idle = definition.placement().idleAnimation();
+                if (idle != null && !idle.isBlank()) {
+                    String wanted = idle.toLowerCase(java.util.Locale.ROOT)
+                            .replaceAll("[^a-z0-9_]+", "_");
+                    if (animations.containsKey(wanted)) {
+                        loops = List.of(wanted);
+                    } else {
+                        LOGGER.warning("Placed model " + definition.key()
+                                + " asks for idle animation '" + idle
+                                + "', which is not authored; loops remain " + loops);
+                    }
+                }
+
+                String entityId = "kalo:model_" + sanitize(shorthand);
+                JsonObject entity = placedEntity(entityId, placedGeometryId,
+                        materialPaths.get("default"), materialPaths, animations, loops);
+                pack.file("entity/" + shorthand + ".entity.json", Json.writable(entity));
+                placedModels.add(new BedrockPlacedModelRegistration(key, entityId,
+                        placedGeometryId, materialPaths.get("default"),
+                        animations, loops, definition.placement().scale()));
+            }
+            return true;
+        } catch (Exception error) {
+            LOGGER.warning("Cannot convert Bedrock Blockbench item " + definition.key()
+                    + ": " + error.getMessage());
+            return false;
+        }
+    }
+
+    /** Bedrock attaches a held model to one root bone via the item-slot binding. */
+    private static void addItemBinding(@NotNull JsonObject geometry) {
+        JsonArray geometries = geometry.getAsJsonArray("minecraft:geometry");
+        if (geometries == null || geometries.isEmpty()) {
+            return;
+        }
+        JsonArray bones = geometries.get(0).getAsJsonObject().getAsJsonArray("bones");
+        if (bones == null) {
+            return;
+        }
+        for (JsonElement element : bones) {
+            JsonObject bone = element.getAsJsonObject();
+            if (!bone.has("parent")) {
+                bone.addProperty("binding", "q.item_slot_to_bone_name(context.item_slot)");
+                return;
+            }
+        }
+        if (!bones.isEmpty()) {
+            bones.get(0).getAsJsonObject().addProperty("binding",
+                    "q.item_slot_to_bone_name(context.item_slot)");
+        }
+    }
+
+    /** {@code assets/<ns>/textures/<value>.png} in the source Java pack. */
+    private static @NotNull String texturePath(@NotNull Key key) {
+        return "assets/" + key.namespace() + "/textures/" + key.value() + ".png";
+    }
+
+    /**
      * Resolve texture aliases from a Java model and Kalo's authored texture overrides.
      * Only one actual texture sheet can be represented without rebuilding the UV atlas.
      */
-    private static @Nullable Key singleSheet(@NotNull ModelDefinition.Custom custom,
-                                              @NotNull JsonObject javaModel) {
+    static @Nullable Key singleSheet(@NotNull ModelDefinition.Custom custom,
+                                             @NotNull JsonObject javaModel) {
         Map<String, String> modelTextures = new TreeMap<>();
         JsonObject textures = javaModel.getAsJsonObject("textures");
         if (textures != null) {
@@ -393,13 +747,17 @@ public final class BedrockPackCompiler {
      * the texture is copied to a flat location and registered here.
      */
     private void registerItemTexture(@NotNull String icon, @NotNull Key texture) {
+        registerItemAtlas(icon);
+        copyTexture(texture, "textures/items/" + icon + ".png");
+    }
+
+    /** Adds the atlas alias without copying; used when the caller already wrote the PNG. */
+    private void registerItemAtlas(@NotNull String icon) {
         JsonArray paths = new JsonArray();
         paths.add("textures/items/" + icon);
         JsonObject entry = new JsonObject();
         entry.add("textures", paths);
         textureData.add(icon, entry);
-
-        copyTexture(texture, "textures/items/" + icon + ".png");
     }
 
     /**
@@ -455,10 +813,21 @@ public final class BedrockPackCompiler {
                 javaItem, bedrockId, key.asString(), iconKey, displayName, 64, null, false));
 
         registerItemTexture(iconKey, icon);
+        byte[] renderedIcon = renderedBlockIcons.remove(shorthand);
+        if (renderedIcon != null) {
+            pack.file("textures/items/" + iconKey + ".png", Writable.bytes(renderedIcon));
+            return;
+        }
+        byte[] embeddedIcon = embeddedBlockIcons.remove(shorthand);
+        if (embeddedIcon != null) {
+            // The flat item icon comes from the same first texture; an embedded source is
+            // not present in the Java pack's asset tree, so write it from the IR bytes.
+            pack.file("textures/items/" + iconKey + ".png", Writable.bytes(embeddedIcon));
+        }
     }
 
     /** The face a block's flat inventory icon is drawn from. */
-    private static @Nullable Key iconTextureFor(@NotNull BlockDefinition definition) {
+    private @Nullable Key iconTextureFor(@NotNull BlockDefinition definition) {
         return switch (definition.model()) {
             case BlockModelDefinition.CubeAll cubeAll -> cubeAll.texture();
             case BlockModelDefinition.Cube cube -> cubeFaceTexture(cube.faces(), "up");
@@ -469,7 +838,228 @@ public final class BedrockPackCompiler {
                 Map<String, Key> sorted = new TreeMap<>(custom.textures());
                 yield sorted.containsKey("all") ? sorted.get("all") : sorted.values().iterator().next();
             }
+            case BlockModelDefinition.Blockbench ignored -> {
+                BlockbenchBlockAssets assets = blockbenchBlocks.get(definition.key().asString());
+                yield assets == null ? null : assets.icon();
+            }
         };
+    }
+
+    /** Adds emote props: geometry, animations and a registered client entity. */
+    public void addEmotes(@NotNull Iterable<? extends io.kalo.content.emote.Emote> emotes,
+                          @NotNull java.util.Set<String> skip) {
+        for (io.kalo.content.emote.Emote emote : emotes) {
+            io.kalo.content.emote.EmoteDefinition definition = emote.definition();
+            if (definition.bedrock().enabled() && !skip.contains(definition.key().asString())) {
+                Key previousOwner = pack.owner(definition.key());
+                try {
+                    addRig(definition.key(), emoteModel(definition), "kalo:emote_", "_emote",
+                            definition.rig() == io.kalo.content.emote.EmoteDefinition.RigMode.PLAYER);
+                } finally {
+                    pack.owner(previousOwner);
+                }
+            }
+        }
+    }
+
+    /** Adds vehicles: geometry, animations and a registered client entity. */
+    public void addVehicles(@NotNull Iterable<? extends io.kalo.content.vehicle.Vehicle> vehicles,
+                            @NotNull java.util.Set<String> skip) {
+        for (io.kalo.content.vehicle.Vehicle vehicle : vehicles) {
+            io.kalo.content.vehicle.VehicleDefinition definition = vehicle.definition();
+            if (definition.bedrock().enabled() && !skip.contains(definition.key().asString())) {
+                Key previousOwner = pack.owner(definition.key());
+                try {
+                    addRig(definition.key(), definition.model(), "kalo:vehicle_", "_vehicle",
+                            false);
+                } finally {
+                    pack.owner(previousOwner);
+                }
+            }
+        }
+    }
+
+    private static @NotNull ModelDefinition emoteModel(
+            @NotNull io.kalo.content.emote.EmoteDefinition definition) {
+        if (!(definition.model() instanceof ModelDefinition.Blockbench blockbench)
+                || definition.skin() == null) {
+            return definition.model();
+        }
+        Map<String, Key> textures = new TreeMap<>(blockbench.textures());
+        textures.putIfAbsent("0", definition.skin());
+        return new ModelDefinition.Blockbench(blockbench.source(), textures);
+    }
+
+    /** Adds Bedrock client-entity assets for each VFX layer. */
+    public void addVfx(@NotNull Iterable<VfxDefinition> definitions) {
+        for (VfxDefinition definition : definitions) {
+            Key previous = pack.owner(definition.key());
+            try {
+                rigs.addAll(BedrockVfxCompiler.compile(javaSource, pack, List.of(definition),
+                        key -> {
+                            Item item = itemIndex.get(key);
+                            return item == null ? null : item.definition().model();
+                        }));
+            } finally {
+                pack.owner(previous);
+            }
+        }
+    }
+
+    private void addRig(@NotNull Key key,
+                        @NotNull ModelDefinition modelDefinition,
+                        @NotNull String identifierPrefix,
+                        @NotNull String fileSuffix,
+                        boolean playerAttachable) {
+        if (!(modelDefinition instanceof ModelDefinition.Blockbench blockbench)) {
+            return;
+        }
+        String shorthand = key.namespace() + "_" + key.value() + fileSuffix;
+        try {
+            io.kalo.model.ModelIR model = io.kalo.model.ModelRegistry.load(javaSource,
+                    blockbench.source());
+            String entityId = identifierPrefix + sanitize(shorthand);
+            String geometryId = BedrockGeometry.identifierFor(key.namespace(),
+                    key.value() + fileSuffix);
+            io.kalo.model.bedrock.BedrockModelCompiler.Result compiled =
+                    io.kalo.model.bedrock.BedrockModelCompiler.compileEntity(model,
+                            geometryId, blockbench.textures(), key.namespace(), shorthand);
+            io.kalo.model.ModelDiagnostics.log(LOGGER,
+                    "Bedrock rig " + key.asString(), compiled.diagnostics());
+            if (!compiled.compiled()) {
+                LOGGER.warning("Rig model for " + key.asString()
+                        + " did not compile for Bedrock: " + compiled.errorSummary());
+                return;
+            }
+            Map<String, String> textures = new TreeMap<>();
+            for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                    : compiled.textures()) {
+                String destination = "textures/entity/" + shorthand + "_"
+                        + texture.material();
+                if (texture.embeddedPng() != null) {
+                    pack.file(destination + ".png", Writable.bytes(texture.embeddedPng()));
+                } else if (javaSource.file(texturePath(texture.key())) != null) {
+                    pack.file(destination + ".png", javaSource.file(texturePath(texture.key())));
+                } else {
+                    LOGGER.warning("Rig texture " + texture.key().asString()
+                            + " is missing from the pack");
+                    return;
+                }
+                textures.put(texture.material(), destination);
+            }
+            if (textures.isEmpty()) {
+                return;
+            }
+            pack.file("models/entity/" + shorthand + ".geo.json",
+                    Json.writable(compiled.geometry()));
+            Map<String, String> animations = new TreeMap<>();
+            if (compiled.animationIds() != null) {
+                compiled.animationIds().forEach(animations::put);
+            }
+            List<String> loops = new ArrayList<>(compiled.loopAnimations());
+            writeControllers(shorthand, compiled, loops);
+            if (compiled.animations() != null) {
+                pack.file("animations/" + shorthand + ".animation.json",
+                        Json.writable(compiled.animations()));
+            }
+            JsonObject entity = placedEntity(entityId, geometryId,
+                    textures.values().iterator().next(), textures, animations, loops);
+            pack.file("entity/" + shorthand + ".entity.json", Json.writable(entity));
+            if (playerAttachable) {
+                pack.file("attachables/" + shorthand + ".json", Json.writable(
+                        BedrockAttachable.playerEmote(key, geometryId,
+                                textures.values().iterator().next(), textures,
+                                animations, loops)));
+            }
+            rigs.add(new BedrockRigRegistration(key, entityId));
+        } catch (Exception error) {
+            LOGGER.warning("Cannot convert Bedrock rig " + key.asString() + ": "
+                    + error.getMessage());
+        }
+    }
+
+    /**
+     * Adds custom mobs: geometry, animations and a client entity registered with Geyser.
+     * Mobs without a Blockbench model keep the base mob's vanilla appearance.
+     */
+    public void addMobs(@NotNull Iterable<? extends io.kalo.content.mob.Mob> mobsToAdd,
+                        @NotNull java.util.Set<String> skip) {
+        for (io.kalo.content.mob.Mob mob : mobsToAdd) {
+            io.kalo.content.mob.MobDefinition definition = mob.definition();
+            if (!definition.bedrock().enabled()
+                    || skip.contains(definition.key().asString())) {
+                continue;
+            }
+            if (!(definition.model() instanceof ModelDefinition.Blockbench blockbench)) {
+                continue;
+            }
+            Key key = definition.key();
+            Key previousOwner = pack.owner(key);
+            try {
+            String shorthand = key.namespace() + "_" + key.value();
+            try {
+                io.kalo.model.ModelIR model = io.kalo.model.ModelRegistry.load(javaSource,
+                        blockbench.source());
+                String entityId = "kalo:mob_" + sanitize(shorthand);
+                String geometryId = BedrockGeometry.identifierFor(key.namespace(),
+                        key.value() + "_mob");
+                io.kalo.model.bedrock.BedrockModelCompiler.Result compiled =
+                        io.kalo.model.bedrock.BedrockModelCompiler.compileEntity(model,
+                                geometryId, blockbench.textures(), key.namespace(),
+                                shorthand + "_mob");
+                io.kalo.model.ModelDiagnostics.log(LOGGER,
+                        "Bedrock mob " + key.asString(), compiled.diagnostics());
+                if (!compiled.compiled()) {
+                    LOGGER.warning("Mob model for " + key.asString()
+                            + " did not compile for Bedrock: " + compiled.errorSummary());
+                    continue;
+                }
+                Map<String, String> textures = new TreeMap<>();
+                boolean missing = false;
+                for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                        : compiled.textures()) {
+                    String destination = "textures/entity/" + shorthand + "_"
+                            + texture.material();
+                    if (texture.embeddedPng() != null) {
+                        pack.file(destination + ".png",
+                                Writable.bytes(texture.embeddedPng()));
+                    } else if (javaSource.file(texturePath(texture.key())) != null) {
+                        pack.file(destination + ".png",
+                                javaSource.file(texturePath(texture.key())));
+                    } else {
+                        missing = true;
+                        break;
+                    }
+                    textures.put(texture.material(), destination);
+                }
+                if (missing || textures.isEmpty()) {
+                    continue;
+                }
+                pack.file("models/entity/" + shorthand + "_mob.geo.json",
+                        Json.writable(compiled.geometry()));
+                Map<String, String> animations = new TreeMap<>();
+                if (compiled.animationIds() != null) {
+                    compiled.animationIds().forEach(animations::put);
+                }
+                List<String> loops = new ArrayList<>(compiled.loopAnimations());
+                writeControllers(shorthand + "_mob", compiled, loops);
+                if (compiled.animations() != null) {
+                    pack.file("animations/" + shorthand + "_mob.animation.json",
+                            Json.writable(compiled.animations()));
+                }
+                JsonObject entity = placedEntity(entityId, geometryId,
+                        textures.values().iterator().next(), textures, animations, loops);
+                pack.file("entity/" + shorthand + "_mob.entity.json",
+                        Json.writable(entity));
+                mobs.add(new BedrockMobRegistration(key, entityId, animations, loops));
+            } catch (Exception error) {
+                LOGGER.warning("Cannot convert Bedrock mob " + key.asString() + ": "
+                        + error.getMessage());
+            }
+            } finally {
+                pack.owner(previousOwner);
+            }
+        }
     }
 
     /**
@@ -483,8 +1073,14 @@ public final class BedrockPackCompiler {
     public void addArmor(@NotNull Iterable<? extends io.kalo.content.armor.Armor> armors) {
         for (io.kalo.content.armor.Armor armor : armors) {
             io.kalo.content.armor.ArmorDefinition definition = armor.armorDefinition();
+            Key previousOwner = pack.owner(definition.key());
+            try {
 
             if (!definition.item().bedrock().enabled()) {
+                continue;
+            }
+            if (definition.armorModel() != null && addWornArmor(definition)) {
+                attachables++;
                 continue;
             }
             io.kalo.content.armor.ArmorDefinition.EquipmentTexture equipment = definition.equipment();
@@ -510,6 +1106,87 @@ public final class BedrockPackCompiler {
                     BedrockAttachable.texturePath(textureName, layer) + ".png");
 
             attachables++;
+            } finally {
+                pack.owner(previousOwner);
+            }
+        }
+    }
+
+    /**
+     * Compiles a Blockbench worn model: geometry + animations + an attachable bound to
+     * the vanilla armor bones. The model must be authored in Bedrock entity/wearer space
+     * (feet at y=0, X/Z centred), which is why this uses the entity-space compiler.
+     */
+    private boolean addWornArmor(
+            @NotNull io.kalo.content.armor.ArmorDefinition definition) {
+        Key key = definition.key();
+        io.kalo.content.armor.ArmorDefinition.ArmorModel worn = definition.armorModel();
+        String shorthand = key.namespace() + "_" + key.value();
+        try {
+            io.kalo.model.ModelIR model = io.kalo.model.ModelRegistry.load(javaSource,
+                    worn.source());
+            String geometryId = BedrockGeometry.identifierFor(key.namespace(),
+                    key.value() + "_armor");
+            io.kalo.model.bedrock.BedrockModelCompiler.Result compiled =
+                    io.kalo.model.bedrock.BedrockModelCompiler.compileEntity(model,
+                            geometryId, worn.textures(), key.namespace(), shorthand + "_armor");
+            io.kalo.model.ModelDiagnostics.log(LOGGER,
+                    "Bedrock worn armor " + key.asString(), compiled.diagnostics());
+            if (!compiled.compiled()) {
+                LOGGER.warning("Worn armor model for " + key.asString()
+                        + " did not compile for Bedrock: " + compiled.errorSummary());
+                return false;
+            }
+            Map<String, String> textures = new TreeMap<>();
+            for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                    : compiled.textures()) {
+                String destination = "textures/models/armor/" + shorthand + "_"
+                        + texture.material();
+                if (texture.embeddedPng() != null) {
+                    pack.file(destination + ".png", Writable.bytes(texture.embeddedPng()));
+                } else if (javaSource.file(texturePath(texture.key())) != null) {
+                    pack.file(destination + ".png",
+                            javaSource.file(texturePath(texture.key())));
+                } else {
+                    LOGGER.warning("Worn armor texture " + texture.key().asString()
+                            + " is missing from the pack");
+                    return false;
+                }
+                textures.put(texture.material(), destination);
+            }
+            if (textures.isEmpty()) {
+                return false;
+            }
+            Map<String, String> animations = new TreeMap<>();
+            if (compiled.animationIds() != null) {
+                compiled.animationIds().forEach((name, id) -> {
+                    if (!name.startsWith("hold_")) {
+                        animations.put(name, id);
+                    }
+                });
+            }
+            List<String> loops = new ArrayList<>();
+            for (String loop : compiled.loopAnimations()) {
+                if (!loop.startsWith("hold_")) {
+                    loops.add(loop);
+                }
+            }
+            writeControllers(shorthand + "_armor", compiled, loops);
+            pack.file("models/armor/" + shorthand + ".geo.json",
+                    Json.writable(compiled.geometry()));
+            if (compiled.animations() != null) {
+                pack.file("animations/" + shorthand + "_armor.animation.json",
+                        Json.writable(compiled.animations()));
+            }
+            pack.file(BedrockAttachable.attachablePath(key), Json.writable(
+                    BedrockAttachable.wornModel(definition, geometryId,
+                            textures.values().iterator().next(), textures,
+                            animations, loops)));
+            return true;
+        } catch (Exception error) {
+            LOGGER.warning("Cannot convert worn armor model " + key.asString() + ": "
+                    + error.getMessage());
+            return false;
         }
     }
 
@@ -559,12 +1236,24 @@ public final class BedrockPackCompiler {
             }
 
             Key key = definition.key();
+            Key previousOwner = pack.owner(key);
+            try {
             // Geyser namespaces every custom block it registers itself, and a
             // custom_mappings file cannot override that, so the identifier is built the
             // one way both registration paths can agree on. The pack's blocks.json is
             // keyed by it, so a mismatch renders the block untextured.
             String shorthand = key.namespace() + "_" + key.value();
             String bedrockId = BedrockBlockRegistration.identifierFor(shorthand);
+
+            if (definition.model() instanceof BlockModelDefinition.Blockbench blockbench) {
+                BlockbenchBlockAssets assets = compileBlockbenchBlock(definition, blockbench,
+                        shorthand);
+                if (assets == null) {
+                    skipped++;
+                    continue;
+                }
+                blockbenchBlocks.put(key.asString(), assets);
+            }
 
             JsonElement textures = blockTextures(definition, shorthand);
             if (textures == null) {
@@ -607,16 +1296,149 @@ public final class BedrockPackCompiler {
                     ? Float.MAX_VALUE
                     : definition.behaviour().hardness();
             record.addProperty("hardness", hardness);
-            String geometry = definition.model() instanceof BlockModelDefinition.Custom
-                    ? BedrockGeometry.identifierFor(key.namespace(), key.value())
-                    : "minecraft:geometry.full_block";
+            String geometry = switch (definition.model()) {
+                case BlockModelDefinition.Custom ignored ->
+                        BedrockGeometry.identifierFor(key.namespace(), key.value());
+                case BlockModelDefinition.Blockbench ignored ->
+                        blockbenchBlocks.get(key.asString()).geometryIdentifier();
+                default -> "minecraft:geometry.full_block";
+            };
             record.addProperty("geometry", geometry);
             mappedBlocks.add(record);
             blockRegistrations.add(new BedrockBlockRegistration(
                     key.asString(), bedrockId, javaIdentifier, geometry, displayName,
                     hardness, materials));
             addBlockItem(definition, shorthand);
+            } finally {
+                pack.owner(previousOwner);
+            }
         }
+    }
+
+    /**
+     * Compiles a Blockbench block once. Textures/geometry are written by
+     * {@link #blockTextures} after all sources have been preflighted.
+     */
+    private @Nullable BlockbenchBlockAssets compileBlockbenchBlock(
+            @NotNull BlockDefinition definition,
+            @NotNull BlockModelDefinition.Blockbench blockbench,
+            @NotNull String shorthand) {
+        Key key = definition.key();
+        try {
+            io.kalo.model.ModelIR model = io.kalo.model.ModelRegistry.load(javaSource,
+                    blockbench.source());
+            String identifier = BedrockGeometry.identifierFor(key.namespace(), key.value());
+            io.kalo.model.bedrock.BedrockModelCompiler.Result compiled =
+                    io.kalo.model.bedrock.BedrockModelCompiler.compile(model, identifier,
+                            blockbench.textures(), key.namespace(), shorthand);
+            io.kalo.model.ModelDiagnostics.log(LOGGER,
+                    "Bedrock Blockbench block " + key.asString(), compiled.diagnostics());
+            if (!compiled.compiled()) {
+                return null;
+            }
+            for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                    : compiled.textures()) {
+                if (texture.embeddedPng() == null
+                        && javaSource.file(texturePath(texture.key())) == null) {
+                    return null;
+                }
+            }
+            // Bedrock animation is delivered through a client entity, and the entity is
+            // only spawned for display-backed (virtual) blocks. An explicitly native
+            // block stays a static block on both platforms. Hold poses are synthesized
+            // for every model, so a block is only animated when it has an authored loop.
+            Map<String, String> animations = new TreeMap<>();
+            List<String> loops = new ArrayList<>();
+            if (compiled.animationIds() != null) {
+                compiled.animationIds().forEach((name, id) -> {
+                    if (!name.startsWith("hold_")) {
+                        animations.put(name, id);
+                    }
+                });
+            }
+            for (String loop : compiled.loopAnimations()) {
+                if (!loop.startsWith("hold_")) {
+                    loops.add(loop);
+                }
+            }
+            boolean animated = definition.java().mode() == JavaBlockMode.VIRTUAL
+                    && compiled.animations() != null
+                    && (!loops.isEmpty() || !compiled.controllerIds().isEmpty());
+            Map<String, String> entityTextures = new TreeMap<>();
+            if (animated) {
+                // Bedrock block geometry is static. The visible mesh becomes a client
+                // entity, so its textures live under entity/ rather than the terrain atlas.
+                for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                        : compiled.textures()) {
+                    String destination = "textures/entity/" + shorthand + "_"
+                            + texture.material();
+                    if (texture.embeddedPng() != null) {
+                        pack.file(destination + ".png", Writable.bytes(texture.embeddedPng()));
+                    } else {
+                        copyTexture(texture.key(), destination + ".png");
+                    }
+                    entityTextures.put(texture.material(), destination);
+                }
+                JsonObject blockAnimations = compiled.animations().deepCopy();
+                JsonObject table = blockAnimations.getAsJsonObject("animations");
+                if (table != null) {
+                    for (String id : List.copyOf(table.keySet())) {
+                        if (id.endsWith(".hold_first_person")
+                                || id.endsWith(".hold_third_person")) {
+                            table.remove(id);
+                        }
+                    }
+                }
+                pack.file("animations/" + shorthand + "_block.animation.json",
+                        Json.writable(blockAnimations));
+                writeControllers(shorthand + "_block", compiled, loops);
+                String entityId = "kalo:block_" + sanitize(shorthand);
+                JsonObject entity = placedEntity(entityId, identifier,
+                        entityTextures.values().iterator().next(), entityTextures,
+                        animations, loops);
+                pack.file("entity/" + shorthand + "_block.entity.json",
+                        Json.writable(entity));
+                animatedBlocks.add(new BedrockAnimatedBlockRegistration(key, entityId,
+                        animations, loops));
+            }
+            byte[] renderedIcon = BedrockModelIcon.render(model, compiled.textures(),
+                    javaSource);
+            if (renderedIcon != null) {
+                renderedBlockIcons.put(shorthand, renderedIcon);
+            }
+            Map<String, String> materials = new TreeMap<>();
+            Map<String, io.kalo.model.ModelTextureResolver.ResolvedTexture> byMaterial =
+                    new LinkedHashMap<>();
+            for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                    : compiled.textures()) {
+                materials.put(texture.material(), shorthand + "_" + texture.material());
+                byMaterial.putIfAbsent(texture.material(), texture);
+            }
+            if (materials.isEmpty()) {
+                return null;
+            }
+            io.kalo.model.ModelTextureResolver.ResolvedTexture icon = compiled.textures().getFirst();
+            if (icon.embeddedPng() != null) {
+                embeddedBlockIcons.put(shorthand, icon.embeddedPng());
+            }
+            return new BlockbenchBlockAssets(compiled.geometry(), identifier, materials,
+                    byMaterial, icon.key(), animated, Map.copyOf(entityTextures));
+        } catch (Exception error) {
+            LOGGER.warning("Cannot convert Bedrock Blockbench block " + definition.key()
+                    + ": " + error.getMessage());
+            return null;
+        }
+    }
+
+    private record BlockbenchBlockAssets(
+            @NotNull JsonObject geometry,
+            @NotNull String geometryIdentifier,
+            @NotNull Map<String, String> materials,
+            @NotNull Map<String, io.kalo.model.ModelTextureResolver.ResolvedTexture> textures,
+            @NotNull Key icon,
+            boolean animated,
+            @NotNull Map<String, String> entityTextures
+    ) {
     }
 
     /**
@@ -670,6 +1492,31 @@ public final class BedrockPackCompiler {
                 return new com.google.gson.JsonPrimitive(
                         shorthand + "_" + BedrockGeometry.materialName(fallbackSlot));
             }
+            case BlockModelDefinition.Blockbench ignored -> {
+                BlockbenchBlockAssets assets = blockbenchBlocks.get(definition.key().asString());
+                if (assets == null) {
+                    return null;
+                }
+                assets.textures().forEach((material, texture) -> {
+                    String terrainShorthand = assets.materials().get(material);
+                    if (assets.animated()) {
+                        // The client entity draws the visible mesh; keeping the block
+                        // surface transparent avoids drawing the model twice.
+                        registerTerrainTexture(terrainShorthand,
+                                BedrockTransparentTexture.png());
+                    } else if (texture.embeddedPng() != null) {
+                        registerTerrainTexture(terrainShorthand, texture.embeddedPng());
+                    } else {
+                        registerTerrainTexture(terrainShorthand, texture.key());
+                    }
+                });
+                Key key = definition.key();
+                pack.file("models/blocks/" + key.namespace() + "_" + key.value() + ".geo.json",
+                        Json.writable(assets.geometry()));
+                geometries.addProperty(key.asString(), assets.geometryIdentifier());
+                String fallback = assets.materials().values().iterator().next();
+                return new com.google.gson.JsonPrimitive(fallback);
+            }
         }
     }
 
@@ -680,7 +1527,7 @@ public final class BedrockPackCompiler {
      * absent texture makes Geyser fall back to the block identifier, which differs from
      * Kalo's underscore-separated atlas keys.</p>
      */
-    private static @NotNull Map<String, String> blockMaterialInstances(
+    private @NotNull Map<String, String> blockMaterialInstances(
             @NotNull BlockDefinition definition, @NotNull String shorthand) {
         Map<String, String> materials = new TreeMap<>();
         switch (definition.model()) {
@@ -696,6 +1543,12 @@ public final class BedrockPackCompiler {
                     String material = BedrockGeometry.materialName(slot);
                     materials.put(material, shorthand + "_" + material);
                 });
+            }
+            case BlockModelDefinition.Blockbench ignored -> {
+                BlockbenchBlockAssets assets = blockbenchBlocks.get(definition.key().asString());
+                if (assets != null) {
+                    materials.putAll(assets.materials());
+                }
             }
         }
         return Map.copyOf(materials);
@@ -766,6 +1619,13 @@ public final class BedrockPackCompiler {
         copyTexture(texture, "textures/blocks/" + shorthand + ".png");
     }
 
+    private void registerTerrainTexture(@NotNull String shorthand, byte @NotNull [] png) {
+        JsonObject entry = new JsonObject();
+        entry.addProperty("textures", "textures/blocks/" + shorthand);
+        terrainTextureData.add(shorthand, entry);
+        pack.file("textures/blocks/" + shorthand + ".png", Writable.bytes(png));
+    }
+
     /** Java names cube faces by direction; Bedrock uses up/down/side plus directions. */
     private static @NotNull String bedrockFace(@NotNull String javaFace) {
         return switch (javaFace) {
@@ -774,6 +1634,16 @@ public final class BedrockPackCompiler {
             case "all" -> "side";
             default -> javaFace;
         };
+    }
+
+    private void writeControllers(@NotNull String stem,
+                                  @NotNull io.kalo.model.bedrock.BedrockModelCompiler.Result compiled,
+                                  @NotNull List<String> autoAnimate) {
+        if (compiled.controllers() != null) {
+            pack.file("animation_controllers/" + stem + ".animation_controllers.json",
+                    Json.writable(compiled.controllers()));
+        }
+        autoAnimate.addAll(compiled.controllerIds());
     }
 
     /** Pulls a texture out of the Java pack, which already gathered every pack's assets. */
@@ -787,6 +1657,21 @@ public final class BedrockPackCompiler {
 
     /** Writes the files that describe the pack as a whole. Call once, after all adds. */
     public @NotNull Result finish() {
+        // Translate Java base-pack resources into Bedrock-native paths before atlas
+        // serialization. Custom item/block registrations below are still authoritative.
+        JavaAssetsBedrockTranslator.Report translation =
+                JavaAssetsBedrockTranslator.translate(javaSource, pack, textureData, terrainTextureData);
+        if (translation.textures() > 0 || translation.soundFiles() > 0 || translation.locales() > 0) {
+            LOGGER.info("Converted Java base assets for Bedrock: " + translation.textures()
+                    + " textures (" + translation.vanillaTextures() + " vanilla overrides), "
+                    + translation.soundFiles() + " sounds, " + translation.locales() + " language(s)");
+        }
+        if (translation.unsupportedAssets() > 0) {
+            LOGGER.warning(translation.unsupportedAssets()
+                    + " Java asset descriptor(s) still need specialized Bedrock conversion"
+                    + " or runtime Geyser item/block identity; examples: "
+                    + translation.unsupportedExamples());
+        }
         JsonObject itemTexture = new JsonObject();
         itemTexture.addProperty("resource_pack_name", "kalo");
         itemTexture.addProperty("texture_name", "atlas.items");
@@ -794,6 +1679,8 @@ public final class BedrockPackCompiler {
 
         pack.file("textures/item_texture.json", Json.writable(itemTexture));
         pack.file("manifest.json", Json.writable(manifest()));
+        pack.file(SessionContentManifest.PATH,
+                Json.writable(SessionContentManifest.json(pack.owners())));
 
         if (!blockDefinitions.isEmpty()) {
             JsonObject blocks = new JsonObject();
@@ -801,6 +1688,8 @@ public final class BedrockPackCompiler {
             blockDefinitions.entrySet().forEach(entry -> blocks.add(entry.getKey(), entry.getValue()));
             pack.file("blocks.json", Json.writable(blocks));
 
+        }
+        if (!terrainTextureData.isEmpty()) {
             JsonObject terrain = new JsonObject();
             terrain.addProperty("resource_pack_name", "kalo");
             terrain.addProperty("texture_name", "atlas.terrain");
@@ -817,10 +1706,12 @@ public final class BedrockPackCompiler {
         int itemDefinitions = mappedItems.entrySet().stream()
                 .mapToInt(entry -> entry.getValue().getAsJsonArray().size())
                 .sum();
-        return new Result(pack, Json.writable(itemMappings), Json.writable(blockMappings()),
+        return new Result(target, Json.writable(itemMappings), Json.writable(blockMappings()),
                 mappedItems.size(), itemDefinitions,
                 blockRegistrations.size(), attachables, skipped, generation,
-                List.copyOf(blockRegistrations), List.copyOf(itemRegistrations));
+                List.copyOf(blockRegistrations), List.copyOf(itemRegistrations),
+                List.copyOf(placedModels), List.copyOf(animatedBlocks),
+                List.copyOf(mobs), List.copyOf(rigs));
     }
 
     /**
@@ -835,41 +1726,9 @@ public final class BedrockPackCompiler {
      * because on Java they are an entity wearing a block's appearance.</p>
      */
     private @NotNull JsonObject blockMappings() {
-        JsonObject blocks = new JsonObject();
-        for (BedrockBlockRegistration registration : blockRegistrations) {
-            if (registration.javaIdentifier() == null) {
-                continue;
-            }
-
-            JsonObject entry = new JsonObject();
-            entry.addProperty("name", registration.bedrockName());
-            if (registration.displayName() != null) {
-                entry.addProperty("display_name", registration.displayName());
-            }
-            entry.addProperty("geometry", registration.geometry());
-            entry.addProperty("destructible_by_mining", registration.hardness());
-            // Obtained through Kalo's own items, so a second copy in the Bedrock creative
-            // menu would only be confusing.
-            entry.addProperty("included_in_creative_inventory", false);
-
-            JsonObject materials = new JsonObject();
-            registration.materialInstances().forEach((slot, texture) -> {
-                JsonObject instance = new JsonObject();
-                instance.addProperty("texture", texture);
-                instance.addProperty("render_method", "opaque");
-                instance.addProperty("face_dimming", true);
-                instance.addProperty("ambient_occlusion", true);
-                materials.add(slot, instance);
-            });
-            entry.add("material_instances", materials);
-
-            blocks.add(registration.javaIdentifier(), entry);
-        }
-
-        JsonObject mappings = new JsonObject();
-        mappings.addProperty("format_version", 1);
-        mappings.add("blocks", blocks);
-        return mappings;
+        // Keyed by plain Java block id with states under state_overrides; see
+        // GeyserBlockMappings for why the bracketed form is rejected by Geyser.
+        return io.kalo.platform.bedrock.GeyserBlockMappings.encode(blockRegistrations);
     }
 
     /**
@@ -891,11 +1750,138 @@ public final class BedrockPackCompiler {
                          int skippedCount,
                          @NotNull BedrockRegistrationSnapshot.Generation generation,
                          @NotNull List<BedrockBlockRegistration> registrations,
-                         @NotNull List<BedrockItemRegistration> itemRegistrations) {
+                         @NotNull List<BedrockItemRegistration> itemRegistrations,
+                         @NotNull List<BedrockPlacedModelRegistration> placedModels,
+                         @NotNull List<BedrockAnimatedBlockRegistration> animatedBlocks,
+                         @NotNull List<BedrockMobRegistration> mobs,
+                         @NotNull List<BedrockRigRegistration> rigs) {
         public Result {
             registrations = List.copyOf(registrations);
             itemRegistrations = List.copyOf(itemRegistrations);
+            placedModels = List.copyOf(placedModels);
+            animatedBlocks = List.copyOf(animatedBlocks);
+            mobs = List.copyOf(mobs);
+            rigs = List.copyOf(rigs);
         }
+    }
+
+    /**
+     * Largest model dimension, in model units (16 = one block).
+     *
+     * <p>Only used to keep an outlier from arriving in the hand at twice a block; a model
+     * that already fits is left exactly as its author drew it.</p>
+     */
+    static double modelSpan(@NotNull JsonObject model) {
+        com.google.gson.JsonArray elements = model.getAsJsonArray("elements");
+        if (elements == null) {
+            return 0;
+        }
+        double span = 0;
+        for (com.google.gson.JsonElement element : elements) {
+            if (!element.isJsonObject()) continue;
+            com.google.gson.JsonObject entry = element.getAsJsonObject();
+            com.google.gson.JsonArray from = entry.getAsJsonArray("from");
+            com.google.gson.JsonArray to = entry.getAsJsonArray("to");
+            if (from == null || to == null || from.size() < 3 || to.size() < 3) continue;
+            for (int axis = 0; axis < 3; axis++) {
+                span = Math.max(span, Math.abs(to.get(axis).getAsDouble()
+                        - from.get(axis).getAsDouble()));
+            }
+        }
+        return span;
+    }
+
+    /** A hand-held model larger than this (0.625 block) is scaled down automatically. */
+    private static final double MAX_HAND_UNITS = 10.0;
+
+    /**
+     * Base scale for a held model, or null when the author's own size already fits.
+     *
+     * <p>Java renders a held item at half the model's authored size; Bedrock has no such
+     * base, so the compiler supplies it. A model authored much larger than a vanilla item
+     * would still arrive oversized, so the base is reduced until the longest side fits
+     * {@link #MAX_HAND_UNITS}. Nothing is ever enlarged: a small model stays small.</p>
+     */
+    static @org.jetbrains.annotations.Nullable Double autoHandScale(@NotNull JsonObject model) {
+        double span = modelSpan(model);
+        if (span <= 0) {
+            return null;
+        }
+        double display = 1.0;
+        com.google.gson.JsonObject displaySection = model.getAsJsonObject("display");
+        if (displaySection != null && displaySection.has("thirdperson_righthand")) {
+            com.google.gson.JsonObject third =
+                    displaySection.getAsJsonObject("thirdperson_righthand");
+            if (third != null && third.has("scale")) {
+                com.google.gson.JsonArray scale = third.getAsJsonArray("scale");
+                if (scale != null && scale.size() == 3) {
+                    display = Math.max(scale.get(0).getAsDouble(),
+                            Math.max(scale.get(1).getAsDouble(), scale.get(2).getAsDouble()));
+                }
+            }
+        }
+        double effective = span * display * 0.5;
+        if (effective <= MAX_HAND_UNITS) {
+            return null;
+        }
+        return 0.5 * (MAX_HAND_UNITS / effective);
+    }
+
+    private static @NotNull String sanitize(@NotNull String value) {
+        String cleaned = value.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9_]+", "_")
+                .replaceAll("_{2,}", "_")
+                .replaceAll("^_+|_+$", "");
+        return cleaned.isBlank() ? "model" : cleaned;
+    }
+
+    static @NotNull JsonObject placedEntity(@NotNull String identifier,
+                                                    @NotNull String geometry,
+                                                    @NotNull String texture,
+                                                    @NotNull Map<String, String> materialPaths,
+                                                    @NotNull Map<String, String> animations,
+                                                    @NotNull List<String> loops) {
+        JsonObject materials = new JsonObject();
+        materials.addProperty("default", "entity_alphatest");
+        JsonObject textures = new JsonObject();
+        textures.addProperty("default", texture);
+        materialPaths.forEach((material, path) -> {
+            if (material.equals("default") || material.equals("enchanted")) {
+                return;
+            }
+            materials.addProperty(material, "entity_alphatest");
+            textures.addProperty(material, path);
+        });
+        JsonObject geometryRef = new JsonObject();
+        geometryRef.addProperty("default", geometry);
+
+        JsonObject description = new JsonObject();
+        description.addProperty("identifier", identifier);
+        description.add("materials", materials);
+        description.add("textures", textures);
+        description.add("geometry", geometryRef);
+        if (!animations.isEmpty()) {
+            JsonObject animationRefs = new JsonObject();
+            animations.forEach(animationRefs::addProperty);
+            description.add("animations", animationRefs);
+        }
+        if (!loops.isEmpty()) {
+            JsonArray animate = new JsonArray();
+            loops.forEach(animate::add);
+            JsonObject scripts = new JsonObject();
+            scripts.add("animate", animate);
+            description.add("scripts", scripts);
+        }
+        JsonArray controllers = new JsonArray();
+        controllers.add("controller.render.default");
+        description.add("render_controllers", controllers);
+
+        JsonObject body = new JsonObject();
+        body.add("description", description);
+        JsonObject entity = new JsonObject();
+        entity.addProperty("format_version", "1.10.0");
+        entity.add("minecraft:client_entity", body);
+        return entity;
     }
 
     private static @Nullable String plainName(@NotNull ItemDefinition definition) {
@@ -957,5 +1943,77 @@ public final class BedrockPackCompiler {
      */
     private static @NotNull String stableUuid(@NotNull String name) {
         return UUID.nameUUIDFromBytes(name.getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    /**
+     * Delegating pack that records which content key owns each file. The owning key is set
+     * around one content's compile pass; files written outside such a pass (manifests,
+     * atlases, translated base assets) stay ownerless and are always shared.
+     */
+    private static final class TrackedPack implements ResourcePack {
+        private final ResourcePack delegate;
+        private final Map<String, String> owners = new TreeMap<>();
+        private @Nullable Key owner;
+
+        private TrackedPack(@NotNull ResourcePack delegate) {
+            this.delegate = delegate;
+        }
+
+        /** Sets the current owner and returns the previous one for try/finally restore. */
+        private @Nullable Key owner(@Nullable Key next) {
+            Key previous = owner;
+            owner = next;
+            return previous;
+        }
+
+        private @NotNull Map<String, String> owners() {
+            return Map.copyOf(owners);
+        }
+
+        @Override
+        public void file(@NotNull String path, @NotNull Writable content) {
+            String normalized = normalize(path);
+            delegate.file(normalized, content);
+            if (owner == null) {
+                owners.remove(normalized);
+            } else {
+                owners.put(normalized, owner.asString());
+            }
+        }
+
+        @Override
+        public @Nullable Writable file(@NotNull String path) {
+            return delegate.file(path);
+        }
+
+        @Override
+        public boolean removeFile(@NotNull String path) {
+            String normalized = normalize(path);
+            owners.remove(normalized);
+            return delegate.removeFile(normalized);
+        }
+
+        @Override
+        public @NotNull Map<String, Writable> files() {
+            return delegate.files();
+        }
+
+        @Override
+        public @NotNull PackMeta meta() {
+            return delegate.meta();
+        }
+
+        @Override
+        public void meta(@NotNull PackMeta meta) {
+            delegate.meta(meta);
+        }
+
+        private static @NotNull String normalize(@NotNull String path) {
+            String normalized = path.replace('\\', '/');
+            while (normalized.startsWith("/")) {
+                normalized = normalized.substring(1);
+            }
+            return normalized;
+        }
     }
 }

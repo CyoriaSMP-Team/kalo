@@ -30,6 +30,41 @@ class PackValidatorTest {
     }
 
     @Test
+    void unqualifiedVanillaReferencesDoNotRequireBundledClientAssets() {
+        ResourcePack pack = pack();
+        pack.file("assets/testpack/models/item/example.json", Writable.string(
+                "{\"parent\":\"item/generated\",\"textures\":{\"layer0\":\"item/apple\"}}"));
+        pack.file("assets/minecraft/blockstates/example.json", Writable.string(
+                "{\"variants\":{\"\":{\"model\":\"block/chorus_plant\"}}}"));
+
+        assertEquals(List.of(), PackValidator.validate(pack));
+    }
+
+    @Test
+    void modelTextureVariablesAreNotFilePaths() {
+        ResourcePack pack = pack();
+        pack.file("assets/testpack/models/block/leaves.json", Writable.string(
+                "{\"textures\":{\"bottom\":\"testpack:block/leaves\"},"
+                        + "\"elements\":[{\"faces\":{\"north\":{\"texture\":\"#bottom\"}}}]}"));
+
+        assertEquals(List.of(), PackValidator.validate(pack));
+    }
+
+    @Test
+    void unqualifiedMinecraftReferencesDoNotHideMissingCustomNamespaceAssets() {
+        ResourcePack pack = pack();
+        pack.file("assets/testpack/models/item/ghost.json", Writable.string(
+                "{\"parent\":\"item/generated\",\"textures\":{\"layer0\":\"testpack:item/missing\"}}"));
+        pack.file("assets/testpack/items/ghost.json", Writable.string(
+                "{\"model\":{\"type\":\"model\",\"model\":\"testpack:item/gone\"}}"));
+
+        List<String> errors = PackValidator.validate(pack);
+        assertEquals(2, errors.size(), errors.toString());
+        assertTrue(errors.stream().anyMatch(v -> v.contains("testpack:item/missing")), errors.toString());
+        assertTrue(errors.stream().anyMatch(v -> v.contains("testpack:item/gone")), errors.toString());
+    }
+
+    @Test
     void aMissingTextureIsNamedWithTheFileThatWantedIt() {
         // The whole point: a typo used to be invisible until a player saw a magenta cube.
         ResourcePack pack = pack();

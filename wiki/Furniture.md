@@ -16,6 +16,10 @@ ruby_chair:
       barriers: [[0,0,0]]
 ```
 
+A `model.blockbench:` source is also accepted for static Blockbench cube models, for
+example `blockbench: "models/furniture/ruby_chair.bbmodel"`. See
+`docs/BLOCKBENCH.md` for the Java/Bedrock feature limits.
+
 ## Rotation
 
 Furniture can be rotated by players (sneak + right-click).
@@ -197,6 +201,6 @@ ruby_chair:
 
 [GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
 
-> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+> **Version:** 0.2.1-prealpha.16 • **License:** MIT • **Java:** 21 bytecode / 25 for 26.x runtime
 
 *Build once. Play everywhere.*

@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -78,23 +79,36 @@ public final class ZipPackWriter {
         }
     }
 
+    /** Serializes a small in-memory overlay pack without touching disk. */
+    public static byte @NotNull [] toBytes(@NotNull ResourcePack pack) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
+            writePack(zip, pack);
+        }
+        return buffer.toByteArray();
+    }
+
     private static void writeTo(@NotNull Path destination, @NotNull ResourcePack pack) throws IOException {
         try (OutputStream fileOut = Files.newOutputStream(destination);
              ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(fileOut))) {
+            writePack(zip, pack);
+        }
+    }
 
-            writeEntry(zip, "pack.mcmeta", Writable.string(packMetaJson(pack.meta())));
+    private static void writePack(@NotNull ZipOutputStream zip, @NotNull ResourcePack pack)
+            throws IOException {
+        writeEntry(zip, "pack.mcmeta", Writable.string(packMetaJson(pack.meta())));
 
-            // Sorted so entry order does not depend on map iteration order, for the same
-            // reproducibility reason as the fixed timestamps.
-            List<Map.Entry<String, Writable>> entries = new ArrayList<>(pack.files().entrySet());
-            entries.sort(Map.Entry.comparingByKey());
+        // Sorted so entry order does not depend on map iteration order, for the same
+        // reproducibility reason as the fixed timestamps.
+        List<Map.Entry<String, Writable>> entries = new ArrayList<>(pack.files().entrySet());
+        entries.sort(Map.Entry.comparingByKey());
 
-            for (Map.Entry<String, Writable> entry : entries) {
-                if (entry.getKey().equals("pack.mcmeta")) {
-                    continue; // generated from PackMeta above
-                }
-                writeEntry(zip, entry.getKey(), entry.getValue());
+        for (Map.Entry<String, Writable> entry : entries) {
+            if (entry.getKey().equals("pack.mcmeta")) {
+                continue; // generated from PackMeta above
             }
+            writeEntry(zip, entry.getKey(), entry.getValue());
         }
     }
 
@@ -117,14 +131,32 @@ public final class ZipPackWriter {
     }
 
     static @NotNull String packMetaJson(@NotNull PackMeta meta) {
-        JsonObject supportedFormats = new JsonObject();
-        supportedFormats.addProperty("min_inclusive", meta.minFormat());
-        supportedFormats.addProperty("max_inclusive", meta.maxFormat());
-
         JsonObject packSection = new JsonObject();
-        packSection.addProperty("pack_format", meta.format());
         packSection.addProperty("description", meta.description());
-        packSection.add("supported_formats", supportedFormats);
+
+        // Minecraft 1.21.9+ (resource format >=65) requires min_format and
+        // max_format. The old supported_formats field is INVALID for packs
+        // targeting only modern formats. Omitting min/max caused 1.21.11
+        // clients to reject the ENTIRE pack, including the ESC logo glyph.
+        if (meta.maxFormat() >= 65) {
+            com.google.gson.JsonArray min = new com.google.gson.JsonArray();
+            min.add(meta.minFormat());
+            min.add(0);
+            com.google.gson.JsonArray max = new com.google.gson.JsonArray();
+            max.add(meta.maxFormat());
+            max.add(0);
+            packSection.add("min_format", min);
+            packSection.add("max_format", max);
+        }
+        if (meta.minFormat() < 65) {
+            // Keep legacy metadata ONLY if the advertised range includes an
+            // actual pre-1.21.9 pack format. Mixed ranges carry both schemas.
+            JsonObject supportedFormats = new JsonObject();
+            supportedFormats.addProperty("min_inclusive", meta.minFormat());
+            supportedFormats.addProperty("max_inclusive", meta.maxFormat());
+            packSection.addProperty("pack_format", meta.format());
+            packSection.add("supported_formats", supportedFormats);
+        }
 
         JsonObject root = new JsonObject();
         root.add("pack", packSection);

@@ -93,7 +93,7 @@ public final class GlyphType implements ContentType<Item> {
     }
 
     /** Accepts a literal character, a decimal codepoint, or {@code U+XXXX}. */
-    static int parseCharacter(Object value) {
+    public static int parseCharacter(Object value) {
         if (value == null) {
             throw new IllegalArgumentException("glyph has no character");
         }

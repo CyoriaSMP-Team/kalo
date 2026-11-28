@@ -10,7 +10,7 @@
 
 [![Status](https://img.shields.io/badge/Status-Pre--alpha-orange?style=flat-square)](docs/RELEASING.md)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange?style=flat-square&logo=openjdk)](https://openjdk.org/)
-[![Paper](https://img.shields.io/badge/Paper-1.21.4%20%E2%86%92%2026.2-green?style=flat-square&logo=papermc)](https://papermc.io/)
+[![Paper](https://img.shields.io/badge/Paper%20API-1.21.4%2B-green?style=flat-square&logo=papermc)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-supported-success?style=flat-square)](https://papermc.io/software/folia)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
@@ -37,7 +37,31 @@ translation. That is the thing Kalo exists to do.
 > verified on Paper 26.2 + Folia. Virtual blocks have a persistent index, chunk
 > load/unload, explosion handling and a `/kalo migrate-world` dry-run.
 >
-> **Experimental Bedrock 3D:** Static Java cuboid models now have generated Bedrock geometry and held-item attachables. Real Bedrock-client validation of 3D rendering is still pending.
+> **Experimental Bedrock 3D:** Kalo imports Blockbench `.bbmodel` 3.2–5.0 cube
+> models into a shared IR, preserving outliner bones, pivots and per-face UVs for Bedrock
+> static geometry and emitting Java model JSON from the same source. Rotated bones and
+> inflation are refused on Java. Blockbench animation JSON is generated and auto-wired to
+> held-item attachables, 3D items receive a rendered isometric inventory icon, and hold
+> animations come from authored display transforms instead of the vanilla player-skeleton
+> holds. Animated Blockbench blocks and furniture play their loop animations on Java
+> through a per-bone display rig, and on Bedrock through a client entity while the block
+> surface is made transparent. A `place:` section adds a chunk-saved Java display entity
+> and a Bedrock client entity with authored animation; placed models now play their loop
+> animations on Java through per-bone display rigs, and a configured interaction clip
+> plays once on both platforms before the idle loop resumes. Placed-model storage and
+> light/solid/model states are implemented; block/furniture interaction clips now play
+> once and resume idle. Blockbench animation controllers compile to Bedrock state
+> controllers and drive the Java per-bone rig through a Molang evaluator with state
+> variables, remap curves, math functions, arrays, structs, loops, strings, deterministic
+> random and blend weights. Bezier keyframes are sampled
+> as cubic curves on Java and baked into intermediate linear keys for Bedrock; Catmull-Rom
+> keyframes sample the same neighbouring-key spline on Java as Bedrock's `lerp_mode`.
+> Each Bedrock session receives its own staged pack that can be filtered by a per-XUID
+> content policy and is replaced and re-served on a content update. Custom mobs (`type: mob`), 3D worn armor (`armor_model:`), rideable
+> vehicles (`type: vehicle`) and emote props (`type: emote`) compile to Bedrock client
+> entities/attachables and to Java display rigs. Mobs, worn armor, placed models and
+> animated blocks/furniture play a configured one-shot interaction clip and resume idle.
+> Real Bedrock-client validation is still pending. See [docs/BLOCKBENCH.md](docs/BLOCKBENCH.md).
 >
 > **Bedrock is verified by a Bedrock player**, on a live server running Geyser and
 > Floodgate: custom item icons, native blocks placed and mined, and worn armor all render.
@@ -50,7 +74,7 @@ translation. That is the thing Kalo exists to do.
 |---|---|
 | **Open Source** | MIT, no paid tier gating features |
 | **Community First** | No player caps, item caps, or premium converters |
-| **Paper / Folia** | Modern server API, current Minecraft — both verified on 26.2 |
+| **Paper / Folia** | Compiled against Paper API 1.21.4; runtime verification is tracked separately in the roadmap |
 | **Java + Bedrock** | One definition compiles to both. No converter, no companion plugin, no second jar — where Geyser shares the server, there is nothing to install or copy at all |
 
 ## Content packs
@@ -243,10 +267,33 @@ model:
 model:
   vanilla: "minecraft:apple"       # reuse a vanilla item's appearance
 model:
-  custom: "item/ruby_sword"        # a model you authored, shipped in assets/
+  custom: "item/ruby_sword"        # a Java model you authored, shipped in assets/
   textures:
     layer0: "item/ruby_sword"
+model:
+  blockbench: "models/item/ruby_sword.bbmodel"  # .bbmodel under assets/<pack>/
+  textures:
+    "0": "item/ruby_sword"
+place:
+  scale: 1.0
+  width: 1.0
+  height: 1.0
+  seat: 0.5        # optional; reserved for the next placed-model slice
+  light: 0
+  idle: swing     # authored loop animation to start automatically
+  interact: swing # authored animation on right-click
 ```
+
+`.bbmodel` imports keep the outliner hierarchy for Bedrock and compile to a Java model
+from the same IR. Held Blockbench item animations are converted to Bedrock animation JSON
+and wired to the attachable. An animated block or furniture model is automatically placed
+through display entities so Java can play it one bone at a time; Bedrock renders the same
+loop through a client entity and hides the static block surface. A `place:` section adds a
+Java display entity and a Bedrock client entity with authored animation, including storage
+and light/solid/model states. Placed-model Java playback remains unimplemented; each
+Bedrock session receives its own staged pack, optionally filtered by content namespace or
+key. The exact supported/rejected feature list is
+in [`docs/BLOCKBENCH.md`](docs/BLOCKBENCH.md).
 
 ## Commands
 
@@ -259,6 +306,16 @@ model:
 | `/kalo doctor` | `kalo.command.doctor` |
 | `/kalo migrate-world` | `kalo.command.migrate` |
 | `/kalo gui open <player> <namespace:gui>` | `kalo.command.gui` |
+| `/kalo hud <namespace:hud>` | `kalo.command.hud` |
+| `/kalo dialog <namespace:dialog> [target]` | `kalo.command.dialog` |
+| `/kalo dialog open <player> <namespace:dialog> [target]` | `kalo.command.dialog` |
+| `/kalo vfx <namespace:vfx> [options]` | `kalo.command.vfx` |
+| `/kalo vfx list` | `kalo.command.vfx` |
+| `/kalo vfx stop [tag:<name>\|all]` | `kalo.command.vfx` |
+| `/kalo liquid corner` | `kalo.command.liquid` |
+| `/kalo liquid fill <namespace:liquid>` | `kalo.command.liquid` |
+| `/kalo liquid clear` | `kalo.command.liquid` |
+| `/kalo click <key>` | none — internal dialog click route |
 | `/kalo export kalopack <pack>` | `kalo.command.export` |
 | `/kalo inspect-pack <filename>` | `kalo.command.inspect-pack` |
 | `/kalo learn-held` | `kalo.command.learn-held` |
@@ -443,15 +500,19 @@ Kalo writes its own resource packs rather than depending on a third-party pack l
 pack compilation is the product, and being blocked on someone else's release schedule
 every Minecraft version is not an option. See [`docs/PHASE0_AUDIT.md`](docs/PHASE0_AUDIT.md) §2.4.
 
-Deliberately **not** in v0.1: HUD, custom mobs, a scripting language, web editor,
-marketplace. The basics have to be solid first.
+Deliberately **not** in v0.1: a scripting language, web editor, marketplace.
+The basics have to be solid first; custom mobs now have a basic spawn command and model
+pipeline, not a full ability system.
 
 Kalo Cloud, when it exists, sells *operations* — hosting, CDN, build workers — never
 features. The Community Edition is standalone forever.
 
 ## Development
 
-Requires **Java 21** for Paper 1.21.4, **Java 25** for 26.2 (supports **1.21.4+ → 26.2** with one jar — `pack_format` auto-selects 46 for 1.21.4, 88 for 26.2). The Gradle toolchain provisions the needed JDK automatically.
+Requires **Java 21** bytecode for Paper 1.21.4 through 26.2 (Minecraft 26.x itself
+requires Java 25 to run). One jar spans that range; `pack_format` auto-selects 46 for
+1.21.4, 88 for 26.2. Verified at runtime on 26.2 and 1.21.11; the 1.21.4 floor is compiled
+against but untested. The Gradle toolchain provisions the needed JDK automatically.
 
 ```bash
 ./gradlew build          # build + test
@@ -532,11 +593,10 @@ corpus of real packs, so treat a first import as a draft to review.
 
 ## Bedrock setup
 
-Bedrock output is built **only when Geyser is running on this server**. A Java-only server
+Bedrock output is built when Geyser shares this JVM, when `bedrock-standalone.directory`
+is configured, or when `bedrock: always` is set. A Java-only server with `bedrock: auto`
 gets no `.mcpack` and no mapping file, because it has no use for them — at a thousand
-items that is thousands of files written for nobody. Override with `bedrock: always` in
-the config when Geyser runs as a separate process Kalo cannot see, or `never` to skip it
-outright.
+items that is thousands of files written for nobody. Use `never` to skip it outright.
 
 **If Geyser runs as a plugin on the same server — the usual setup — there is nothing to
 install and nothing to copy.** Kalo registers its blocks with Geyser directly through
@@ -546,12 +606,21 @@ Geyser's own API:
 [Kalo] Registering Kalo items, blocks and resource pack with Geyser directly — no extension needed
 [Kalo] Registered and mapped 2 block(s) with Geyser natively; 1 virtual block(s) render as entities instead
 [Kalo] Registered 8 item(s) with Geyser natively
-[Kalo] Registered generated.mcpack with Geyser
+[Kalo] Kalo Bedrock packs are staged per session
 ```
 
-Items, blocks **and `generated.mcpack` itself** are handed to Geyser through its own API,
-so there is no pack to copy either. That is the whole setup, and it is the configuration a
-Bedrock player has actually been through.
+Items and blocks are registered through Geyser's own API, so there is no mapping to copy.
+The pack is handed to Geyser too, but one copy per session rather than one shared archive:
+at login Kalo writes `plugins/Kalo/bedrock-packs/<xuid>.mcpack` and registers that file, so
+two players never negotiate over the same cached object. The archive is a deterministic zip
+whose `kalo-session.json` marker records the XUID and the SHA-256 of the `generated.mcpack`
+it was built from; it is only rebuilt when that source hash changes.
+
+When content is regenerated while Bedrock players are online, Kalo stages the new copy and,
+with `bedrock-packs.transfer: true` (the default), transfers those sessions back through
+their join address so the next login reads the replacement. A player who joins later always
+gets the current revision. Set `bedrock-packs.transfer: false` to apply updates only on the
+next natural login, or `bedrock-packs.per-player: false` to go back to one global pack.
 
 Reading from the live registry rather than a file is the point: there is nothing in
 between to go stale, so regenerating content cannot leave Bedrock on an old copy.
@@ -559,6 +628,22 @@ between to go stale, so regenerating content cannot leave Bedrock on an old copy
 Geyser reports its own tally on the next lines, and it should match. If Kalo says it
 registered blocks and Geyser does not count them, the two disagree and nothing will render
 — that is worth reading rather than scrolling past.
+
+### Geyser on a Velocity proxy
+
+This is a different topology from "Geyser is not installed". Geyser runs in the proxy's
+JVM; Floodgate runs on the backend. The backend cannot call Geyser's JVM API, so Kalo
+exports files and never attempts an in-process cross-JVM registration:
+
+1. Set `bedrock: always` on the Paper/Folia backend (or configure
+   `bedrock-standalone.directory`).
+2. Copy `plugins/Kalo/generated.mcpack` into the proxy Geyser's `packs/` folder.
+3. Copy `plugins/Kalo/geyser/kalo-items.json` and `kalo-blocks.json` into the proxy
+   Geyser's `custom_mappings/` folder.
+
+Floodgate on the backend authenticates Bedrock players independently; it is not required
+for this export and its absence does not disable Java menus. No Geyser-Spigot plugin is
+required on the backend for this topology.
 
 ### Geyser running standalone
 
@@ -605,6 +690,15 @@ tests themselves. Treat the rest of this page accordingly.
 | | What is missing |
 |---|---|
 | Standalone-Geyser path | The mapping files generate on a real server and match Geyser's documented format, but nobody has copied them into a separate Geyser process and watched it work |
+| **Blockbench `.bbmodel` import and static geometry** | Format 3.2–5.0 cube/outliner import, hierarchy-preserving Bedrock bones, Java model output, multi-material attachables and held-item animation JSON are unit-tested. Real Bedrock-client rendering and a real Blockbench project corpus are unverified |
+| **Placed-model runtime** | Java display-entity/hitbox placement, per-bone loop animation, Bedrock client-entity assets, registration and reflective spawn/remove/animation are unit-tested. Real Geyser/Cloudburst internals and a Bedrock client are unverified; per-session pack staging and reconnects are unit-tested against files rather than a live Geyser |
+| **Custom mobs** | `type: mob` compiles a Blockbench model to Bedrock geometry/entity/animation and registers it; Java spawns the real base mob invisible with a per-bone display rig. `animation: {idle, interact}` selects loops and a right-click one-shot. Spawn via `/kalo spawn`. Real AI/model alignment and a Bedrock client are unverified |
+| **3D worn armor** | `armor_model:` compiles geometry/animation and a Bedrock attachable bound to the armor bones; Java hides the flat equipment layer and draws a per-bone display rig at the wearer's feet. `animation: {idle, interact}` selects loops and an empty-hand right-click one-shot. Parent-bone motion is composed on Java; a real client is unverified |
+| **Vehicles** | `type: vehicle` spawns an invisible real carrier, one marker stand per declared seat, a following display and a Bedrock client entity. Seat zero drives through Paper's `PlayerInput`; right-click fills the next free seat and sneak ejects. `medium`, buoyancy, air climb/gravity and solid-block collision are unit-tested; a real client is unverified |
+| **Emotes** | `type: emote` + `/kalo emote [cast]` plays a prop or player-body rig for one or more performers. `rig: player` hides the vanilla body, runs per-bone Java displays and a Bedrock client entity, and layers a cached or automatically fetched `plugins/Kalo/skins/<uuid>.png` into that player's session pack. Java gets a tiny per-player overlay for the emote's unique texture path when the local pack host is available; real client unverified |
+| **HUDs and dialogs** | `type: hud` compiles an image into the Java font and a Bedrock glyph page with horizontal offsets; `type: dialog` writes a Java data pack, resolves title/body/label/tooltip placeholders at open time, authorizes console/multi-command clicks with one-time shown-dialog keys, supports tooltips/after/escape modes and raw Java JSON, and sends a Cumulus form to Bedrock players. Parser, generated JSON/data-pack and click-key paths are unit-tested; Java 1.21.6+ dialogs and live Bedrock form delivery are unverified |
+| **VFX** | `type: vfx` parses presets, inline recipes and Studio-style JSON, paints colored sprite textures/models into the Java pack, and runs a deterministic item-display simulation. Sound events, loop build-up/repeat/fade, loop time/cycle limits, conditions (`until`/`while`/`check`) with PlaceholderAPI fallback, graceful stop, tags, speed/scale/follow/offset/turn/delay/seed/only-caster, world-space `motes`, view-anchored `camera` sprites with packet-based Java camera control behind a no-op-fallback seam, `model` display layers with compiled Bedrock model client entities, Bedrock client-entity assets with cast `scale` delivery and the `vfx.max-sprites` budget are implemented. Java `fov` is a dolly approximation, Bedrock players keep their normal camera, and model roll is baked into the Bedrock geometry; a protocol-level live Bedrock check observed the staged pack and sprite/model entities, while rendered visuals and Java camera packets on Bedrock remain unverified |
+| **Liquids** | `type: liquid` parses water/lava rules, persists boxes, adds `liquid:` buckets with empty-bucket pickup/refill, expands/trims volumes on fluid flow, trims sponge-absorbed regions and deliberately placed/broken or physics-changed cells (MONITOR-order, idempotence and fluid guards unit-tested), applies effects/damage/fireproof once a second, and writes colored Java biomes. A live Bedrock check observed volume creation/persistence and, in a mob-free void world, isolated acid contact damage as five-point health drops. Colour is per column and needs a restart; live client rendering is unverified |
 | The 1.21.4 end of the version range | One jar spans 1.21.4 → 26.2. It has been run on 26.2 and 1.21.11; the bottom of the range is untested |
 | Oraxen / ItemsAdder import | Written against documented formats, never run against a real pack. Treat any import as a draft to review |
 
@@ -619,7 +713,8 @@ tests themselves. Treat the rest of this page accordingly.
 | | |
 |---|---|
 | Verified `pack_format` for 1.21.5 – 1.21.10 | 1.21.4 (46), 1.21.11 (75) and 26.2 (88) are read out of real client jars. The versions between get the nearest number in their family plus a console warning saying it is a guess. Read `pack_version.resource_major` from that version's client jar and add it to `PackFormats` |
-| Bedrock geometry for custom **item** models | Only sprite items reach Bedrock; an item with a hand-authored model is skipped and counted in the generation warning. Blocks and furniture are fine — `BedrockGeometry` converts their custom models already |
+| Blockbench block/furniture animation | Loop animations play on Java through per-bone display rigs and on Bedrock through a client entity with a transparent block surface. Placed models and animated blocks/furniture play a configured one-shot interaction clip and resume idle loops. Unit-tested against a synthetic fixture; real Bedrock-client rendering is unverified, and provider-specific Molang queries/entity references remain host supplied |
+| Custom mobs on Java | The base mob is invisible and the custom model follows as a per-bone display rig with authored loops and a right-click interaction clip. Parent-bone motion is composed on Java; Bedrock invisibility forwarding is unverified |
 | Real server-side block registration | Would still need a borrowed visual state on vanilla clients — see the `BlockCarrier` javadoc |
 
 ## License
@@ -627,18 +722,24 @@ tests themselves. Treat the rest of this page accordingly.
 MIT. Kalo is derived from [Neko](https://github.com/bindglam/Neko) by Woobeen Jeon, whose
 copyright notice is retained in [LICENSE](LICENSE) as that license requires.
 
+The RP Engine comparison is documented separately: [docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md)
+records what is independently implemented, what is still missing, and the clean-room rule
+that no GPL-3.0 source is copied into this MIT project.
+
 ---
 
 <!-- CYTECH_STAR_HISTORY:START -->
 
 ## Star History
 
-<a href="https://star-history.dera.page/#CyoriaSMP-Team/kalo&type=date&legend=top-left">
+<a href="https://github.com/CyoriaSMP-Team/kalo/stargazers">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left" />
-    <img alt="GitHub star history for CyoriaSMP-Team/kalo" src="https://star-history.dera.page/svg?repos=CyoriaSMP-Team/kalo&type=date&legend=top-left" width="800" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/CyoriaSMP-Team/kalo/refs/heads/main/assets/star-history-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/CyoriaSMP-Team/kalo/refs/heads/main/assets/star-history-light.svg" />
+    <img alt="Star history for CyoriaSMP-Team/kalo" src="https://raw.githubusercontent.com/CyoriaSMP-Team/kalo/refs/heads/main/assets/star-history-light.svg" width="1100" />
   </picture>
 </a>
+
+<sub>Updated automatically from GitHub's dated stargazers. Only currently starred accounts are included.</sub>
 
 <!-- CYTECH_STAR_HISTORY:END -->

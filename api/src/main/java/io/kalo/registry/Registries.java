@@ -8,6 +8,12 @@ import io.kalo.content.item.Item;
 import io.kalo.content.item.ItemRegistryEntry;
 import io.kalo.content.armor.Armor;
 import io.kalo.content.armor.ArmorRegistryEntry;
+import io.kalo.content.mob.Mob;
+import io.kalo.content.mob.MobRegistryEntry;
+import io.kalo.content.emote.Emote;
+import io.kalo.content.emote.EmoteRegistryEntry;
+import io.kalo.content.vehicle.Vehicle;
+import io.kalo.content.vehicle.VehicleRegistryEntry;
 import io.kalo.content.painting.Painting;
 import io.kalo.content.painting.PaintingRegistryEntry;
 import io.kalo.content.musicdisc.MusicDisc;
@@ -25,6 +31,12 @@ public interface Registries {
     @NotNull EntryWritableRegistry<Furniture, FurnitureRegistryEntry> furniture();
 
     @NotNull EntryWritableRegistry<Armor, ArmorRegistryEntry> armor();
+
+    @NotNull EntryWritableRegistry<Mob, MobRegistryEntry> mob();
+
+    @NotNull EntryWritableRegistry<Emote, EmoteRegistryEntry> emote();
+
+    @NotNull EntryWritableRegistry<Vehicle, VehicleRegistryEntry> vehicle();
 
     @NotNull EntryWritableRegistry<Painting, PaintingRegistryEntry> painting();
 

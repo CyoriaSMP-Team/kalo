@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -30,12 +31,15 @@ import java.util.Set;
  * A Bedrock held-item attachable has one texture: each Java face is remapped into a
  * deterministic horizontal atlas with its own absolute UV origin.
  *
- * Restrictions are explicit: no parent-only geometry, no absent face texture, no
- * mixed-size PNGs, no more than 16 sheets or 4096px combined width. This also avoids
- * decoding arbitrary-size user images during pack generation.
+ * Restrictions are explicit: no parent-only geometry, no absent face texture,
+ * no more than 16 source sheets and 4096px atlas width/height. Original high-resolution
+ * textures are preserved. Animated Java strips contribute their first native-size frame
+ * until a compatible Bedrock animation controller can reproduce the timing.
  */
 final class BedrockItemAtlas {
     private BedrockItemAtlas() {}
+
+    private record Sheet(@NotNull BufferedImage image, int x, int width, int height) {}
 
     record Result(@NotNull Key iconSource, byte[] image, int sheets) {
         Result {
@@ -91,53 +95,89 @@ final class BedrockItemAtlas {
             }
             faceSlots.add(byFace);
         }
-        if (slots.size() < 2 || (long)slots.size() * tileWidth > 4096) return null;
+        if (slots.size() < 2) return null;
 
-        BufferedImage atlas = new BufferedImage(tileWidth * slots.size(), tileHeight, BufferedImage.TYPE_INT_ARGB);
+        // A Java model with UVs in 0..16 may reference 512x512 PNGs and even
+        // multiple different-sized PNGs. Older Kalo required every PNG to be
+        // exactly 16x16, causing the majority of 3D weapons to disappear in
+        // Bedrock. Decode with dimensions capped, and preserve source pixels.
+        Map<Key, Sheet> sheets = new LinkedHashMap<>();
+        int atlasWidth = 0;
+        int atlasHeight = 0;
+        for (Key key : slots.keySet()) {
+            Writable source = javaSource.file("assets/" + key.namespace()
+                    + "/textures/" + key.value() + ".png");
+            if (source == null) return null;
+            byte[] png = source.toByteArray();
+            if (png.length > 16 * 1024 * 1024) return null;
+            try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(png))) {
+                if (input == null) return null;
+                Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+                if (!readers.hasNext()) return null;
+                ImageReader reader = readers.next();
+                try {
+                    reader.setInput(input, true, true);
+                    int width = reader.getWidth(0);
+                    int height = reader.getHeight(0);
+                    if (width < 1 || height < 1 || width > 4096 || height > 4096) return null;
+                    // Java .mcmeta animation generally stacks square frames
+                    // vertically. Render frame zero rather than stretching the
+                    // entire strip into a static Bedrock texture.
+                    boolean animated = javaSource.file("assets/" + key.namespace()
+                            + "/textures/" + key.value() + ".png.mcmeta") != null;
+                    int visibleHeight = animated && height > width && height % width == 0
+                            ? width : height;
+                    if ((long) atlasWidth + width > 4096 || visibleHeight > 4096) return null;
+                    BufferedImage image = reader.read(0);
+                    sheets.put(key, new Sheet(image, atlasWidth, width, visibleHeight));
+                    atlasWidth += width;
+                    atlasHeight = Math.max(atlasHeight, visibleHeight);
+                } finally {
+                    reader.dispose();
+                }
+            }
+        }
+        if (atlasWidth < 1 || atlasHeight < 1
+                || (long) atlasWidth * atlasHeight > 8L * 1024 * 1024) return null;
+        BufferedImage atlas = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D canvas = atlas.createGraphics();
         try {
-            for (var entry : slots.entrySet()) {
-                Key key = entry.getKey();
-                Writable source = javaSource.file("assets/" + key.namespace()
-                        + "/textures/" + key.value() + ".png");
-                if (source == null) return null;
-                byte[] png = source.toByteArray();
-                if (png.length > 16 * 1024 * 1024) return null;
-                // Check dimensions from the PNG header before allocating decoded pixels.
-                // A tiny compressed image can declare huge dimensions (decompression bomb).
-                try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(png))) {
-                    if (input == null) return null;
-                    Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
-                    if (!readers.hasNext()) return null;
-                    ImageReader reader = readers.next();
-                    try {
-                        reader.setInput(input, true, true);
-                        if (reader.getWidth(0) != tileWidth || reader.getHeight(0) != tileHeight) return null;
-                        BufferedImage image = reader.read(0);
-                        canvas.drawImage(image, entry.getValue() * tileWidth, 0, null);
-                    } finally {
-                        reader.dispose();
-                    }
-                }
+            for (Sheet sheet : sheets.values()) {
+                // Clip Java animation strips to the initial native frame.
+                canvas.drawImage(sheet.image(), sheet.x(), 0,
+                        sheet.x() + sheet.width(), sheet.height(),
+                        0, 0, sheet.width(), sheet.height(), null);
             }
         } finally {
             canvas.dispose();
         }
 
-        // Only mutate the isolated geometry object after all PNGs are loaded.
+        // Java model UVs use logical 0..texture_size units. Bedrock instead
+        // expects absolute pixel UVs against the atlas. Scale both position and
+        // size for the original PNG so a 512px sword stays pixel-identical.
+        List<Key> orderedKeys = new ArrayList<>(slots.keySet());
         for (int i = 0; i < cubes.size(); i++) {
             JsonObject bedrockFaces = cubes.get(i).getAsJsonObject().getAsJsonObject("uv");
             if (bedrockFaces == null || bedrockFaces.size() != faceSlots.get(i).size()) return null;
             for (var face : faceSlots.get(i).entrySet()) {
                 JsonObject json = bedrockFaces.getAsJsonObject(face.getKey());
                 if (json == null) return null;
+                Key key = orderedKeys.get(face.getValue());
+                Sheet sheet = sheets.get(key);
                 JsonArray uv = json.getAsJsonArray("uv");
-                uv.set(0, new com.google.gson.JsonPrimitive(
-                        uv.get(0).getAsDouble() + face.getValue() * tileWidth));
+                JsonArray size = json.getAsJsonArray("uv_size");
+                if (uv == null || uv.size() != 2 || size == null || size.size() != 2) return null;
+                double scaleX = (double) sheet.width() / tileWidth;
+                double scaleY = (double) sheet.height() / tileHeight;
+                uv.set(0, new com.google.gson.JsonPrimitive(sheet.x() + uv.get(0).getAsDouble() * scaleX));
+                uv.set(1, new com.google.gson.JsonPrimitive(uv.get(1).getAsDouble() * scaleY));
+                size.set(0, new com.google.gson.JsonPrimitive(size.get(0).getAsDouble() * scaleX));
+                size.set(1, new com.google.gson.JsonPrimitive(size.get(1).getAsDouble() * scaleY));
                 json.addProperty("material_instance", "default");
             }
         }
-        description.addProperty("texture_width", tileWidth * slots.size());
+        description.addProperty("texture_width", atlasWidth);
+        description.addProperty("texture_height", atlasHeight);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         if (!ImageIO.write(atlas, "PNG", output)) return null;
         return new Result(slots.keySet().iterator().next(), output.toByteArray(), slots.size());

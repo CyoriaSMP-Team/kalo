@@ -8,6 +8,7 @@ import io.kalo.pack.Json;
 import io.kalo.pack.ResourcePack;
 import net.kyori.adventure.key.Key;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,10 +46,15 @@ public final class JavaArmorCompiler {
             try {
                 ArmorDefinition definition = armor.armorDefinition();
                 ArmorDefinition.EquipmentTexture equipment = definition.equipment();
-                if (equipment == null) {
+                if (equipment == null && definition.armorModel() == null) {
                     // No worn appearance declared: the base material's vanilla armor
                     // texture is used, and there is no equipment asset to emit.
                     continue;
+                }
+                if (definition.armorModel() != null) {
+                    // The display entity draws the 3D model; the flat equipment layer must
+                    // paint nothing or the vanilla armor shows through it.
+                    writeInvisibleEquipment(pack);
                 }
                 pack.file(equipmentPath(definition.key()), Json.writable(equipmentAsset(definition, equipment)));
             } catch (Exception e) {
@@ -58,17 +64,23 @@ public final class JavaArmorCompiler {
     }
 
     static @NotNull JsonObject equipmentAsset(@NotNull ArmorDefinition definition,
-                                              @NotNull ArmorDefinition.EquipmentTexture equipment) {
+                                              @Nullable ArmorDefinition.EquipmentTexture equipment) {
         JsonObject layers = new JsonObject();
+        boolean invisible = definition.armorModel() != null;
+        Key empty = Key.key("kalo", "armor_invisible");
 
         if (definition.slot().usesLeggingsLayer()) {
             // Leggings are only ever drawn on the leggings layer; putting them on the
             // humanoid layer would paint them over the chestplate.
-            Key texture = equipment.leggings() != null ? equipment.leggings() : equipment.humanoid();
+            Key texture = invisible ? empty
+                    : equipment == null ? empty
+                    : equipment.leggings() != null ? equipment.leggings()
+                    : equipment.humanoid();
             layers.add(LEGGINGS_LAYER, layer(texture));
         } else {
-            layers.add(HUMANOID_LAYER, layer(equipment.humanoid()));
-            if (equipment.leggings() != null) {
+            Key humanoid = invisible || equipment == null ? empty : equipment.humanoid();
+            layers.add(HUMANOID_LAYER, layer(humanoid));
+            if (!invisible && equipment != null && equipment.leggings() != null) {
                 layers.add(LEGGINGS_LAYER, layer(equipment.leggings()));
             }
         }
@@ -76,6 +88,14 @@ public final class JavaArmorCompiler {
         JsonObject root = new JsonObject();
         root.add("layers", layers);
         return root;
+    }
+
+    private static void writeInvisibleEquipment(@NotNull ResourcePack pack) {
+        byte[] png = io.kalo.pack.TransparentPng.bytes();
+        pack.file("assets/kalo/textures/entity/equipment/humanoid/armor_invisible.png",
+                io.kalo.pack.Writable.bytes(png));
+        pack.file("assets/kalo/textures/entity/equipment/humanoid_leggings/armor_invisible.png",
+                io.kalo.pack.Writable.bytes(png));
     }
 
     private static @NotNull JsonArray layer(@NotNull Key texture) {

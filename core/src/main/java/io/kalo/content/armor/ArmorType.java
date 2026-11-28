@@ -67,9 +67,11 @@ public final class ArmorType implements ContentType<Armor> {
             ItemDefinition item = ItemType.parseDefinition(key, config);
             ArmorDefinition.EquipmentTexture equipment =
                     parseEquipment(key, slot, config.getConfigurationSection("equipment"));
+            ArmorDefinition.ArmorModel armorModel =
+                    parseArmorModel(key, config.getConfigurationSection("armor_model"));
             List<FeatureBuilder> features = ItemType.parseFeatures(key, config.getConfigurationSection("features"));
 
-            ArmorDefinition definition = new ArmorDefinition(item, slot, equipment);
+            ArmorDefinition definition = new ArmorDefinition(item, slot, equipment, armorModel);
             registries.armor().register(key, entry -> entry.key(key).definition(definition).features(features));
             return true;
         } catch (Exception e) {
@@ -104,6 +106,36 @@ public final class ArmorType implements ContentType<Armor> {
         return new ArmorDefinition.EquipmentTexture(humanoidKey, leggingsKey);
     }
 
+    static @Nullable ArmorDefinition.ArmorModel parseArmorModel(
+            @NotNull Key key, @Nullable ConfigurationSection config) {
+        if (config == null) {
+            return null;
+        }
+        String source = config.getString("blockbench");
+        if (source == null || source.isBlank()) {
+            throw new IllegalArgumentException(
+                    "armor_model requires a 'blockbench' path to a .bbmodel file");
+        }
+        if (!source.toLowerCase(Locale.ROOT).endsWith(".bbmodel")) {
+            throw new IllegalArgumentException(
+                    "armor_model.blockbench must end in .bbmodel, got '" + source + "'");
+        }
+        java.util.Map<String, Key> textures = new java.util.LinkedHashMap<>();
+        ConfigurationSection overrides = config.getConfigurationSection("textures");
+        if (overrides != null) {
+            for (String id : overrides.getKeys(false)) {
+                textures.put(id, resolveKey(key.namespace(), overrides.getString(id, id)));
+            }
+        }
+        ConfigurationSection animation = config.getConfigurationSection("animation");
+        io.kalo.content.animation.RigAnimation rigAnimation = animation == null
+                ? io.kalo.content.animation.RigAnimation.none()
+                : new io.kalo.content.animation.RigAnimation(
+                        animation.getString("idle"), animation.getString("interact"));
+        return new ArmorDefinition.ArmorModel(
+                resolveKey(key.namespace(), source), textures, rigAnimation);
+    }
+
     @Override
     public void compilePack(@NotNull ResourcePack pack, @NotNull Iterable<Armor> contents) {
         List<Item> items = new ArrayList<>();
@@ -113,6 +145,8 @@ public final class ArmorType implements ContentType<Armor> {
         JavaPackCompiler.compileItems(pack, items);
         // ...plus the equipment asset that paints it onto the player.
         JavaArmorCompiler.compileArmor(pack, contents);
+        // ...and the Java model for pieces whose worn form is a Blockbench model.
+        io.kalo.platform.java.JavaWornModelCompiler.compile(pack, contents);
     }
 
     private static boolean isKnownSlot(@NotNull String name) {

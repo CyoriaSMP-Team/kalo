@@ -79,6 +79,19 @@ model:
     all: "block/ruby_block"
 ```
 
+### Blockbench Model
+
+```yaml
+model:
+  blockbench: "models/block/ruby_pillar.bbmodel"
+  textures:
+    "0": "block/ruby_block"
+```
+
+Blockbench format 3.2–5.0 cube models are imported through the shared model IR. The
+outliner hierarchy, pivots and element rotations reach Bedrock; Java receives compiled
+model JSON with Java's limits applied. Animation keyframes are not played.
+
 ## Behaviour
 
 ```yaml
@@ -131,6 +144,6 @@ ruby_block:
 
 [GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
 
-> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+> **Version:** 0.2.1-prealpha.16 • **License:** MIT • **Java:** 21 bytecode / 25 for 26.x runtime
 
 *Build once. Play everywhere.*

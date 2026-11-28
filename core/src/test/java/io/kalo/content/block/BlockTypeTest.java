@@ -42,6 +42,22 @@ class BlockTypeTest {
         assertEquals(BlockCarrier.TRIPWIRE, definition.java().carrier());
     }
 
+    @Test
+    void parsesIdleAndInteractionAnimationNames() {
+        YamlConfiguration config = yaml("""
+                model:
+                  blockbench: models/block/fan.bbmodel
+                animation:
+                  idle: spin
+                  interact: Open
+                """);
+
+        var definition = BlockType.parseDefinition(Key.key("testpack", "fan"), config);
+
+        assertEquals("spin", definition.animation().idle());
+        assertEquals("Open", definition.animation().interact());
+    }
+
     private static YamlConfiguration yaml(String content) {
         YamlConfiguration config = new YamlConfiguration();
         try {

@@ -3,6 +3,7 @@ package io.kalo.content.furniture.definition;
 import io.kalo.content.block.definition.BlockDefinition;
 import io.kalo.content.item.definition.BedrockOptions;
 import io.kalo.content.item.definition.DisplayProperties;
+import io.kalo.content.block.definition.BlockAnimation;
 import io.kalo.content.block.definition.BlockModelDefinition;
 import io.kalo.content.block.definition.JavaBlockOptions;
 import net.kyori.adventure.key.Key;
@@ -27,7 +28,8 @@ public record FurnitureDefinition(
         @NotNull FurnitureBehaviour behaviour,
         @NotNull JavaBlockOptions java,
         @NotNull BedrockOptions bedrock,
-        @NotNull FurnitureDisplay displayTransform
+        @NotNull FurnitureDisplay displayTransform,
+        @Nullable BlockAnimation animation
 ) {
 
     /**
@@ -44,6 +46,7 @@ public record FurnitureDefinition(
                         behaviour.hardness(), behaviour.requiresTool()))
                 .java(java)
                 .bedrock(bedrock)
+                .animation(animation)
                 .build();
     }
 
@@ -59,6 +62,7 @@ public record FurnitureDefinition(
         private JavaBlockOptions java = JavaBlockOptions.defaults();
         private BedrockOptions bedrock = BedrockOptions.defaults();
         private FurnitureDisplay displayTransform = FurnitureDisplay.defaults();
+        private BlockAnimation animation;
 
         private Builder(@NotNull Key key) {
             this.key = key;
@@ -94,12 +98,18 @@ public record FurnitureDefinition(
             return this;
         }
 
+        public @NotNull Builder animation(@Nullable BlockAnimation animation) {
+            this.animation = animation;
+            return this;
+        }
+
         public @NotNull FurnitureDefinition build() {
             if (model == null) {
                 throw new IllegalStateException(
                         "furniture " + key.asString() + " has no model; declare 'cube_all', 'cube' or 'custom'");
             }
-            return new FurnitureDefinition(key, display, model, behaviour, java, bedrock, displayTransform);
+            return new FurnitureDefinition(key, display, model, behaviour, java, bedrock,
+                    displayTransform, animation);
         }
     }
 }

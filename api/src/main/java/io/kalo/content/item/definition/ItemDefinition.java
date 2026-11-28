@@ -2,6 +2,7 @@ package io.kalo.content.item.definition;
 
 import net.kyori.adventure.key.Key;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
@@ -22,7 +23,8 @@ public record ItemDefinition(
         @NotNull ModelDefinition model,
         @NotNull ItemBehaviour behaviour,
         @NotNull JavaOptions java,
-        @NotNull BedrockOptions bedrock
+        @NotNull BedrockOptions bedrock,
+        @Nullable PlacementDefinition placement
 ) {
 
     /** The generated translation key, used when {@link DisplayProperties#name()} is null. */
@@ -41,6 +43,7 @@ public record ItemDefinition(
         private ItemBehaviour behaviour = ItemBehaviour.defaults();
         private JavaOptions java = JavaOptions.defaults();
         private BedrockOptions bedrock = BedrockOptions.defaults();
+        private PlacementDefinition placement;
 
         private Builder(@NotNull Key key) {
             this.key = key;
@@ -71,6 +74,11 @@ public record ItemDefinition(
             return this;
         }
 
+        public @NotNull Builder placement(@Nullable PlacementDefinition placement) {
+            this.placement = placement;
+            return this;
+        }
+
         public @NotNull ItemDefinition build() {
             // An item with no model declared still needs one; fall back to the base
             // material's own vanilla appearance rather than rendering as missing texture.
@@ -78,7 +86,8 @@ public record ItemDefinition(
                     ? model
                     : new ModelDefinition.Vanilla(
                             Key.key("minecraft", java.baseMaterial().name().toLowerCase(Locale.ROOT)));
-            return new ItemDefinition(key, display, resolved, behaviour, java, bedrock);
+            return new ItemDefinition(key, display, resolved, behaviour, java, bedrock,
+                    placement);
         }
     }
 }

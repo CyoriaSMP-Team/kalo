@@ -11,7 +11,10 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.Collections;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,17 +40,48 @@ public final class PackHost {
     private final File packFile;
     private final int port;
     private final String publicAddress;
+    private final String publicBaseUrl;
+    private final String bindAddress;
+    private final @Nullable RelayPackPublisher relayPublisher;
 
+    private static final int MAX_OVERLAYS = 256;
     private volatile HttpServer server;
+    private volatile boolean started;
     private ExecutorService executor;
     /** URL, hash and bytes change as one snapshot. */
     private volatile PackVersion version =
             new PackVersion(UUID.randomUUID().toString(), "", null);
+    /** Small per-player overlay packs, keyed by their content hash. */
+    private final Map<String, byte[]> overlays = Collections.synchronizedMap(
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
+                    return size() > MAX_OVERLAYS;
+                }
+            });
 
     public PackHost(@NotNull File packFile, int port, @NotNull String publicAddress) {
+        this(packFile, port, publicAddress, "", "0.0.0.0");
+    }
+
+    /**
+     * Allows HTTPS delivery through a reverse proxy / Cloudflare Tunnel while
+     * the pack listener stays bound exclusively to the local loopback interface.
+     */
+    public PackHost(@NotNull File packFile, int port, @NotNull String publicAddress,
+                    @NotNull String publicBaseUrl, @NotNull String bindAddress) {
+        this(packFile, port, publicAddress, publicBaseUrl, bindAddress, null);
+    }
+
+    public PackHost(@NotNull File packFile, int port, @NotNull String publicAddress,
+                    @NotNull String publicBaseUrl, @NotNull String bindAddress,
+                    @Nullable RelayPackPublisher relayPublisher) {
+        this.relayPublisher = relayPublisher;
         this.packFile = packFile;
         this.port = port;
         this.publicAddress = publicAddress;
+        this.publicBaseUrl = publicBaseUrl.trim().replaceAll("/+$", "");
+        this.bindAddress = bindAddress;
     }
 
     /** @return whether the host started; a failure here must not stop the plugin */
@@ -58,18 +92,34 @@ public final class PackHost {
                 // advertise :0 and therefore hand every player an unreachable URL.
                 throw new IllegalArgumentException("port must be between 1 and 65535, got " + port);
             }
-            if (publicAddress.isBlank()) {
+            if (publicBaseUrl.isEmpty() && publicAddress.isBlank()) {
                 throw new IllegalArgumentException("public address must not be blank");
             }
+            if (!publicBaseUrl.isEmpty()) {
+                java.net.URI uri = java.net.URI.create(publicBaseUrl);
+                if (!("https".equalsIgnoreCase(uri.getScheme())
+                        || "http".equalsIgnoreCase(uri.getScheme()))
+                        || uri.getHost() == null || uri.getUserInfo() != null
+                        || uri.getQuery() != null || uri.getFragment() != null) {
+                    throw new IllegalArgumentException("pack-host.public-url must be an HTTP(S) URL");
+                }
+            }
 
-            server = HttpServer.create(new InetSocketAddress(port), 0);
+            if (relayPublisher != null) {
+                // Direct publishing has no need to open a local pack HTTP listener.
+                started = true;
+                LOGGER.info("Direct Relay publisher ready; no local HTTP port opened");
+                return true;
+            }
+
+            server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
             server.createContext("/", this::handle);
             // A virtual-thread executor: downloads are IO-bound and a pack can be tens of
             // megabytes, so a fixed pool would stall joins behind slow clients.
             executor = Executors.newVirtualThreadPerTaskExecutor();
             server.setExecutor(executor);
             server.start();
-
+            started = true;
             refresh();
             LOGGER.info("Serving the resource pack at " + url());
             return true;
@@ -82,6 +132,7 @@ public final class PackHost {
     }
 
     public void stop() {
+        started = false;
         HttpServer running = server;
         server = null;
         if (running != null) {
@@ -94,6 +145,26 @@ public final class PackHost {
         if (runningExecutor != null) {
             runningExecutor.shutdownNow();
         }
+        overlays.clear();
+    }
+
+    /**
+     * Publishes a small per-player overlay pack and returns a content-addressed URL.
+     *
+     * <p>Overlays are memory-only and bounded; they are cosmetic replacements, not a
+     * second copy of the global pack. Relay mode has no local HTTP origin, so it returns
+     * null rather than advertising an unreachable URL.</p>
+     */
+    public @Nullable Snapshot publishOverlay(byte @NotNull [] bytes) {
+        if (!started || relayPublisher != null || bytes.length == 0) {
+            return null;
+        }
+        String sha1 = computeSha1(bytes);
+        if (sha1.isEmpty()) {
+            return null;
+        }
+        overlays.put(sha1, bytes.clone());
+        return new Snapshot(overlayUrl(sha1), sha1);
     }
 
     /**
@@ -107,6 +178,40 @@ public final class PackHost {
         byte[] bytes = readPack();
         version = new PackVersion(
                 UUID.randomUUID().toString(), bytes == null ? "" : computeSha1(bytes), bytes);
+    }
+
+    public boolean relayMode() {
+        return relayPublisher != null;
+    }
+
+    /**
+     * Publish an immutable version to the private Relay API before exposing the
+     * snapshot to players. A failed upload cannot replace a known-good version.
+     * Same pack bytes always produce the same version ID across restarts.
+     */
+    public synchronized boolean publishToRelay() throws IOException, InterruptedException {
+        if (relayPublisher == null) {
+            throw new IllegalStateException("Direct Relay publishing is not configured");
+        }
+        byte[] bytes = readPack();
+        if (bytes == null) {
+            throw new IOException("No generated resource pack is available");
+        }
+        String sha1 = computeSha1(bytes);
+        if (sha1.isBlank()) {
+            throw new IOException("Could not compute resource pack hash");
+        }
+        // Name-based UUID derives from the content hash: identical packs retain
+        // their public URL, even when the Minecraft server restarts.
+        String token = UUID.nameUUIDFromBytes(
+                sha1.getBytes(java.nio.charset.StandardCharsets.US_ASCII)).toString();
+        PackVersion before = version;
+        if (before.bytes() != null && before.token().equals(token) && before.sha1().equals(sha1)) {
+            return false;
+        }
+        relayPublisher.upload(token, bytes);
+        version = new PackVersion(token, sha1, bytes);
+        return true;
     }
 
     public @NotNull String url() {
@@ -125,19 +230,30 @@ public final class PackHost {
     /** A coherent URL/hash pair for one resource-pack request. */
     public @Nullable Snapshot snapshot() {
         PackVersion current = version;
-        if (server == null || current.bytes() == null || current.sha1().isEmpty()) {
+        if (!started || current.bytes() == null || current.sha1().isEmpty()) {
             return null;
         }
         return new Snapshot(url(current.token()), current.sha1());
     }
 
     private @NotNull String url(@NotNull String token) {
+        return baseUrl() + "/" + token + "/pack.zip";
+    }
+
+    private @NotNull String overlayUrl(@NotNull String token) {
+        return baseUrl() + "/overlay/" + token + "/pack.zip";
+    }
+
+    private @NotNull String baseUrl() {
+        if (!publicBaseUrl.isEmpty()) {
+            return publicBaseUrl;
+        }
         String address = publicAddress.trim();
         // URI syntax requires brackets around an IPv6 literal.
         if (address.indexOf(':') >= 0 && !(address.startsWith("[") && address.endsWith("]"))) {
             address = "[" + address + "]";
         }
-        return "http://" + address + ":" + port + "/" + token + "/pack.zip";
+        return "http://" + address + ":" + port;
     }
 
     private void handle(@NotNull HttpExchange exchange) throws IOException {
@@ -149,13 +265,24 @@ public final class PackHost {
             // The token is not security — it is cache busting — but serving any path would
             // make the host an open file server for anything under it.
             PackVersion current = version;
-            if (!exchange.getRequestURI().getPath().equals("/" + current.token() + "/pack.zip")) {
+            String path = exchange.getRequestURI().getPath();
+            byte[] bytes;
+            if (path.equals("/" + current.token() + "/pack.zip")) {
+                bytes = current.bytes();
+                if (bytes == null) {
+                    exchange.sendResponseHeaders(503, -1);
+                    return;
+                }
+            } else if (path.startsWith("/overlay/") && path.endsWith("/pack.zip")) {
+                String token = path.substring("/overlay/".length(),
+                        path.length() - "/pack.zip".length());
+                bytes = overlays.get(token);
+                if (bytes == null) {
+                    exchange.sendResponseHeaders(404, -1);
+                    return;
+                }
+            } else {
                 exchange.sendResponseHeaders(404, -1);
-                return;
-            }
-            byte[] bytes = current.bytes();
-            if (bytes == null) {
-                exchange.sendResponseHeaders(503, -1);
                 return;
             }
 

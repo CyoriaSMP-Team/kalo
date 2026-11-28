@@ -6,10 +6,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
+import org.bukkit.entity.Player;
 import org.bukkit.event.server.ServerLoadEvent;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Method;
 import java.util.logging.Level;
 
 /**
@@ -31,6 +34,9 @@ public final class PlaceholderApiIntegration {
     // Deliberately Object: resolving PlaceholderApiHook's superclass before the guard is
     // exactly what this class exists to avoid.
     private static Object installedExpansion;
+    // Cached after the first call: a VFX condition checks every tick, and Class.forName
+    // plus getMethod on that path is pure overhead once the resolver is known.
+    private static volatile Method placeholderResolver;
 
     private PlaceholderApiIntegration() {
     }
@@ -87,6 +93,34 @@ public final class PlaceholderApiIntegration {
             // Throwable, not Exception: a version mismatch surfaces as LinkageError, and
             // an optional integration must never stop the plugin from loading.
             Plugins.logger().log(Level.WARNING, "Could not register the PlaceholderAPI expansion", t);
+        }
+    }
+
+    /**
+     * Resolves one placeholder through PlaceholderAPI when it is installed.
+     *
+     * @return the resolved value, an empty string for an unknown placeholder, or null
+     *         when PlaceholderAPI is absent
+     */
+    public static @Nullable String resolve(@NotNull Player player,
+                                           @NotNull String placeholder) {
+        Plugin placeholderApi = Bukkit.getPluginManager().getPlugin(PLUGIN_NAME);
+        if (placeholderApi == null || !placeholderApi.isEnabled()) {
+            return null;
+        }
+        try {
+            Method resolver = placeholderResolver;
+            if (resolver == null) {
+                Class<?> type = Class.forName("io.kalo.integration.PlaceholderApiResolver",
+                        true, PlaceholderApiIntegration.class.getClassLoader());
+                resolver = type.getMethod("resolve", Player.class, String.class);
+                placeholderResolver = resolver;
+            }
+            Object value = resolver.invoke(null, player, placeholder);
+            return value instanceof String resolved ? resolved : "";
+        } catch (Throwable unavailable) {
+            // Optional integration: a missing or moved API must not break a VFX cast.
+            return null;
         }
     }
 

@@ -39,6 +39,7 @@ public final class ExternalItemObserver implements Listener, AutoCloseable {
     private final Plugin plugin;
     private final Path file;
     private final Path legacyFile;
+    private final io.kalo.items.ItemIdentityImpl identity;
     private final Set<String> seenLegacy = ConcurrentHashMap.newKeySet();
     private final ExecutorService writer = Executors.newSingleThreadExecutor(
             Thread.ofPlatform().daemon(true).name("kalo-external-item-writer", 0).factory());
@@ -46,8 +47,11 @@ public final class ExternalItemObserver implements Listener, AutoCloseable {
     private final Map<UUID, Long> lastScan = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    public ExternalItemObserver(@NotNull Plugin plugin) throws java.io.IOException {
+    public ExternalItemObserver(@NotNull Plugin plugin,
+                                @NotNull io.kalo.items.ItemIdentityImpl identity)
+            throws java.io.IOException {
         this.plugin = plugin;
+        this.identity = identity;
         this.file = Constants.dataFolder().toPath().resolve("external-items.yml");
         this.legacyFile = Constants.dataFolder().toPath().resolve("legacy-items.yml");
         for (ExternalItemBindings.Binding binding : ExternalItemBindings.load(file)) {
@@ -128,6 +132,10 @@ public final class ExternalItemObserver implements Listener, AutoCloseable {
                 writer.execute(() -> {
                     try {
                         ExternalItemBindings.remember(file, binding);
+                        // Persisted first, then published: a stack is only rebuildable
+                        // once the binding is on disk, so a crash cannot leave a live id
+                        // with no record.
+                        identity.learn(binding);
                     } catch (Exception failure) {
                         seen.remove(binding.itemModel().asString());
                         Plugins.logger().log(Level.WARNING,

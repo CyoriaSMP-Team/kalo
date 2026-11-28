@@ -67,6 +67,11 @@ paperPluginYaml {
         // Geyser is up before Kalo registers blocks with it.
         server("Geyser-Spigot", PaperPluginYaml.Load.BEFORE, false, true)
 
+        // Bedrock Forms uses Cumulus directly. On proxy-based deployments Geyser
+        // may not be installed on this backend; Floodgate bundles Cumulus here.
+        // Share its classpath when present, while keeping it optional for Java-only servers.
+        server("floodgate", PaperPluginYaml.Load.BEFORE, false, true)
+
         // PlaceholderAPI needs an entry for the same reason. Being loaded is not the same
         // as being visible: PlaceholderApiHook extends PlaceholderExpansion, so resolving
         // that class needs a classpath edge, no matter how late the registration happens

@@ -10,30 +10,29 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Converts a Java block/item model into a Bedrock geometry.
+ * Turns a Java model's elements into a flat Bedrock geometry.
  *
- * <p>The two formats describe the same shape in different coordinate systems, and the
- * differences are easy to get subtly wrong:</p>
+ * <p>Both formats describe cuboids, but not in the same space:</p>
  *
  * <ul>
- *   <li>Java positions a cuboid by two corners in {@code 0..16}; Bedrock positions it by
- *       an {@code origin} plus a {@code size}.</li>
- *   <li><b>Bedrock's X axis is mirrored.</b> A cuboid's origin is therefore
- *       {@code 8 - to.x}, not {@code from.x - 8}.
- *       Getting this backwards produces a model that looks right until it is asymmetric.</li>
- *   <li>Java's Y is measured from the block floor and Bedrock's origin Y matches it, but
- *       X and Z are centred on the block, so both shift by 8.</li>
- *   <li>Java UVs are two corners {@code [x1,y1,x2,y2]}; Bedrock takes a corner plus a size.</li>
+ *   <li>Java gives two opposite corners in {@code 0..16} model units; Bedrock wants an
+ *       {@code origin} plus a {@code size}.</li>
+ *   <li>Bedrock's model space is centred on the block in X and Z, and its X axis runs the
+ *       opposite way from Java's. The origin is therefore
+ *       {@code (8 - to.x, from.y, from.z - 8)}: taking X from the far corner is what folds
+ *       the mirroring in. Y needs no shift — both formats measure up from the block's
+ *       floor.</li>
+ *   <li>Java UVs are two corners; Bedrock takes one corner plus a signed size.</li>
  * </ul>
  *
- * <p>Handles axis-aligned cuboids with optional single-axis element rotation, which is
- * what Blockbench produces for the overwhelming majority of custom content. Anything else
- * is reported rather than approximated — a silently wrong model is worse than a missing
- * one, because nobody goes looking for the cause.</p>
+ * <p>Only what the formats share is converted: axis-aligned cuboids, an optional
+ * single-axis element rotation, and per-face UVs. An element without usable corners is
+ * skipped rather than guessed at, and {@link #convert} returns {@code null} if nothing
+ * survives — absent geometry is easier to spot than geometry that is subtly wrong.</p>
  */
 public final class BedrockGeometry {
 
-    /** Java models are authored against a 16x16 texture unless they say otherwise. */
+    /** Sheet size Java assumes when a model does not declare {@code texture_size}. */
     private static final int DEFAULT_TEXTURE_SIZE = 16;
 
     private static final List<String> FACES = List.of("north", "south", "east", "west", "up", "down");
@@ -42,15 +41,17 @@ public final class BedrockGeometry {
     }
 
     /**
-     * @param identifier Bedrock geometry identifier, e.g. {@code geometry.kalo.ruby_chair}
-     * @param javaModel  the parsed Java model
-     * @return the geometry, or {@code null} if the model has no convertible elements
+     * Builds a single-bone geometry from a parsed Java model.
+     *
+     * @param identifier geometry identifier written into the description
+     * @param javaModel  the Java model JSON
+     * @return the geometry document, or {@code null} if no element could be converted
      */
     public static @Nullable JsonObject convert(@NotNull String identifier, @NotNull JsonObject javaModel) {
         JsonArray elements = javaModel.getAsJsonArray("elements");
         if (elements == null || elements.isEmpty()) {
-            // A model that only sets a parent and textures has no shape of its own to
-            // convert; it inherits one, which the resource pack cannot resolve here.
+            // The model only points at a parent and textures; its shape lives in a file
+            // this converter does not follow.
             return null;
         }
 
@@ -115,7 +116,7 @@ public final class BedrockGeometry {
         double toZ = to.get(2).getAsDouble();
 
         JsonObject cube = new JsonObject();
-        // X is mirrored between the two engines, so the origin comes from `to`, not `from`.
+        // Bedrock's mirrored X means the origin sits at the far corner, not the near one.
         cube.add("origin", array(8 - toX, fromY, fromZ - 8));
         cube.add("size", array(toX - fromX, toY - fromY, toZ - fromZ));
 
@@ -136,10 +137,12 @@ public final class BedrockGeometry {
     }
 
     /**
-     * Java rotates an element around a pivot on one axis; Bedrock takes the same idea but
-     * expects the angle on all three axes. Mirroring the model's X coordinates reverses
-     * an X-axis rotation; Y and Z keep their authored sign. This matches the converter
-     * Geyser itself ships in Rainbow.
+     * Copies a single-axis element rotation.
+     *
+     * <p>Java rotates around a pivot on one axis; Bedrock stores a three-component
+     * rotation around a pivot. The pivot moves with the mirrored, centred space like any
+     * other point, and the angle signs follow the axes that were flipped: X and Y invert,
+     * Z does not.</p>
      */
     private static void applyRotation(@NotNull JsonObject cube, @NotNull JsonObject rotation) {
         JsonArray origin = rotation.getAsJsonArray("origin");
@@ -158,9 +161,9 @@ public final class BedrockGeometry {
                 origin.get(2).getAsDouble() - 8));
 
         cube.add("rotation", switch (axis) {
-            // Mirroring the model coordinates reverses rotation around X only.
+            // Only the flipped axes get a sign change; Z is authored the same way.
             case "x" -> array(-angle, 0, 0);
-            case "y" -> array(0, angle, 0);
+            case "y" -> array(0, -angle, 0);
             case "z" -> array(0, 0, angle);
             default -> array(0, 0, 0);
         });
@@ -180,8 +183,8 @@ public final class BedrockGeometry {
             if (uv == null) {
                 uv = defaultUv(face, fromX, fromY, fromZ, toX, toY, toZ);
             } else if (uv.size() != 4) {
-                // Malformed rather than omitted. Java would reject this model too, so do
-                // not invent coordinates for it.
+                // Four numbers or nothing: inventing the missing ones would produce a
+                // face Java itself would have rejected.
                 continue;
             }
 
@@ -192,9 +195,9 @@ public final class BedrockGeometry {
 
             JsonObject bedrockFace = new JsonObject();
             if ("up".equals(face) || "down".equals(face)) {
-                // Java and Bedrock orient horizontal faces oppositely. Negative sizes
-                // are intentional and supported by Bedrock; taking abs() silently
-                // unflips asymmetric textures.
+                // Top and bottom faces run the other way in Bedrock. The resulting
+                // negative uv_size is legal and preserves the image; abs() would visibly
+                // unflip it.
                 bedrockFace.add("uv", array(x2, y2));
                 bedrockFace.add("uv_size", array(x1 - x2, y1 - y2));
             } else {
@@ -212,20 +215,20 @@ public final class BedrockGeometry {
                 bedrockFace.addProperty("material_instance", materialName(texture.getAsString()));
             }
 
-            // The cube coordinates themselves are mirrored. Face names stay attached to
-            // their world directions; swapping east/west here mirrors the model twice.
+            // Only the cube coordinates are mirrored. Face keys still mean the same world
+            // directions; swapping east and west here would mirror the model twice.
             converted.add(face, bedrockFace);
         }
 
         return converted;
     }
 
-    /** Kept package-visible for the coordinate-regression tests. */
+    /** Identity mapping; package-visible so the coordinate tests can pin face naming. */
     static @NotNull String mirrorFace(@NotNull String javaFace) {
         return javaFace;
     }
 
-    /** Java's exact inferred face UVs when a model omits the optional {@code uv} field. */
+    /** Java's derived UVs for a face that omits the optional {@code uv} field. */
     private static @NotNull JsonArray defaultUv(@NotNull String face,
                                                  double fromX, double fromY, double fromZ,
                                                  double toX, double toY, double toZ) {
@@ -240,13 +243,13 @@ public final class BedrockGeometry {
         };
     }
 
-    /** Bedrock material-instance names cannot use Java's leading reference marker. */
+    /** Turns a texture reference into a Bedrock material name: no {@code #}, no separators. */
     public static @NotNull String materialName(@NotNull String texture) {
         String value = texture.startsWith("#") ? texture.substring(1) : texture;
         return value.replace(':', '_').replace('/', '_');
     }
 
-    /** Blockbench writes {@code texture_size: [w, h]} when the sheet is not 16x16. */
+    /** Reads the {@code texture_size} Blockbench writes for non-16x16 sheets. */
     private static int[] textureSize(@NotNull JsonObject javaModel) {
         JsonElement size = javaModel.get("texture_size");
         if (size != null && size.isJsonArray() && size.getAsJsonArray().size() == 2) {
@@ -256,7 +259,7 @@ public final class BedrockGeometry {
         return new int[]{DEFAULT_TEXTURE_SIZE, DEFAULT_TEXTURE_SIZE};
     }
 
-    /** The Bedrock geometry identifier for a piece of content. */
+    /** The geometry identifier used for a piece of content. */
     public static @NotNull String identifierFor(@NotNull String namespace, @NotNull String name) {
         return "geometry.kalo." + namespace + "_" + name;
     }
@@ -264,8 +267,8 @@ public final class BedrockGeometry {
     private static @NotNull JsonArray array(double... values) {
         JsonArray array = new JsonArray(values.length);
         for (double value : values) {
-            // Whole numbers serialize as 8 rather than 8.0, which is what Bedrock's own
-            // geometry files look like.
+            // Integer-shaped numbers are written as integers, which is how a hand-authored
+            // Bedrock geometry reads and keeps the JSON compact.
             if (value == Math.rint(value) && !Double.isInfinite(value)) {
                 array.add((int) value);
             } else {

@@ -24,6 +24,7 @@ public final class GeyserIntegration {
     private static final String GEYSER_PLUGIN = "Geyser-Spigot";
     // Object keeps this guard class free of Geyser types in its fields and signatures.
     private static Object registration;
+    private static volatile BedrockSupport support = BedrockSupport.NONE;
 
     private GeyserIntegration() {
     }
@@ -43,10 +44,13 @@ public final class GeyserIntegration {
         }
         try {
             registration = GeyserBridge.register(plugin);
+            support = new GeyserBedrockSupport(plugin);
             return true;
         } catch (Throwable t) {
             // Throwable: a Geyser version whose API has moved surfaces as LinkageError,
             // and Bedrock support failing must never stop the server from starting.
+            registration = null;
+            support = BedrockSupport.NONE;
             Plugins.logger().log(Level.WARNING,
                     "Geyser is installed but could not be hooked; use the standalone extension instead", t);
             return false;
@@ -57,6 +61,7 @@ public final class GeyserIntegration {
     public static synchronized void unregister() {
         Object registered = registration;
         registration = null;
+        support = BedrockSupport.NONE;
         if (registered == null) {
             return;
         }
@@ -65,6 +70,11 @@ public final class GeyserIntegration {
         } catch (Throwable t) {
             Plugins.logger().log(Level.WARNING, "Could not unregister Kalo from Geyser", t);
         }
+    }
+
+    /** The active Bedrock seam; {@link BedrockSupport#NONE} when Geyser is absent. */
+    public static @NotNull BedrockSupport support() {
+        return support;
     }
 
     /**

@@ -101,6 +101,11 @@ public final class CommandManager implements Managerial {
                 .handler(ctx -> runDoctor(ctx.sender().getSender())));
 
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("performance")
+                .permission(Permission.of(PERMISSION_PREFIX + "performance"))
+                .handler(ctx -> runPerformance(ctx.sender().getSender())));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("learn-held")
                 .permission(Permission.of(PERMISSION_PREFIX + "learn-held"))
                 .handler(ctx -> runLearnHeld(context.plugin(), ctx.sender().getSender())));
@@ -137,6 +142,13 @@ public final class CommandManager implements Managerial {
                                 Component.text("Unknown content '" + itemKey + "'", NamedTextColor.RED));
                         return;
                     }
+                    if (!io.kalo.platform.java.ContentEntitlements.allows(player,
+                            itemKey.getNamespace() + ":" + itemKey.getKey())) {
+                        ctx.sender().getSender().sendMessage(Component.text(
+                                player.getName() + " is not entitled to " + itemKey,
+                                NamedTextColor.RED));
+                        return;
+                    }
 
                     CommandSender sender = ctx.sender().getSender();
                     Runnable retired = () -> sender.sendMessage(Component.text(
@@ -150,6 +162,99 @@ public final class CommandManager implements Managerial {
                         }
                     }, retired, 1L);
                     if (!scheduled) retired.run();
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("vehicle")
+                .permission(Permission.of(PERMISSION_PREFIX + "vehicle"))
+                .required("vehicle", NamespacedKeyParser.namespacedKeyParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player", NamedTextColor.RED));
+                        return;
+                    }
+                    NamespacedKey raw = ctx.get("vehicle");
+                    io.kalo.content.vehicle.Vehicle vehicle = RegistryManager.GlobalRegistries
+                            .registries().vehicle().get(net.kyori.adventure.key.Key.key(
+                                    raw.getNamespace(), raw.getKey())).orElse(null);
+                    if (vehicle == null) {
+                        sender.sendMessage(Component.text("Unknown vehicle '" + raw + "'",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    if (!io.kalo.platform.java.ContentEntitlements.allows(player,
+                            raw.getNamespace() + ":" + raw.getKey())) {
+                        sender.sendMessage(Component.text(
+                                "You are not entitled to that vehicle", NamedTextColor.RED));
+                        return;
+                    }
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)
+                            || instance.vehicleListener() == null) {
+                        sender.sendMessage(Component.text("Kalo vehicles are not initialized",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    Runnable retired = () -> sender.sendMessage(Component.text(
+                            "Could not spawn the vehicle because " + player.getName()
+                                    + " is no longer available", NamedTextColor.RED));
+                    boolean scheduled = player.getScheduler().execute(context.plugin(), () -> {
+                        var spawned = instance.vehicleListener().spawn(player, vehicle);
+                        sender.sendMessage(spawned == null
+                                ? Component.text("Vehicle model is not ready yet",
+                                        NamedTextColor.RED)
+                                : Component.text("Spawned " + raw, NamedTextColor.GREEN));
+                    }, retired, 1L);
+                    if (!scheduled) {
+                        retired.run();
+                    }
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("spawn")
+                .permission(Permission.of(PERMISSION_PREFIX + "spawn"))
+                .required("mob", NamespacedKeyParser.namespacedKeyParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text(
+                                "Run this from inside the world you want the mob in",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    NamespacedKey key = ctx.get("mob");
+                    io.kalo.content.mob.Mob mob = RegistryManager.GlobalRegistries
+                            .registries().mob().get(net.kyori.adventure.key.Key.key(
+                                    key.getNamespace(), key.getKey())).orElse(null);
+                    if (mob == null) {
+                        sender.sendMessage(Component.text("Unknown mob '" + key + "'",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    if (!io.kalo.platform.java.ContentEntitlements.allows(player,
+                            key.getNamespace() + ":" + key.getKey())) {
+                        sender.sendMessage(Component.text(
+                                "You are not entitled to that mob", NamedTextColor.RED));
+                        return;
+                    }
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)
+                            || instance.mobListener() == null) {
+                        sender.sendMessage(Component.text("Kalo mobs are not initialized",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    Runnable retired = () -> sender.sendMessage(Component.text(
+                            "Could not spawn the mob because " + player.getName()
+                                    + " is no longer available", NamedTextColor.RED));
+                    boolean scheduled = player.getScheduler().execute(context.plugin(), () -> {
+                        var spawned = instance.mobListener().spawn(player.getLocation(), mob);
+                        sender.sendMessage(spawned == null
+                                ? Component.text("Could not spawn " + key, NamedTextColor.RED)
+                                : Component.text("Spawned " + key, NamedTextColor.GREEN));
+                    }, retired, 1L);
+                    if (!scheduled) {
+                        retired.run();
+                    }
                 }));
 
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
@@ -172,6 +277,338 @@ public final class CommandManager implements Managerial {
 
         // Explicit path form for unusual layouts and files from a plugin that is not
         // currently installed. The normal path is /kalo import <plugin>.
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("hud")
+                .literal("stop")
+                .permission(Permission.of(PERMISSION_PREFIX + "hud"))
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player", NamedTextColor.RED));
+                        return;
+                    }
+                    io.kalo.platform.java.HudRuntime.stop(player);
+                    sender.sendMessage(Component.text("HUD stopped", NamedTextColor.GREEN));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("hud")
+                .permission(Permission.of(PERMISSION_PREFIX + "hud"))
+                .required("hud", NamespacedKeyParser.namespacedKeyParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player", NamedTextColor.RED));
+                        return;
+                    }
+                    NamespacedKey raw = ctx.get("hud");
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)) {
+                        sender.sendMessage(Component.text("Kalo HUDs are not initialized",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    if (!io.kalo.platform.java.ContentEntitlements.allows(player,
+                            raw.getNamespace() + ":" + raw.getKey())) {
+                        sender.sendMessage(Component.text(
+                                "You are not entitled to that HUD", NamedTextColor.RED));
+                        return;
+                    }
+                    var definition = instance.registryManager().hudType().huds()
+                            .get(net.kyori.adventure.key.Key.key(
+                                    raw.getNamespace(), raw.getKey()));
+                    if (definition == null) {
+                        sender.sendMessage(Component.text("Unknown HUD '" + raw + "'",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    boolean shown = io.kalo.platform.java.HudRuntime.show(player, definition);
+                    sender.sendMessage(shown
+                            ? Component.text("Showing " + raw, NamedTextColor.GREEN)
+                            : Component.text("Could not draw that HUD", NamedTextColor.RED));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("dialog")
+                .literal("open")
+                .permission(Permission.of(PERMISSION_PREFIX + "dialog"))
+                .required("player", PlayerParser.playerParser())
+                .required("dialog", NamespacedKeyParser.namespacedKeyParser())
+                .optional("target", StringParser.greedyStringParser())
+                .handler(ctx -> openDialog(ctx.sender().getSender(), ctx.get("player"),
+                        ctx.get("dialog"), ctx.<String>optional("target").orElse(""))));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("dialog")
+                .permission(Permission.of(PERMISSION_PREFIX + "dialog"))
+                .required("dialog", NamespacedKeyParser.namespacedKeyParser())
+                .optional("target", StringParser.greedyStringParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    openDialog(sender, player, ctx.get("dialog"),
+                            ctx.<String>optional("target").orElse(""));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("liquid")
+                .literal("corner")
+                .permission(Permission.of(PERMISSION_PREFIX + "liquid"))
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    io.kalo.platform.java.LiquidRuntime.corner(player);
+                    sender.sendMessage(Component.text(
+                            "Liquid corner set at your block", NamedTextColor.GREEN));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("liquid")
+                .literal("fill")
+                .permission(Permission.of(PERMISSION_PREFIX + "liquid"))
+                .required("liquid", NamespacedKeyParser.namespacedKeyParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    NamespacedKey raw = ctx.get("liquid");
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)) {
+                        sender.sendMessage(Component.text("Kalo liquids are not initialized",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    net.kyori.adventure.key.Key key = net.kyori.adventure.key.Key.key(
+                            raw.getNamespace(), raw.getKey());
+                    if (!io.kalo.platform.java.ContentEntitlements.allows(player, key)) {
+                        sender.sendMessage(Component.text(
+                                "You are not entitled to that liquid", NamedTextColor.RED));
+                        return;
+                    }
+                    var definition = instance.registryManager().liquidType().liquids().get(key);
+                    if (definition == null) {
+                        sender.sendMessage(Component.text("Unknown liquid '" + raw + "'",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    boolean filled = io.kalo.platform.java.LiquidRuntime.fill(player, definition);
+                    sender.sendMessage(filled
+                            ? Component.text("Marked liquid volume " + raw,
+                                    NamedTextColor.GREEN)
+                            : Component.text("Set a corner first with /kalo liquid corner",
+                                    NamedTextColor.RED));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("liquid")
+                .literal("clear")
+                .permission(Permission.of(PERMISSION_PREFIX + "liquid"))
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    boolean cleared = io.kalo.platform.java.LiquidRuntime.clear(player);
+                    sender.sendMessage(cleared
+                            ? Component.text("Liquid volume cleared", NamedTextColor.GREEN)
+                            : Component.text("No liquid volume here", NamedTextColor.RED));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("vfx")
+                .literal("list")
+                .permission(Permission.of(PERMISSION_PREFIX + "vfx"))
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)) {
+                        sender.sendMessage(Component.text("Kalo VFX are not initialized",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    String names = instance.registryManager().vfxType().effects().keySet()
+                            .stream().map(net.kyori.adventure.key.Key::asString)
+                            .sorted().collect(java.util.stream.Collectors.joining(", "));
+                    sender.sendMessage(Component.text(names.isEmpty()
+                            ? "No VFX loaded" : "VFX: " + names, NamedTextColor.GRAY));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("vfx")
+                .literal("stop")
+                .permission(Permission.of(PERMISSION_PREFIX + "vfx"))
+                .optional("target", StringParser.greedyStringParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    String target = ctx.<String>optional("target").orElse("").trim();
+                    if (target.equals("all")) {
+                        io.kalo.platform.java.VfxRuntime.clear();
+                    } else if (target.startsWith("tag:")) {
+                        io.kalo.platform.java.VfxRuntime.stopTag(
+                                target.substring("tag:".length()));
+                    } else if (!target.isBlank()) {
+                        sender.sendMessage(Component.text(
+                                "Use /kalo vfx stop, stop tag:<name> or stop all",
+                                NamedTextColor.RED));
+                        return;
+                    } else {
+                        io.kalo.platform.java.VfxRuntime.stop(player);
+                    }
+                    sender.sendMessage(Component.text("VFX stopped", NamedTextColor.GREEN));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("vfx")
+                .permission(Permission.of(PERMISSION_PREFIX + "vfx"))
+                .required("vfx", NamespacedKeyParser.namespacedKeyParser())
+                .optional("options", StringParser.greedyStringParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    NamespacedKey raw = ctx.get("vfx");
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)) {
+                        sender.sendMessage(Component.text("Kalo VFX are not initialized",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    net.kyori.adventure.key.Key key = net.kyori.adventure.key.Key.key(
+                            raw.getNamespace(), raw.getKey());
+                    if (!io.kalo.platform.java.ContentEntitlements.allows(player, key)) {
+                        sender.sendMessage(Component.text(
+                                "You are not entitled to that VFX", NamedTextColor.RED));
+                        return;
+                    }
+                    var definition = instance.registryManager().vfxType().effects().get(key);
+                    if (definition == null) {
+                        sender.sendMessage(Component.text("Unknown VFX '" + raw + "'",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    io.kalo.content.vfx.definition.VfxCastOptions options;
+                    try {
+                        options = io.kalo.content.vfx.definition.VfxCastOptions.parse(
+                                ctx.<String>optional("options").orElse(""));
+                    } catch (IllegalArgumentException invalid) {
+                        sender.sendMessage(Component.text(invalid.getMessage(),
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    boolean played = io.kalo.platform.java.VfxRuntime.play(
+                            player, definition, options);
+                    sender.sendMessage(played
+                            ? Component.text("Casting " + raw, NamedTextColor.GREEN)
+                            : Component.text("Could not play that VFX", NamedTextColor.RED));
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("click")
+                .required("key", StringParser.stringParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    if (!io.kalo.platform.java.DialogRuntime.click(player, ctx.get("key"))) {
+                        sender.sendMessage(Component.text(
+                                "That dialog is no longer open", NamedTextColor.RED));
+                    }
+                }));
+
+        manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
+                .literal("emote")
+                .permission(Permission.of(PERMISSION_PREFIX + "emote"))
+                .required("emote", NamespacedKeyParser.namespacedKeyParser())
+                .optional("cast", StringParser.greedyStringParser())
+                .handler(ctx -> {
+                    CommandSender sender = ctx.sender().getSender();
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(Component.text("Run this as a player", NamedTextColor.RED));
+                        return;
+                    }
+                    NamespacedKey raw = ctx.get("emote");
+                    io.kalo.content.emote.Emote emote = RegistryManager.GlobalRegistries
+                            .registries().emote().get(net.kyori.adventure.key.Key.key(
+                                    raw.getNamespace(), raw.getKey())).orElse(null);
+                    if (emote == null) {
+                        sender.sendMessage(Component.text("Unknown emote '" + raw + "'",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    if (!io.kalo.platform.java.ContentEntitlements.allows(player,
+                            raw.getNamespace() + ":" + raw.getKey())) {
+                        sender.sendMessage(Component.text(
+                                "You are not entitled to that emote", NamedTextColor.RED));
+                        return;
+                    }
+                    if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)
+                            || instance.emoteListener() == null) {
+                        sender.sendMessage(Component.text("Kalo emotes are not initialized",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    String permission = emote.definition().permission();
+                    if (permission != null && !player.hasPermission(permission)) {
+                        sender.sendMessage(Component.text("You cannot play that emote",
+                                NamedTextColor.RED));
+                        return;
+                    }
+                    String castRaw = ctx.<String>optional("cast").orElse("");
+                    java.util.List<String> castNames = io.kalo.content.emote.EmoteCast
+                            .tokens(castRaw);
+                    String castError = io.kalo.content.emote.EmoteCast.validate(
+                            emote.definition().performers().size() - 1,
+                            castNames, player.getName());
+                    if (castError != null) {
+                        sender.sendMessage(Component.text(castError, NamedTextColor.RED));
+                        return;
+                    }
+                    java.util.List<Player> cast = new java.util.ArrayList<>();
+                    for (String name : castNames) {
+                        Player member = context.plugin().getServer().getPlayerExact(name);
+                        if (member == null || member.equals(player)) {
+                            sender.sendMessage(Component.text(
+                                    "Unknown or unavailable performer '" + name + "'",
+                                    NamedTextColor.RED));
+                            return;
+                        }
+                        cast.add(member);
+                    }
+                    Runnable retired = () -> sender.sendMessage(Component.text(
+                            "Could not play the emote because " + player.getName()
+                                    + " is no longer available", NamedTextColor.RED));
+                    boolean scheduled = player.getScheduler().execute(context.plugin(), () -> {
+                        boolean played = instance.emoteListener().play(player, emote, cast);
+                        sender.sendMessage(played
+                                ? Component.text("Playing " + raw, NamedTextColor.GREEN)
+                                : Component.text("Emote model is not ready yet", NamedTextColor.RED));
+                    }, retired, 1L);
+                    if (!scheduled) {
+                        retired.run();
+                    }
+                }));
+
+
         manager.command(manager.commandBuilder(Constants.PLUGIN_ID)
                 .literal("import")
                 .literal("file")
@@ -290,6 +727,10 @@ public final class CommandManager implements Managerial {
             java.util.concurrent.CompletableFuture.runAsync(() -> {
                 try {
                     io.kalo.converter.ExternalItemBindings.remember(destination, observed);
+                    if (io.kalo.Kalo.plugin().items()
+                            instanceof io.kalo.items.ItemIdentityImpl impl) {
+                        impl.learn(observed);
+                    }
                 } catch (java.io.IOException failed) {
                     throw new java.util.concurrent.CompletionException(failed);
                 }
@@ -465,12 +906,8 @@ public final class CommandManager implements Managerial {
         io.kalo.performance.PerformanceSnapshot performance = Kalo.plugin().performance().snapshot();
 
         sender.sendMessage(Component.text("Kalo diagnostics", NamedTextColor.AQUA));
-        sender.sendMessage(Component.text(
-                "Runtime: " + performance.pressure()
-                        + " | TPS " + String.format(java.util.Locale.ROOT, "%.2f", performance.tps())
-                        + " | heap " + String.format(java.util.Locale.ROOT, "%.1f%%", performance.heapUsage() * 100.0),
-                performance.pressure() == io.kalo.performance.Pressure.NORMAL
-                        ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+        sendRuntime(sender, performance);
+        sendBudget(sender, performance);
         sender.sendMessage(Component.text(
                 "Content: " + registries.item().entries().size() + " items, "
                         + registries.block().entries().size() + " blocks, "
@@ -492,13 +929,68 @@ public final class CommandManager implements Managerial {
                         : "not generated yet")
                         + " | adaptive=" + Kalo.plugin().performance().adaptiveEnabled(),
                 NamedTextColor.GRAY));
+        NamedTextColor delivery = io.kalo.platform.bedrock.BedrockDeliveryStatus.mode()
+                == io.kalo.platform.bedrock.BedrockDeliveryStatus.Mode.NONE
+                ? NamedTextColor.RED : NamedTextColor.GRAY;
+        sender.sendMessage(Component.text("Bedrock: "
+                + io.kalo.platform.bedrock.BedrockDeliveryStatus.describe(), delivery));
+        sender.sendMessage(Component.text("Bedrock forms: "
+                + io.kalo.converter.DeluxeMenuFormBridge.diagnostics(), NamedTextColor.GRAY));
+        String safeMenus = io.kalo.converter.DeluxeMenuFormBridge.safeMenus();
+        if (!safeMenus.isEmpty()) {
+            sender.sendMessage(Component.text("Safe menus: "
+                    + (safeMenus.length() > 240 ? safeMenus.substring(0, 240) + "…" : safeMenus),
+                    NamedTextColor.DARK_GRAY));
+        }
         sender.sendMessage(Component.text(
                 "Limits: no artificial content caps; runtime scales until platform/hardware limits.",
                 NamedTextColor.DARK_GRAY));
     }
 
-    private static void runMigrateWorldDryRun(@NotNull CommandSender sender) {
-        sender.sendMessage(Component.text("Scanning loaded chunks for Kalo-allocated block states...", NamedTextColor.YELLOW));
+    private static String scale(double value) {
+        return String.format(java.util.Locale.ROOT, "%.2f", value);
+    }
+
+    private static void sendRuntime(@NotNull CommandSender sender,
+                                    @NotNull io.kalo.performance.PerformanceSnapshot snapshot) {
+        sender.sendMessage(Component.text(
+                "Runtime: " + snapshot.pressure()
+                        + " | TPS " + String.format(java.util.Locale.ROOT, "%.2f", snapshot.tps())
+                        + " | heap " + String.format(java.util.Locale.ROOT, "%.1f%%", snapshot.heapUsage() * 100.0),
+                snapshot.pressure() == io.kalo.performance.Pressure.NORMAL
+                        ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+    }
+
+    private static void sendBudget(@NotNull CommandSender sender,
+                                   @NotNull io.kalo.performance.PerformanceSnapshot snapshot) {
+        io.kalo.performance.RuntimeBudget budget = snapshot.budget();
+        sender.sendMessage(Component.text(
+                "Budget: background=" + scale(budget.backgroundWorkScale())
+                        + " render=" + scale(budget.renderDistanceScale())
+                        + " cache=" + scale(budget.cacheRetentionScale())
+                        + " | model-cache=" + io.kalo.model.ModelRegistry.size()
+                        + "/" + io.kalo.model.ModelRegistry.capacity(),
+                NamedTextColor.GRAY));
+    }
+
+    /**
+     * Answers "is the server under pressure, and what did Kalo scale back?" without the
+     * content inventory {@code /kalo doctor} prints.
+     */
+    private static void runPerformance(@NotNull CommandSender sender) {
+        io.kalo.performance.PerformanceSnapshot snapshot = Kalo.plugin().performance().snapshot();
+        sender.sendMessage(Component.text("Kalo performance", NamedTextColor.AQUA));
+        sendRuntime(sender, snapshot);
+        sendBudget(sender, snapshot);
+        int external = Kalo.plugin().items() instanceof io.kalo.items.ItemIdentityImpl impl
+                ? impl.externalCount() : 0;
+        sender.sendMessage(Component.text(
+                "Adaptive: " + Kalo.plugin().performance().adaptiveEnabled()
+                        + " | external ids: " + external,
+                NamedTextColor.GRAY));
+    }
+
+    private static void runMigrateWorldDryRun(@NotNull CommandSender sender) {        sender.sendMessage(Component.text("Scanning loaded chunks for Kalo-allocated block states...", NamedTextColor.YELLOW));
         if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl plugin)) {
             sender.sendMessage(Component.text("Not running as KaloPluginImpl — cannot access allocator", NamedTextColor.RED));
             return;
@@ -816,5 +1308,42 @@ public final class CommandManager implements Managerial {
 
     @Override
     public void end(@NotNull Context context) {
+    }
+
+    /** Shared by /kalo dialog &lt;name&gt; and /kalo dialog open &lt;player&gt; &lt;name&gt;. */
+    private static void openDialog(@NotNull CommandSender sender, @NotNull Player player,
+                                   @NotNull NamespacedKey raw, @NotNull String target) {
+        if (!(Kalo.plugin() instanceof io.kalo.KaloPluginImpl instance)) {
+            sender.sendMessage(Component.text("Kalo dialogs are not initialized",
+                    NamedTextColor.RED));
+            return;
+        }
+        net.kyori.adventure.key.Key key = net.kyori.adventure.key.Key.key(
+                raw.getNamespace(), raw.getKey());
+        var definition = instance.registryManager().dialogType().dialogs().get(key);
+        if (definition == null) {
+            sender.sendMessage(Component.text("Unknown dialog '" + raw + "'",
+                    NamedTextColor.RED));
+            return;
+        }
+        if (!io.kalo.platform.java.ContentEntitlements.allows(player, key)) {
+            sender.sendMessage(Component.text("That player is not entitled to this dialog",
+                    NamedTextColor.RED));
+            return;
+        }
+        java.util.Map<String, String> placeholders = target.isBlank()
+                ? java.util.Map.of() : java.util.Map.of("target", target);
+        boolean shown = io.kalo.platform.java.DialogRuntime.show(player, definition,
+                placeholders);
+        if (!shown) {
+            sender.sendMessage(Component.text("Could not open that dialog; Java 1.21.6+"
+                    + " with the kalo-dialogs data pack, or a Bedrock forms bridge, is required",
+                    NamedTextColor.RED));
+            return;
+        }
+        if (!sender.equals(player)) {
+            sender.sendMessage(Component.text("Opened " + raw + " for " + player.getName(),
+                    NamedTextColor.GREEN));
+        }
     }
 }

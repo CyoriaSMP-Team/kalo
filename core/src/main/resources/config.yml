@@ -21,6 +21,49 @@ base-pack: ""
 #   never  skip Bedrock entirely.
 bedrock: auto
 
+# First-party vanilla Java ESC / Pause Menu branding (no client mod).
+# Kalo adds the PNG as a bitmap font glyph and overrides selected vanilla
+# translation keys when generating the pack. It does not add clickable buttons.
+# Put your own PNG in plugins/Kalo/branding/pause-logo.png, enable this, then
+# run /kalo reload. The base-pack never needs manual editing.
+pause-menu:
+  enabled: false
+  logo: "branding/pause-logo.png"
+  title: "<glyph:pause_logo>" # Native glyph registry placeholder for ESC header
+  glyph-codepoint: "E7C0" # Private-use BMP character, must not overlap other fonts
+  height: 30              # Display height; bitmap keeps original aspect ratio
+  ascent: 26              # Baseline position (must not exceed height)
+  translations:
+    en_us:
+      return-to-game: "Back to the server"
+      disconnect: "Disconnect"
+    th_th:
+      return-to-game: "กลับเข้าเกม"
+      disconnect: "ออกจากเซิร์ฟเวอร์"
+
+  # Server-side real clickable ESC button (Java 1.21.11 dialogs).
+  # Kalo creates world/datapacks/kalo-pause-menu; Minecraft registry reload
+  # (or world restart) is necessary after changing these entries.
+  dialog:
+    enabled: false
+    title: "CyoriaSMP"
+    pause-button: "เมนู CyoriaSMP"
+    description: "ทางลัดสำหรับผู้เล่น CyoriaSMP"
+    columns: 2
+    buttons:
+      - label: "กลับจุดเกิด"
+        type: command
+        value: "/spawn"
+      - label: "ตลาด"
+        type: command
+        value: "/shop"
+      - label: "เว็บไซต์"
+        type: url
+        value: "https://www.cyoriasmp.com"
+      - label: "Discord"
+        type: url
+        value: "https://discord.cyoriasmp.com"
+
 # Optional synchronization into an EXISTING standalone Geyser directory.
 # Keep this empty unless you operate Geyser in a separate process and want
 # Kalo to copy its generated.mcpack and two mapping files automatically.
@@ -30,6 +73,67 @@ bedrock: auto
 # bedrock: never always takes precedence over this setting.
 bedrock-standalone:
   directory: ""
+  # A proxy puts Geyser one or two levels from the server directory. When no path is
+  # configured, look there for a Geyser home (config.yml + packs/ + custom_mappings/)
+  # instead of generating a pack nobody reads. Set false to require an explicit path.
+  auto-discover: true
+
+# A hotbar item that opens a menu without typing a command.
+#
+# A Bedrock client whose account has chat restricted cannot run any command — the message
+# never reaches the server — so a menu that is only reachable by command is unreachable
+# for that player. A right click needs no chat. The item is marked in its persistent data
+# container, so an ordinary item of the same material does nothing, and it is given once
+# per join only when the player does not already carry one.
+menu-item:
+  enabled: false
+  material: COMPASS
+  # Hotbar slot, 0-8. Falls back to the first empty hotbar slot when occupied.
+  slot: 8
+  name: "<gold>เมนู</gold>"
+  lore:
+    - "<gray>คลิกขวาเพื่อเปิดเมนู</gray>"
+  command: "rtpmenu"
+
+# Per-player Bedrock pack staging.# Bedrock negotiates its pack list at login. Kalo copies generated.mcpack into
+# plugins/Kalo/bedrock-packs/<xuid>.mcpack per session and hands that copy to
+# Geyser, so two players never negotiate over one shared archive and a content
+# rebuild can replace one session's copy without touching another's.
+# transfer: when the generated pack changes while a Bedrock player is online,
+# ask that player to reconnect through the join address so the next login reads
+# the new copy. Set false to apply changes only on the next natural login.
+bedrock-packs:
+  per-player: true
+  transfer: true
+  # Optional per-session content filtering. Requires per-player: true.
+  # sessions maps an XUID to allowed content namespaces or full keys.
+  # Unlisted sessions receive everything; an empty list sends only shared
+  # pack files; "*" sends everything. Content files are identified by the
+  # generated kalo-content.json manifest, not by filename guessing.
+  # This filters pack assets and gates gameplay grants; Geyser's own
+  # registration remains global.
+  session-content:
+    enabled: false
+    # Content key -> permission node. Listed content is removed from the
+    # session pack and blocked from /kalo give, pickup, use, placement,
+    # vehicle/mob spawning and emotes unless the player has the node.
+    # Namespace wildcards are supported, e.g. "testpack:*".
+    permissions: {}
+    sessions: {}
+
+# Player skins for player-body emotes (rig: player).
+# When enabled, a Bedrock player's own skin is read from their signed profile
+# texture URL, validated as a PNG, cached at plugins/Kalo/skins/<uuid>.png,
+# and overlaid into that XUID's session pack. A cached file always wins, so
+# operators can pre-seed skins or run without outbound HTTP.
+# skin-hosts is an allowlist; no other host is fetched.
+# Changes to this section apply after a server restart.
+emotes:
+  skin-fetch: true
+  skin-hosts:
+    - textures.minecraft.net
+    - textures.mojang.com
+  skin-timeout-seconds: 8
 
 # Optional Rainbow-style bridge for EXISTING Java resource-pack items.
 #
@@ -52,6 +156,13 @@ external-content:
   # Kalo will not guess or replace their contents. /kalo discover-packs lists
   # all valid candidates for explicit selection. No network downloads.
   auto-discover-packs: true
+
+# VFX runtime limits.
+#
+# Every VFX sprite is an ItemDisplay. When a new cast would exceed this planned
+# count, Kalo ends the oldest active cast to make room. 0 disables the cap.
+vfx:
+  max-sprites: 4000
 
 # Runtime performance controller.
 #
@@ -83,6 +194,21 @@ pack-host:
   # The host or IP players will reach the server on. "127.0.0.1" only works for a client
   # on the same machine as the server.
   public-address: "127.0.0.1"
+
+  # Optional full public base URL for HTTPS reverse proxies / Cloudflare Tunnel.
+  # If set, Kalo sends https://hostname/<token>/pack.zip instead of http://host:port/.
+  public-url: ""
+
+  # Listener interface. Keep this on loopback if accessed only through a local proxy.
+  # Legacy default listens on all interfaces, matching previous versions.
+  bind-address: "0.0.0.0"
+
+  # Optional direct publish. Kalo uploads completed packs via the private
+  # Tailnet/WireGuard endpoint and only advertises after Relay confirms bytes.
+  # Empty = legacy local HTTP hosting; no Relay upload.
+  relay-upload-url: ""
+  # Absolute path to a private bearer token file; never commit the token.
+  relay-token-file: ""
 
   # true kicks players who decline or fail to download. Leave false unless the content is
   # essential to play — a failed download then only means missing textures, not no access.

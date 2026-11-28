@@ -38,10 +38,37 @@ class ZipPackWriterTest {
         JsonObject root = JsonParser.parseString(read(out, "pack.mcmeta")).getAsJsonObject();
         JsonObject packSection = root.getAsJsonObject("pack");
 
-        assertEquals(PackFormats.CURRENT, packSection.get("pack_format").getAsInt());
         assertEquals("test pack", packSection.get("description").getAsString());
-        assertEquals(PackFormats.CURRENT,
-                packSection.getAsJsonObject("supported_formats").get("min_inclusive").getAsInt());
+        assertEquals(PackFormats.CURRENT, packSection.getAsJsonArray("min_format").get(0).getAsInt());
+        assertEquals(0, packSection.getAsJsonArray("min_format").get(1).getAsInt());
+        assertEquals(PackFormats.CURRENT, packSection.getAsJsonArray("max_format").get(0).getAsInt());
+        assertFalse(packSection.has("supported_formats"), "legacy metadata is rejected by 1.21.11");
+        assertFalse(packSection.has("pack_format"), "legacy pack_format is unnecessary for modern-only packs");
+    }
+
+    @Test
+    void generatesMetadataAcceptedByMinecraft12111(@TempDir Path dir) throws IOException {
+        ResourcePack current = new ResourcePackImpl(PackMeta.of(75, "CyoriaSMP native branding"));
+        File out = dir.resolve("minecraft-1.21.11.zip").toFile();
+        ZipPackWriter.write(out, current);
+        JsonObject meta = JsonParser.parseString(read(out, "pack.mcmeta")).getAsJsonObject().getAsJsonObject("pack");
+        assertEquals(75, meta.getAsJsonArray("min_format").get(0).getAsInt());
+        assertEquals(75, meta.getAsJsonArray("max_format").get(0).getAsInt());
+        assertEquals(0, meta.getAsJsonArray("min_format").get(1).getAsInt());
+        assertEquals(0, meta.getAsJsonArray("max_format").get(1).getAsInt());
+        assertFalse(meta.has("supported_formats"));
+    }
+
+    @Test
+    void retainsLegacyMetadataFor1218(@TempDir Path dir) throws IOException {
+        ResourcePack legacy = new ResourcePackImpl(PackMeta.of(64, "old Minecraft"));
+        File out = dir.resolve("minecraft-1.21.8.zip").toFile();
+        ZipPackWriter.write(out, legacy);
+        JsonObject meta = JsonParser.parseString(read(out, "pack.mcmeta")).getAsJsonObject().getAsJsonObject("pack");
+        assertEquals(64, meta.get("pack_format").getAsInt());
+        assertEquals(64, meta.getAsJsonObject("supported_formats").get("min_inclusive").getAsInt());
+        assertFalse(meta.has("min_format"));
+        assertFalse(meta.has("max_format"));
     }
 
     @Test

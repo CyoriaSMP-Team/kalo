@@ -1,5 +1,6 @@
 package io.kalo;
 
+import io.kalo.items.ItemIdentity;
 import io.kalo.manager.ContentManager;
 import io.kalo.manager.RegistryManager;
 import io.kalo.manager.ResourcePackManager;
@@ -10,6 +11,9 @@ public interface KaloPlugin {
     @NotNull RegistryManager registryManager();
 
     @NotNull ContentManager contentManager();
+
+    /** Stable item identity contract shared by Kalo and every consumer plugin. */
+    @NotNull ItemIdentity items();
 
     @NotNull ResourcePackManager resourcePackManager();
 

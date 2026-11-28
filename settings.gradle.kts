@@ -8,3 +8,4 @@ rootProject.name = "Kalo"
 include("api")
 include("core")
 include("mohist")
+include("compat:nexo")

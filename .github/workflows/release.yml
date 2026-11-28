@@ -29,7 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Minecraft 26.x requires Java 25, so the plugin targets it too.
+      # The release jar is Java 21 bytecode so it can start on Paper 1.21.4. CI runs on a
+      # Java 25 JDK; the verification step below inspects the emitted class version.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -111,6 +112,11 @@ jobs:
             echo "::error::Mohist plugin.yml missing or incorrect"
             exit 1
           }
+
+      # Full MIT: never publish a jar that contains RP Engine packages, GPL text or a
+      # third-party plugin main class. Runs before any release channel is touched.
+      - name: Verify MIT-only provenance
+        run: python3 scripts/clean-room-guard.py
 
       # Four channels each want release notes, and none of them should get an empty box.
       # Failing here costs a re-tag; shipping blank notes to Modrinth cannot be undone.

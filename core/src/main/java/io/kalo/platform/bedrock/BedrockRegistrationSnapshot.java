@@ -35,11 +35,48 @@ public final class BedrockRegistrationSnapshot {
     public static void publishSuccess(@NotNull Generation generation,
                                       @NotNull List<BedrockBlockRegistration> blocks,
                                       @NotNull List<BedrockItemRegistration> items) {
+        publishSuccess(generation, blocks, items, List.of(), List.of());
+    }
+
+    public static void publishSuccess(@NotNull Generation generation,
+                                      @NotNull List<BedrockBlockRegistration> blocks,
+                                      @NotNull List<BedrockItemRegistration> items,
+                                      @NotNull List<BedrockPlacedModelRegistration> placedModels) {
+        publishSuccess(generation, blocks, items, placedModels, List.of());
+    }
+
+    public static void publishSuccess(@NotNull Generation generation,
+                                      @NotNull List<BedrockBlockRegistration> blocks,
+                                      @NotNull List<BedrockItemRegistration> items,
+                                      @NotNull List<BedrockPlacedModelRegistration> placedModels,
+                                      @NotNull List<BedrockAnimatedBlockRegistration> animatedBlocks) {
+        publishSuccess(generation, blocks, items, placedModels, animatedBlocks, List.of());
+    }
+
+    public static void publishSuccess(@NotNull Generation generation,
+                                      @NotNull List<BedrockBlockRegistration> blocks,
+                                      @NotNull List<BedrockItemRegistration> items,
+                                      @NotNull List<BedrockPlacedModelRegistration> placedModels,
+                                      @NotNull List<BedrockAnimatedBlockRegistration> animatedBlocks,
+                                      @NotNull List<BedrockMobRegistration> mobs) {
+        publishSuccess(generation, blocks, items, placedModels, animatedBlocks, mobs,
+                List.of());
+    }
+
+    public static void publishSuccess(@NotNull Generation generation,
+                                      @NotNull List<BedrockBlockRegistration> blocks,
+                                      @NotNull List<BedrockItemRegistration> items,
+                                      @NotNull List<BedrockPlacedModelRegistration> placedModels,
+                                      @NotNull List<BedrockAnimatedBlockRegistration> animatedBlocks,
+                                      @NotNull List<BedrockMobRegistration> mobs,
+                                      @NotNull List<BedrockRigRegistration> rigs) {
         State state = CURRENT.get();
         if (!state.generation().equals(generation)) {
             return;
         }
-        state.ready().complete(new Registrations(List.copyOf(blocks), List.copyOf(items)));
+        state.ready().complete(new Registrations(List.copyOf(blocks), List.copyOf(items),
+                List.copyOf(placedModels), List.copyOf(animatedBlocks),
+                List.copyOf(mobs), List.copyOf(rigs)));
     }
 
     /**
@@ -54,7 +91,8 @@ public final class BedrockRegistrationSnapshot {
         if (!state.generation().equals(generation)) {
             return;
         }
-        state.ready().complete(new Registrations(List.of(), List.of()));
+        state.ready().complete(new Registrations(List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of()));
     }
 
     /**
@@ -75,7 +113,24 @@ public final class BedrockRegistrationSnapshot {
 
     /** Everything one compile decided Bedrock should be told about. */
     public record Registrations(@NotNull List<BedrockBlockRegistration> blocks,
-                                @NotNull List<BedrockItemRegistration> items) {
+                                @NotNull List<BedrockItemRegistration> items,
+                                @NotNull List<BedrockPlacedModelRegistration> placedModels,
+                                @NotNull List<BedrockAnimatedBlockRegistration> animatedBlocks,
+                                @NotNull List<BedrockMobRegistration> mobs,
+                                @NotNull List<BedrockRigRegistration> rigs) {
+        public Registrations {
+            blocks = List.copyOf(blocks);
+            items = List.copyOf(items);
+            placedModels = List.copyOf(placedModels);
+            animatedBlocks = List.copyOf(animatedBlocks);
+            mobs = List.copyOf(mobs);
+            rigs = List.copyOf(rigs);
+        }
+
+        public Registrations(@NotNull List<BedrockBlockRegistration> blocks,
+                             @NotNull List<BedrockItemRegistration> items) {
+            this(blocks, items, List.of(), List.of(), List.of(), List.of());
+        }
     }
 
     /** Opaque token tying durable output to the compiler generation that produced it. */

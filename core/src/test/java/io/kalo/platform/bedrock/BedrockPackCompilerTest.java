@@ -11,7 +11,11 @@ import io.kalo.content.item.definition.BedrockOptions;
 import io.kalo.content.item.definition.DisplayProperties;
 import io.kalo.content.item.definition.ItemBehaviour;
 import io.kalo.content.item.definition.ItemDefinition;
+import io.kalo.content.item.definition.JavaOptions;
+import org.bukkit.Material;
 import io.kalo.content.item.definition.ModelDefinition;
+import io.kalo.content.vfx.definition.VfxDefinition;
+import io.kalo.content.vfx.definition.VfxRecipe;
 import io.kalo.content.block.definition.BlockCarrier;
 import io.kalo.pack.PackFormats;
 import io.kalo.pack.PackMeta;
@@ -49,7 +53,19 @@ class BedrockPackCompilerTest {
     /** One block's entry in Geyser's custom_mappings file, keyed by the state it overrides. */
     private static JsonObject blockEntry(BedrockPackCompiler.Result result, String javaIdentifier)
             throws IOException {
-        return json(result.blockMappings()).getAsJsonObject("blocks").getAsJsonObject(javaIdentifier);
+        return json(result.blockMappings()).getAsJsonObject("blocks")
+                .getAsJsonObject(io.kalo.platform.bedrock.GeyserBlockMappings.baseOf(javaIdentifier));
+    }
+
+    /**
+     * The per-state part of a block mapping. Geyser keeps components under
+     * {@code state_overrides}, keyed by the state string alone.
+     */
+    private static JsonObject stateEntry(BedrockPackCompiler.Result result, String javaIdentifier)
+            throws IOException {
+        JsonObject entry = blockEntry(result, javaIdentifier);
+        String state = io.kalo.platform.bedrock.GeyserBlockMappings.stateOf(javaIdentifier);
+        return state == null ? entry : entry.getAsJsonObject("state_overrides").getAsJsonObject(state);
     }
 
     /** The texture named by one material instance slot. */
@@ -139,6 +155,34 @@ class BedrockPackCompilerTest {
     }
 
     @Test
+    void vfxModelLayersReuseRegisteredItemModelsOnBedrock() throws Exception {
+        BedrockVfxRegistry.clear();
+        Item ruby = stubSpriteItem("ruby_vfx");
+        VfxDefinition definition = new VfxDefinition(Key.key("testpack", "spark"), "Spark",
+                new VfxRecipe(20, null, List.of(), List.of(),
+                        List.of(new VfxRecipe.Model(ruby.key(), 0, 20,
+                                VfxRecipe.Vec3.ZERO, 1.5, 0, 0, 0, 20)),
+                        List.of(), List.of()), null);
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/ruby_vfx.png");
+        ResourcePack bedrock = new ResourcePackImpl(PackMeta.of(PackFormats.CURRENT,
+                "bedrock"));
+        BedrockPackCompiler compiler = new BedrockPackCompiler(java, bedrock);
+
+        compiler.add(List.of(ruby), Set.of());
+        compiler.addVfx(List.of(definition));
+        BedrockPackCompiler.Result result = compiler.finish();
+
+        String entityId = BedrockVfxRegistry.modelFor(definition.key(), 0);
+        assertNotNull(entityId);
+        assertTrue(result.rigs().stream()
+                .anyMatch(rig -> rig.entityIdentifier().equals(entityId)));
+        String stem = "testpack_spark_vfx_model_0";
+        assertNotNull(bedrock.file("entity/" + stem + ".entity.json"));
+        assertNotNull(bedrock.file("models/entity/" + stem + ".geo.json"));
+        assertNotNull(bedrock.file("textures/entity/vfx/" + stem + ".png"));
+    }
+
+    @Test
     void spriteTextureIsCopiedIntoBedrocksFlatItemAtlas() throws IOException {
         ResourcePack java = javaPackWith("assets/testpack/textures/item/ruby_sword.png");
 
@@ -195,6 +239,25 @@ class BedrockPackCompilerTest {
         assertEquals(250, components.get("minecraft:max_damage").getAsInt());
         assertFalse(components.has("minecraft:durability"),
                 "that is a Bedrock output component, not a Java component Geyser can match");
+    }
+
+    @Test
+    void durableItemsAreForcedToStackSizeOne() throws IOException {
+        // Geyser rejects the whole definition with "Stack size must be 1 when max damage
+        // is above 0", and the item silently never appears on Bedrock.
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/bow.png");
+        // A bow is damageable because of its base material, not because the pack said so.
+        ItemDefinition bow = ItemDefinition.builder(Key.key("testpack", "bow"))
+                .model(new ModelDefinition.Sprite(Key.key("testpack", "item/bow")))
+                .java(new JavaOptions(Material.BOW))
+                .build();
+
+        JsonObject components = json(compile(java, List.of(new StubItem(bow))).itemMappings())
+                .getAsJsonObject("items")
+                .getAsJsonArray("minecraft:bow").get(0).getAsJsonObject()
+                .getAsJsonObject("components");
+
+        assertEquals(1, components.get("minecraft:max_stack_size").getAsInt());
     }
 
     @Test
@@ -280,8 +343,9 @@ class BedrockPackCompilerTest {
         assertEquals("testpack:wrench", attachable.get("identifier").getAsString());
         assertEquals("geometry.kalo.testpack_wrench",
                 attachable.getAsJsonObject("geometry").get("default").getAsString());
-        assertEquals("textures/items/testpack_wrench",
-                attachable.getAsJsonObject("textures").get("default").getAsString());
+        assertEquals("textures/models/items/testpack_wrench",
+                attachable.getAsJsonObject("textures").get("default").getAsString(),
+                "the held model must not sample the inventory icon");
 
         JsonObject mapping = json(result.itemMappings())
                 .getAsJsonObject("items").getAsJsonArray("minecraft:paper")
@@ -368,7 +432,7 @@ class BedrockPackCompilerTest {
     }
 
     @Test
-    void multiSheetAtlasRejectsIncompatibleImageDimensionsWithoutMappings() throws IOException {
+    void multiSheetAtlasPreservesDifferentResolutionSourcePngs() throws IOException {
         ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
         java.file("assets/testpack/textures/item/red.png", Writable.bytes(solidPng(16,16,0xFFFF0000)));
         java.file("assets/testpack/textures/item/blue.png", Writable.bytes(solidPng(32,16,0xFF0000FF)));
@@ -381,10 +445,57 @@ class BedrockPackCompilerTest {
                 .model(new ModelDefinition.Custom(Key.key("testpack", "item/multi"), Map.of()))
                 .build();
         BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(definition)));
-        assertEquals(1, result.skippedCount());
-        assertEquals(0, result.itemCount());
-        assertNull(result.pack().file("textures/models/items/testpack_multi.png"));
-        assertTrue(result.itemRegistrations().isEmpty());
+        assertEquals(0, result.skippedCount());
+        assertEquals(1, result.itemCount());
+        assertEquals(1, result.itemRegistrations().size());
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(
+                result.pack().file("textures/models/items/testpack_multi.png").toByteArray()));
+        assertEquals(48, atlas.getWidth());
+        assertEquals(16, atlas.getHeight());
+        assertEquals(0xFFFF0000, atlas.getRGB(0, 0));
+        assertEquals(0xFF0000FF, atlas.getRGB(16, 0));
+        assertEquals(0xFF0000FF, atlas.getRGB(47, 0));
+        JsonObject geometry = json(result.pack().file("models/entity/testpack_multi.geo.json"))
+                .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals(48, geometry.getAsJsonObject("description").get("texture_width").getAsInt());
+        JsonObject faces = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject().getAsJsonObject("uv");
+        assertEquals(16, faces.getAsJsonObject("south").getAsJsonArray("uv").get(0).getAsInt());
+        assertEquals(32, faces.getAsJsonObject("south").getAsJsonArray("uv_size").get(0).getAsInt());
+    }
+
+    @Test
+    void animatedJavaTextureUsesOriginalFirstFrameWithoutStretchingWholeStrip() throws IOException {
+        ResourcePack java = javaPackWith("assets/testpack/textures/item/unrelated.png");
+        java.file("assets/testpack/textures/item/red.png", Writable.bytes(solidPng(64,64,0xFFFF0000)));
+        java.file("assets/testpack/textures/item/animation.png", Writable.bytes(solidPng(32,96,0xFF00FF00)));
+        java.file("assets/testpack/textures/item/animation.png.mcmeta", Writable.string(
+                "{\"animation\":{\"frametime\":3}}"));
+        java.file("assets/testpack/models/item/animated.json", Writable.string("""
+                {"textures":{"red":"testpack:item/red","effect":"testpack:item/animation"},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16],
+                              "faces":{"north":{"texture":"#red","uv":[0,0,16,16]},
+                                       "south":{"texture":"#effect","uv":[0,0,16,16]}}}]}
+                """));
+        ItemDefinition def = ItemDefinition.builder(Key.key("testpack", "animated"))
+                .model(new ModelDefinition.Custom(Key.key("testpack", "item/animated"), Map.of())).build();
+        var result = compile(java, List.of(new StubItem(def)));
+        assertEquals(1, result.itemCount());
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(
+                result.pack().file("textures/models/items/testpack_animated.png").toByteArray()));
+        assertEquals(96, atlas.getWidth());
+        assertEquals(64, atlas.getHeight());
+        assertEquals(0xFFFF0000, atlas.getRGB(0,0));
+        assertEquals(0xFF00FF00, atlas.getRGB(64, 0));
+        assertEquals(0, atlas.getRGB(64, 40) >>> 24,
+                "Do not stretch Java's three-frame strip into a 96px-tall single image");
+        JsonObject geometry = json(result.pack().file("models/entity/testpack_animated.geo.json"))
+                .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals(96, geometry.getAsJsonObject("description").get("texture_width").getAsInt());
+        JsonObject faces = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject().getAsJsonObject("uv");
+        assertEquals(64, faces.getAsJsonObject("south").getAsJsonArray("uv").get(0).getAsInt());
+        assertEquals(32, faces.getAsJsonObject("south").getAsJsonArray("uv_size").get(1).getAsInt());
     }
 
     @Test
@@ -411,10 +522,19 @@ class BedrockPackCompilerTest {
         JsonObject root = json(result.pack().file("models/entity/testpack_child.geo.json"));
         assertNotNull(root.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
                 .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes"));
-        // Single-sheet models keep the source texture bytes, even with inherited geometry.
-        assertTrue(Arrays.equals(
-                solidPng(16,16,0xFF0000FF),
+        // The icon is rendered from the inherited cube, using the child's blue texture —
+        // not the raw texture sheet, which is what made 3D items look like swatches.
+        BufferedImage icon = ImageIO.read(new ByteArrayInputStream(
                 result.pack().file("textures/items/testpack_child.png").toByteArray()));
+        assertEquals(64, icon.getWidth());
+        assertEquals(64, icon.getHeight());
+        boolean blue = false;
+        for (int y = 0; y < icon.getHeight() && !blue; y++) {
+            for (int x = 0; x < icon.getWidth() && !blue; x++) {
+                blue = icon.getRGB(x, y) == 0xFF0000FF;
+            }
+        }
+        assertTrue(blue, "the icon should be drawn from the child's blue texture");
     }
 
     @Test
@@ -439,6 +559,10 @@ class BedrockPackCompilerTest {
         ResourcePack java = javaPackWith("assets/testpack/textures/item/wrench.png");
         java.file("assets/testpack/models/item/wrench.json", Writable.string("""
                 {"textures":{"0":"testpack:item/wrench"},
+                 "display":{
+                   "firstperson_righthand":{"rotation":[0,30,0],"translation":[1,2,3],"scale":[0.5,0.5,0.5]},
+                   "thirdperson_righthand":{"rotation":[0,45,0],"translation":[0,4,0.5],"scale":[0.6,0.6,0.6]}
+                 },
                  "elements":[{"from":[0,0,0],"to":[16,16,16],
                               "faces":{"north":{"texture":"#0"}}}]}
                 """));
@@ -447,11 +571,41 @@ class BedrockPackCompilerTest {
         BedrockPackCompiler.Result result = compile(java, List.of(new StubItem(item)));
         JsonObject description = json(result.pack().file("attachables/testpack_wrench.json"))
                 .getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
-        assertEquals("animation.steve_head.hold_first_person",
+        assertEquals("animation.kalo.testpack_wrench.hold_first_person",
                 description.getAsJsonObject("animations").get("hold_first_person").getAsString());
-        assertEquals("animation.steve_head.hold_third_person",
+        assertEquals("animation.kalo.testpack_wrench.hold_third_person",
                 description.getAsJsonObject("animations").get("hold_third_person").getAsString());
         assertEquals(2, description.getAsJsonObject("scripts").getAsJsonArray("animate").size());
+
+        JsonObject animations = json(result.pack().file(
+                "animations/testpack_wrench.animation.json"))
+                .getAsJsonObject("animations");
+        JsonObject third = animations.getAsJsonObject(
+                        "animation.kalo.testpack_wrench.hold_third_person")
+                .getAsJsonObject("bones").getAsJsonObject("kalo");
+        assertEquals(-45, third.getAsJsonArray("rotation").get(1).getAsInt());
+        assertEquals(0, third.getAsJsonArray("position").get(0).getAsInt());
+        assertEquals(4, third.getAsJsonArray("position").get(1).getAsInt());
+        // Java's display scale is relative to a half-size item transform; Bedrock has none.
+        assertEquals(0.3, third.getAsJsonArray("scale").get(0).getAsDouble(), 1e-9);
+    }
+
+    @Test
+    void oversizedModelsAreScaledDownAutomatically() {
+        com.google.gson.JsonObject huge = com.google.gson.JsonParser.parseString("""
+                {"display":{"thirdperson_righthand":{"scale":[1,1,1]}},
+                 "elements":[{"from":[0,0,0],"to":[64,8,8]}]}
+                """).getAsJsonObject();
+        Double adjusted = BedrockPackCompiler.autoHandScale(huge);
+        assertNotNull(adjusted, "a 4-block model must be reduced");
+        assertTrue(adjusted < 0.2, "reduced base was " + adjusted);
+
+        com.google.gson.JsonObject normal = com.google.gson.JsonParser.parseString("""
+                {"display":{"thirdperson_righthand":{"scale":[0.7,0.7,0.7]}},
+                 "elements":[{"from":[0,0,0],"to":[16,16,16]}]}
+                """).getAsJsonObject();
+        assertNull(BedrockPackCompiler.autoHandScale(normal),
+                "a normal item keeps the author's size");
     }
 
     @Test
@@ -545,7 +699,7 @@ class BedrockPackCompilerTest {
                         .getAsJsonObject("testpack_ruby_block").get("textures").getAsString());
         assertNotNull(result.pack().file("textures/blocks/testpack_ruby_block.png"));
 
-        assertEquals("testpack_ruby_block", materialTexture(blockEntry(result, NOTE_7), "*"));
+        assertEquals("testpack_ruby_block", materialTexture(stateEntry(result, NOTE_7), "*"));
     }
 
     @Test
@@ -583,7 +737,7 @@ class BedrockPackCompilerTest {
         assertFalse(atlas.has("testpack_faced_cube_particle"),
                 "Java's particle texture is an inventory-particle fallback, not a Bedrock cube face");
 
-        JsonObject entry = blockEntry(result, "minecraft:note_block[instrument=harp,note=4,powered=true]");
+        JsonObject entry = stateEntry(result, "minecraft:note_block[instrument=harp,note=4,powered=true]");
         assertEquals(Set.of("down", "up", "north", "south", "west", "east"),
                 entry.getAsJsonObject("material_instances").keySet());
         assertEquals("testpack_faced_cube_up", materialTexture(entry, "up"));
@@ -610,13 +764,15 @@ class BedrockPackCompilerTest {
         assertEquals("minecraft:geometry.full_block", registration.geometry());
         assertEquals(1.5f, registration.hardness());
 
-        // Out of process: the same decision, in the file Geyser reads by itself. The
-        // overridden Java state is the key, which is how Geyser knows what to replace.
+        // Out of process: the same decision, in the file Geyser reads by itself. The Java
+        // block is the outer key and the allocated state lives under state_overrides.
         JsonObject entry = blockEntry(result, NOTE_7);
         assertEquals("testpack_ruby_block", entry.get("name").getAsString());
-        assertEquals("minecraft:geometry.full_block", entry.get("geometry").getAsString());
-        assertEquals(1.5f, entry.get("destructible_by_mining").getAsFloat());
         assertFalse(entry.get("included_in_creative_inventory").getAsBoolean());
+
+        JsonObject state = stateEntry(result, NOTE_7);
+        assertEquals("minecraft:geometry.full_block", state.get("geometry").getAsString());
+        assertEquals(1.5f, state.get("destructible_by_mining").getAsFloat());
         assertEquals(1, json(result.blockMappings()).get("format_version").getAsInt(),
                 "Geyser versions its block mappings separately from its item mappings");
     }
@@ -722,7 +878,7 @@ class BedrockPackCompilerTest {
         assertNotNull(result.pack().file("models/blocks/testpack_chair.geo.json"));
 
         // Each block names its own geometry, so nothing needs a separate lookup table.
-        JsonObject entry = blockEntry(result, "minecraft:note_block[instrument=harp,note=2,powered=false]");
+        JsonObject entry = stateEntry(result, "minecraft:note_block[instrument=harp,note=2,powered=false]");
         assertEquals("geometry.kalo.testpack_chair", entry.get("geometry").getAsString());
         assertEquals("testpack_chair_all", materialTexture(entry, "all"));
         assertEquals("testpack_chair_all", json(result.pack().file("blocks.json"))

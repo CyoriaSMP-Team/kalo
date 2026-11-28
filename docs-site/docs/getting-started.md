@@ -8,8 +8,8 @@ nav_order: 2
 
 ## Requirements
 
-- Java 21+ (for Paper 1.21.4) or Java 25 (for 26.2)
-- Paper or Folia server 1.21.4 or later
+- Java 21+ to run the Java 21-bytecode jar on Paper 1.21.4; Minecraft 26.x itself requires Java 25
+- Paper or Folia 1.21.4 or later compiled against the 1.21.4 API; runtime verification currently covers 26.2 and 1.21.11
 
 ## Installation
 

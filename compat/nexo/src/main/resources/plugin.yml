@@ -1,0 +1,8 @@
+name: Nexo
+version: '1.0.0-kalo'
+main: io.kalo.compat.nexo.NexoBridgePlugin
+api-version: '1.21'
+description: Nexo item API backed by Kalo content
+authors: [Kalo]
+folia-supported: true
+depend: [Kalo]

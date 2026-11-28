@@ -1,0 +1,1 @@
+{"textures":{"t0":"testpack:item/ruby"},"elements":[{"from":[4,0,4],"to":[12,12,12],"faces":{"down":{"uv":[8,0,12,4],"texture":"#t0"},"up":{"uv":[4,0,8,4],"texture":"#t0"},"north":{"uv":[4,4,12,12],"texture":"#t0"},"south":{"uv":[8,4,12,12],"texture":"#t0"},"west":{"uv":[12,4,16,12],"texture":"#t0"},"east":{"uv":[0,4,4,12],"texture":"#t0"}}}]}

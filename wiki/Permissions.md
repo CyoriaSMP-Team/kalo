@@ -6,6 +6,10 @@
 |------------|-------------|---------|
 | `kalo.command.reload` | Reload packs | `op` |
 | `kalo.command.give` | Give items | `op` |
+| `kalo.command.hud` | Show or stop HUD overlays | `op` |
+| `kalo.command.dialog` | Open a dialog for yourself or another player | `op` |
+| `kalo.command.vfx` | Cast or stop a VFX | `op` |
+| `kalo.command.liquid` | Mark or clear liquid volumes | `op` |
 | `kalo.command.import` | Import from plugins | `op` |
 | `kalo.command.doctor` | Run diagnostics | `op` |
 | `kalo.command.migrate` | Migrate world blocks | `op` |
@@ -48,6 +52,6 @@ Kalo registers permissions automatically. Players with `op` have all permissions
 
 [GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
 
-> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+> **Version:** 0.2.1-prealpha.16 • **License:** MIT • **Java:** 21 bytecode / 25 for 26.x runtime
 
 *Build once. Play everywhere.*

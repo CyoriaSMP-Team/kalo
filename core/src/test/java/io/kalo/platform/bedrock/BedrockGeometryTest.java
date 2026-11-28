@@ -117,7 +117,8 @@ class BedrockGeometryTest {
 
         JsonObject cube = firstCube(geometry);
         assertArrayEquals(new double[]{0, 8, 0}, doubles(cube.getAsJsonArray("pivot")));
-        assertArrayEquals(new double[]{0, 22.5, 0}, doubles(cube.getAsJsonArray("rotation")));
+        // Bedrock's centred, X-mirrored space negates X and Y rotation; Z keeps its sign.
+        assertArrayEquals(new double[]{0, -22.5, 0}, doubles(cube.getAsJsonArray("rotation")));
     }
 
     @Test

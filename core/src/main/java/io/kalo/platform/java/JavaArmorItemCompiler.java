@@ -39,7 +39,7 @@ public final class JavaArmorItemCompiler {
             EquippableComponent equippable = meta.getEquippable();
             equippable.setSlot(toBukkit(definition.slot()));
 
-            if (definition.equipment() != null) {
+            if (definition.equipment() != null || definition.armorModel() != null) {
                 // Points at assets/<ns>/equipment/<name>.json emitted by JavaArmorCompiler.
                 Key key = definition.key();
                 equippable.setModel(new NamespacedKey(key.namespace(), key.value()));

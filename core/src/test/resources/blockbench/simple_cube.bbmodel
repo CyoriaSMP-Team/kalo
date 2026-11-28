@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "format_version": "4.10",
+    "model_format": "java_block",
+    "box_uv": false
+  },
+  "name": "simple_cube",
+  "resolution": {
+    "width": 16,
+    "height": 16
+  },
+  "elements": [
+    {
+      "name": "body",
+      "type": "cube",
+      "uuid": "11111111-1111-4111-8111-111111111111",
+      "from": [4, 0, 4],
+      "to": [12, 12, 12],
+      "origin": [8, 0, 8],
+      "rotation": [0, 0, 0],
+      "visibility": true,
+      "export": true,
+      "inflate": 0,
+      "faces": {
+        "north": {"uv": [4, 4, 12, 12], "texture": 0},
+        "east": {"uv": [0, 4, 4, 12], "texture": 0},
+        "south": {"uv": [8, 4, 12, 12], "texture": 0},
+        "west": {"uv": [12, 4, 16, 12], "texture": 0},
+        "up": {"uv": [4, 0, 8, 4], "texture": 0},
+        "down": {"uv": [8, 0, 12, 4], "texture": 0}
+      }
+    }
+  ],
+  "outliner": ["11111111-1111-4111-8111-111111111111"],
+  "textures": [
+    {
+      "id": "0",
+      "name": "ruby",
+      "relative_path": "textures/item/ruby.png",
+      "width": 16,
+      "height": 16,
+      "uv_width": 16,
+      "uv_height": 16,
+      "particle": true
+    }
+  ]
+}

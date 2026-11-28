@@ -4,6 +4,7 @@ import io.kalo.content.item.definition.BedrockOptions;
 import io.kalo.content.item.definition.DisplayProperties;
 import net.kyori.adventure.key.Key;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The platform-neutral description of a custom block.
@@ -20,7 +21,8 @@ public record BlockDefinition(
         @NotNull BlockModelDefinition model,
         @NotNull BlockBehaviour behaviour,
         @NotNull JavaBlockOptions java,
-        @NotNull BedrockOptions bedrock
+        @NotNull BedrockOptions bedrock,
+        @Nullable BlockAnimation animation
 ) {
 
     /** Translation key for the block's item form. */
@@ -39,6 +41,7 @@ public record BlockDefinition(
         private BlockBehaviour behaviour = BlockBehaviour.defaults();
         private JavaBlockOptions java = JavaBlockOptions.defaults();
         private BedrockOptions bedrock = BedrockOptions.defaults();
+        private BlockAnimation animation;
 
         private Builder(@NotNull Key key) {
             this.key = key;
@@ -69,6 +72,11 @@ public record BlockDefinition(
             return this;
         }
 
+        public @NotNull Builder animation(@Nullable BlockAnimation animation) {
+            this.animation = animation;
+            return this;
+        }
+
         public @NotNull BlockDefinition build() {
             if (model == null) {
                 // Unlike items there is no sensible vanilla fallback: a block with no
@@ -77,7 +85,8 @@ public record BlockDefinition(
                 throw new IllegalStateException(
                         "block " + key.asString() + " has no model; declare 'cube_all', 'cube' or 'custom'");
             }
-            return new BlockDefinition(key, display, model, behaviour, java, bedrock);
+            return new BlockDefinition(key, display, model, behaviour, java, bedrock,
+                    animation);
         }
     }
 }

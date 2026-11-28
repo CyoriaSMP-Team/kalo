@@ -29,6 +29,24 @@ public sealed interface ModelDefinition {
     }
 
     /**
+     * A Blockbench {@code .bbmodel} source imported into Kalo's shared model IR.
+     *
+     * <p>The Java compiler emits a Java model from the IR; the Bedrock compiler emits
+     * geometry with the original outliner hierarchy. Neither compiler copies Blockbench's
+     * project JSON into the pack as if it were a client model.</p>
+     *
+     * @param source   pack-relative source under {@code assets/<namespace>/}, e.g.
+     *                 {@code testpack:models/item/ruby_sword.bbmodel}
+     * @param textures optional Kalo texture overrides keyed by Blockbench texture id,
+     *                 name or path
+     */
+    record Blockbench(@NotNull Key source, @NotNull @Unmodifiable Map<String, Key> textures) implements ModelDefinition {
+        public Blockbench {
+            textures = Map.copyOf(textures);
+        }
+    }
+
+    /**
      * Reuse of a vanilla item's own appearance.
      *
      * @param item the vanilla item key, e.g. {@code minecraft:apple} — not a model path

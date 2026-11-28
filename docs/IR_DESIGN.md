@@ -6,11 +6,13 @@ structurally possible rather than aspirational.
 > **Status:** implemented. Items, blocks, furniture, armor and recipes each have a
 > definition in `io.kalo.content.*.definition`, the Java compilers live in
 > `io.kalo.platform.java`, and the Bedrock compiler landed in `io.kalo.platform.bedrock`.
+> Blockbench `.bbmodel` sources now compile through the shared `io.kalo.model.ModelIR`.
 >
 > The claim this document made — that adding Bedrock would be an addition rather than a
 > re-architecture — held: `BedrockOptions` was already there and no definition changed to
 > accommodate it. What has **not** happened is end-to-end verification of the Bedrock
-> output against a real client; see the roadmap in the README.
+> output against a real client; see the roadmap in the README and the exact static-model
+> coverage in `docs/BLOCKBENCH.md`.
 
 ---
 
@@ -114,8 +116,11 @@ public sealed interface ModelDefinition {
     /** A flat sprite — the overwhelmingly common case. */
     record Sprite(Key texture) implements ModelDefinition {}
 
-    /** A model file authored in Blockbench, shipped with the pack. */
+    /** A Java model file shipped with the pack. */
     record Custom(Key model, Map<String, Key> textures) implements ModelDefinition {}
+
+    /** A Blockbench .bbmodel imported into the shared model IR. */
+    record Blockbench(Key source, Map<String, Key> textures) implements ModelDefinition {}
 
     /** Reuse a vanilla model verbatim. */
     record Vanilla(Key model) implements ModelDefinition {}
@@ -128,6 +133,10 @@ public sealed interface ModelDefinition {
 - **Bedrock compiler** turns the same `Sprite` into an item texture entry in
   `textures/item_texture.json` and a Geyser mapping — no model file at all, because
   Bedrock sprite items do not need one.
+- **Both compilers** turn `Blockbench` through `io.kalo.model.ModelIR`: Java receives a
+  flattened model JSON where the format allows it, Bedrock receives real parented bones
+  with the outliner pivots intact. Constructs one format cannot carry are reported; see
+  `docs/BLOCKBENCH.md`.
 
 Same input, two correct and *natively idiomatic* outputs. That is the property worth
 protecting.

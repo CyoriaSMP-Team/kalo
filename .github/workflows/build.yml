@@ -54,6 +54,12 @@ jobs:
             exit 1
           fi
 
+      # Full MIT: what ships must carry no RP Engine package, GPL text or third-party
+      # plugin main class. The guard also checks LICENSE and source headers.
+      - name: Verify MIT-only provenance
+        if: matrix.java == '21'
+        run: python3 scripts/clean-room-guard.py
+
       - name: Upload experimental Mohist compatibility jar
         if: matrix.java == '21'
         uses: actions/upload-artifact@v4

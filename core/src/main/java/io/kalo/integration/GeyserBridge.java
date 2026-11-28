@@ -4,9 +4,14 @@ import io.kalo.content.item.Item;
 import io.kalo.content.item.definition.ItemDefinition;
 import io.kalo.content.item.definition.ModelDefinition;
 import io.kalo.manager.RegistryManager;
+import io.kalo.converter.GuiCustomSkullScanner;
+import io.kalo.platform.bedrock.BedrockAnimatedBlockRegistration;
 import io.kalo.platform.bedrock.BedrockBlockRegistration;
 import io.kalo.platform.bedrock.BedrockItemRegistration;
+import io.kalo.platform.bedrock.BedrockMobRegistration;
+import io.kalo.platform.bedrock.BedrockPlacedModelRegistration;
 import io.kalo.platform.bedrock.BedrockRegistrationSnapshot;
+import io.kalo.platform.bedrock.BedrockRigRegistration;
 import io.kalo.utils.Constants;
 import io.kalo.utils.Plugins;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -20,6 +25,8 @@ import org.geysermc.geyser.api.event.EventRegistrar;
 import org.geysermc.geyser.api.event.bedrock.SessionLoadResourcePacksEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCustomBlocksEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCustomItemsEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCustomSkullsEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserDefineEntitiesEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineResourcePacksEvent;
 import org.geysermc.geyser.api.item.custom.v2.CustomItemBedrockOptions;
 import org.geysermc.geyser.api.item.custom.v2.CustomItemDefinition;
@@ -55,6 +62,9 @@ import java.util.logging.Level;
  */
 public final class GeyserBridge {
 
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger(GeyserBridge.class.getName());
+
     private static final java.util.concurrent.atomic.AtomicReference<CachedPack> CACHED_PACK =
             new java.util.concurrent.atomic.AtomicReference<>();
 
@@ -78,6 +88,10 @@ public final class GeyserBridge {
                 GeyserBridge::onDefineCustomBlocks);
         GeyserApi.api().eventBus().subscribe(registrar, GeyserDefineCustomItemsEvent.class,
                 GeyserBridge::onDefineCustomItems);
+        GeyserApi.api().eventBus().subscribe(registrar, GeyserDefineCustomSkullsEvent.class,
+                GeyserBridge::onDefineCustomSkulls);
+        GeyserApi.api().eventBus().subscribe(registrar, GeyserDefineEntitiesEvent.class,
+                GeyserBridge::onDefineEntities);
         GeyserApi.api().eventBus().subscribe(registrar, GeyserDefineResourcePacksEvent.class,
                 GeyserBridge::onDefineResourcePacks);
         // Initial generation finishes before this bridge is installed. The per-session
@@ -140,6 +154,160 @@ public final class GeyserBridge {
 
         Plugins.logger().info("Registered and mapped " + registered + " block(s) with Geyser natively"
                 + (virtual > 0 ? "; " + virtual + " virtual block(s) render as entities instead" : ""));
+    }
+
+    /**
+     * Registers the client-entity identifiers placed models are spawned as. Geyser asks
+     * once, at startup; the pack supplies geometry/animation/entity JSON.
+     */
+    private static void onDefineEntities(@NotNull GeyserDefineEntitiesEvent event) {
+        if (!bedrockOutputEnabled()) {
+            return;
+        }
+        var snapshot = BedrockRegistrationSnapshot.await(java.time.Duration.ofSeconds(30));
+        if (snapshot.isEmpty()) {
+            Plugins.logger().warning("Kalo's Bedrock compiler did not finish before Geyser froze"
+                    + " its custom-entity registry; placed models will not render on Bedrock");
+            return;
+        }
+        int registered = registerPlacedEntities(event, snapshot.get().placedModels());
+        int animated = registerAnimatedBlockEntities(event, snapshot.get().animatedBlocks());
+        int mobs = registerMobs(event, snapshot.get().mobs());
+        int rigs = registerRigs(event, snapshot.get().rigs());
+        if (registered > 0) {
+            Plugins.logger().info("Registered " + registered
+                    + " placed-model client entity slot(s) with Geyser");
+        }
+        if (animated > 0) {
+            Plugins.logger().info("Registered " + animated
+                    + " animated-block client entity slot(s) with Geyser");
+        }
+        if (mobs > 0) {
+            Plugins.logger().info("Registered " + mobs
+                    + " custom-mob client entity slot(s) with Geyser");
+        }
+        if (rigs > 0) {
+            Plugins.logger().info("Registered " + rigs
+                    + " vehicle/emote client entity slot(s) with Geyser");
+        }
+    }
+
+    /** Package-visible pure registration step, exercised without a live Geyser. */
+    static int registerPlacedEntities(@NotNull GeyserDefineEntitiesEvent event,
+                                      @NotNull java.util.List<BedrockPlacedModelRegistration> placed) {
+        return registerPlacedEntities(event, placed,
+                identifier -> org.geysermc.geyser.api.entity.custom.CustomEntityDefinition
+                        .of(Identifier.of(identifier)));
+    }
+
+    static int registerPlacedEntities(@NotNull GeyserDefineEntitiesEvent event,
+                                      @NotNull java.util.List<BedrockPlacedModelRegistration> placed,
+                                      @NotNull java.util.function.Function<String,
+                                              org.geysermc.geyser.api.entity.custom.CustomEntityDefinition> factory) {
+        return registerIdentifiers(event,
+                placed.stream().map(BedrockPlacedModelRegistration::entityIdentifier).toList(),
+                factory);
+    }
+
+    /** Package-visible pure registration step for animated-block client entities. */
+    static int registerAnimatedBlockEntities(@NotNull GeyserDefineEntitiesEvent event,
+                                             @NotNull java.util.List<BedrockAnimatedBlockRegistration> blocks) {
+        return registerAnimatedBlockEntities(event, blocks,
+                identifier -> org.geysermc.geyser.api.entity.custom.CustomEntityDefinition
+                        .of(Identifier.of(identifier)));
+    }
+
+    static int registerAnimatedBlockEntities(@NotNull GeyserDefineEntitiesEvent event,
+                                             @NotNull java.util.List<BedrockAnimatedBlockRegistration> blocks,
+                                             @NotNull java.util.function.Function<String,
+                                                     org.geysermc.geyser.api.entity.custom.CustomEntityDefinition> factory) {
+        return registerIdentifiers(event,
+                blocks.stream().map(BedrockAnimatedBlockRegistration::entityIdentifier).toList(),
+                factory);
+    }
+
+    /** Package-visible pure registration step for custom-mob client entities. */
+    static int registerMobs(@NotNull GeyserDefineEntitiesEvent event,
+                            @NotNull java.util.List<BedrockMobRegistration> mobs) {
+        return registerMobs(event, mobs,
+                identifier -> org.geysermc.geyser.api.entity.custom.CustomEntityDefinition
+                        .of(Identifier.of(identifier)));
+    }
+
+    static int registerMobs(@NotNull GeyserDefineEntitiesEvent event,
+                            @NotNull java.util.List<BedrockMobRegistration> mobs,
+                            @NotNull java.util.function.Function<String,
+                                    org.geysermc.geyser.api.entity.custom.CustomEntityDefinition> factory) {
+        return registerIdentifiers(event,
+                mobs.stream().map(BedrockMobRegistration::entityIdentifier).toList(),
+                factory);
+    }
+
+    static int registerRigs(@NotNull GeyserDefineEntitiesEvent event,
+                            @NotNull java.util.List<BedrockRigRegistration> rigs) {
+        return registerRigs(event, rigs,
+                identifier -> org.geysermc.geyser.api.entity.custom.CustomEntityDefinition
+                        .of(Identifier.of(identifier)));
+    }
+
+    static int registerRigs(@NotNull GeyserDefineEntitiesEvent event,
+                            @NotNull java.util.List<BedrockRigRegistration> rigs,
+                            @NotNull java.util.function.Function<String,
+                                    org.geysermc.geyser.api.entity.custom.CustomEntityDefinition> factory) {
+        return registerIdentifiers(event,
+                rigs.stream().map(BedrockRigRegistration::entityIdentifier).toList(), factory);
+    }
+
+    private static int registerIdentifiers(
+            @NotNull GeyserDefineEntitiesEvent event,
+            @NotNull java.util.List<String> identifiers,
+            @NotNull java.util.function.Function<String,
+                    org.geysermc.geyser.api.entity.custom.CustomEntityDefinition> factory) {
+        int registered = 0;
+        for (String identifier : identifiers) {
+            try {
+                event.register(factory.apply(identifier));
+                registered++;
+            } catch (Exception | LinkageError error) {
+                LOGGER.warning("Could not register Bedrock client entity "
+                        + identifier + ": " + error.getMessage());
+            }
+        }
+        return registered;
+    }
+
+    /**
+     * Register menu custom heads before Geyser generates its Bedrock skull pack.
+     * Files are scanned on every Geyser startup/reload, so changing DeluxeMenus
+     * never requires hand-editing a second Bedrock-only mapping file.
+     */
+    private static void onDefineCustomSkulls(@NotNull GeyserDefineCustomSkullsEvent event) {
+        if (!Plugins.plugin().getConfig().getBoolean("bedrock.auto-register-gui-heads", true)) {
+            return;
+        }
+        Path pluginsDirectory = Plugins.plugin().getDataFolder().toPath().getParent();
+        if (pluginsDirectory == null) return;
+        Path menus = pluginsDirectory.resolve("DeluxeMenus").resolve("gui_menus");
+        try {
+            var scan = GuiCustomSkullScanner.discover(menus);
+            int registered = 0;
+            for (String skinHash : scan.skinHashes()) {
+                try {
+                    event.register(skinHash, GeyserDefineCustomSkullsEvent.SkullTextureType.SKIN_HASH);
+                    registered++;
+                } catch (Exception ex) {
+                    Plugins.logger().log(Level.WARNING,
+                            "Could not register Java GUI skull " + skinHash + " with Geyser", ex);
+                }
+            }
+            Plugins.logger().info("Auto-registered " + registered + " DeluxeMenus custom skull(s) with Geyser"
+                    + " from " + scan.filesScanned() + " Java menu file(s)"
+                    + (scan.invalidProfiles() > 0
+                        ? "; rejected " + scan.invalidProfiles() + " invalid profile(s)" : ""));
+        } catch (Exception ex) {
+            // A misconfigured menu must never disable Geyser or prevent login.
+            Plugins.logger().log(Level.WARNING, "Could not scan DeluxeMenus GUI textures", ex);
+        }
     }
 
     /**
@@ -315,21 +483,35 @@ public final class GeyserBridge {
         if (!bedrockOutputEnabled()) {
             return;
         }
+        if (perPlayerPacks()) {
+            // The per-session copy is registered on SessionLoadResourcePacksEvent
+            // instead. Registering the global archive here as well would hand a client
+            // two copies of the same pack UUID; that event is the one with the XUID.
+            Plugins.logger().info("Kalo Bedrock packs are staged per session");
+            return;
+        }
         ResourcePack pack = generatedPack();
         if (pack == null) {
-            Plugins.logger().info("Kalo's generated.mcpack is not ready yet; it will be attached when a"
-                    + " Bedrock player connects");
+            // A later pack is attached when a Bedrock player connects.
             return;
         }
         if (containsPack(event.resourcePacks(), pack)) {
             return;
         }
-
         try {
             event.register(pack);
-            Plugins.logger().info("Registered generated.mcpack with Geyser");
+            Plugins.logger().info("Registered generated.mcpack with Geyser (per-player staging disabled)");
         } catch (Exception e) {
             Plugins.logger().log(Level.WARNING, "Could not register generated.mcpack with Geyser", e);
+        }
+    }
+
+    /** Whether each Bedrock session receives its own staged copy of generated.mcpack. */
+    static boolean perPlayerPacks() {
+        try {
+            return Plugins.plugin().getConfig().getBoolean("bedrock-packs.per-player", true);
+        } catch (Throwable unavailable) {
+            return true;
         }
     }
 
@@ -337,11 +519,54 @@ public final class GeyserBridge {
         if (!bedrockOutputEnabled()) {
             return;
         }
+        Path source = generatedPackPath();
+        if (source == null) {
+            Plugins.logger().info("Kalo's generated.mcpack is not ready yet; it will be attached when a"
+                    + " Bedrock player connects");
+            return;
+        }
+
+        String xuid = event.connection().xuid();
+        if (perPlayerPacks() && xuid != null && !xuid.isBlank()) {
+            try {
+                Path dataFolder = Constants.dataFolder().toPath();
+                java.util.Map<String, byte[]> overlays = new java.util.TreeMap<>(
+                        io.kalo.platform.bedrock.BedrockSkinOverlays.forXuid(xuid));
+                java.util.UUID playerId = event.connection().javaUuid();
+                if (playerId != null) {
+                    overlays.putAll(io.kalo.platform.bedrock.EmoteSkinOverlays
+                            .forPlayer(dataFolder, playerId));
+                }
+                io.kalo.platform.bedrock.SessionContentPolicy policy =
+                        io.kalo.platform.bedrock.SessionContentPolicy.fromPluginConfig();
+                java.util.function.Predicate<String> permissions = node -> false;
+                if (playerId != null) {
+                    org.bukkit.entity.Player player =
+                            org.bukkit.Bukkit.getPlayer(playerId);
+                    if (player != null) {
+                        permissions = player::hasPermission;
+                    }
+                }
+                Path staged = io.kalo.platform.bedrock.BedrockPackStager.stage(
+                        dataFolder, source, xuid, overlays, policy, permissions);
+                event.register(ResourcePack.create(PackCodec.path(staged)),
+                        new org.geysermc.geyser.api.pack.option.ResourcePackOption<?>[0]);
+                io.kalo.platform.bedrock.BedrockPackStager.markServed(xuid,
+                        io.kalo.platform.bedrock.BedrockPackStager.sessionDigest(
+                                source, overlays,
+                                policy.fingerprint(xuid, permissions)));
+                return;
+            } catch (Exception stagedError) {
+                Plugins.logger().log(Level.WARNING,
+                        "Could not stage the per-session Bedrock pack for " + xuid
+                                + "; falling back to the global pack", stagedError);
+            }
+        }
+
         ResourcePack pack = generatedPack();
         if (pack == null || containsPack(event.resourcePacks(), pack)) {
             return;
         }
-
         try {
             event.register(pack,
                     new org.geysermc.geyser.api.pack.option.ResourcePackOption<?>[0]);
@@ -349,6 +574,11 @@ public final class GeyserBridge {
             Plugins.logger().log(Level.WARNING,
                     "Could not attach generated.mcpack to a Bedrock connection", e);
         }
+    }
+
+    private static @Nullable Path generatedPackPath() {
+        Path path = new java.io.File(Constants.dataFolder(), "generated.mcpack").toPath();
+        return Files.isRegularFile(path) ? path : null;
     }
 
     private static boolean containsPack(@NotNull List<ResourcePack> packs,

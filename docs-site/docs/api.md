@@ -23,7 +23,7 @@ Developer API for building Kalo add-ons.
 <dependency>
   <groupId>com.github.CyoriaSMP-Team</groupId>
   <artifactId>kalo</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.1-prealpha.16</version>
   <scope>provided</scope>
 </dependency>
 ```
@@ -36,7 +36,7 @@ repositories {
 }
 
 dependencies {
-  compileOnly 'com.github.CyoriaSMP-Team:kalo:0.1.0'
+  compileOnly 'com.github.CyoriaSMP-Team:kalo:0.2.1-prealpha.16'
 }
 ```
 

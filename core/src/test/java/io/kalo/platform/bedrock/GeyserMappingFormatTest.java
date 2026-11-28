@@ -53,7 +53,7 @@ class GeyserMappingFormatTest {
     }
 
     @Test
-    void theBlockFileIsFormatVersionOneKeyedByJavaBlockState() throws IOException {
+    void theBlockFileIsFormatVersionOneWithStatesUnderOverrides() throws IOException {
         JsonObject blockFile = json(compileRubyBlock().blockMappings());
 
         assertEquals(1, blockFile.get("format_version").getAsInt());
@@ -62,17 +62,21 @@ class GeyserMappingFormatTest {
                 "items version separately, so they cannot share a file with blocks");
 
         JsonObject blocks = blockFile.getAsJsonObject("blocks");
-        assertEquals(Set.of("minecraft:note_block[instrument=harp,note=3,powered=true]"),
+        assertEquals(Set.of("minecraft:note_block"),
                 blocks.keySet(),
-                "Geyser keys a block mapping by the Java state it overrides");
+                "Geyser parses this key as an Adventure Key, so a bracketed state is invalid");
 
-        JsonObject entry = blocks.getAsJsonObject(blocks.keySet().iterator().next());
+        JsonObject entry = blocks.getAsJsonObject("minecraft:note_block");
         // "name" is strictly required and must be bare: Geyser namespaces it itself.
         assertTrue(entry.has("name"));
         assertFalse(entry.get("name").getAsString().contains(":"),
                 "a mapping names a block, it does not namespace it");
+        assertTrue(entry.get("only_override_states").getAsBoolean(),
+                "only the allocated states are replaced, not every note_block state");
 
-        JsonObject material = entry.getAsJsonObject("material_instances").getAsJsonObject("*");
+        JsonObject override = entry.getAsJsonObject("state_overrides")
+                .getAsJsonObject("instrument=harp,note=3,powered=true");
+        JsonObject material = override.getAsJsonObject("material_instances").getAsJsonObject("*");
         assertEquals(Set.of("texture", "render_method", "face_dimming", "ambient_occlusion"),
                 material.keySet());
     }

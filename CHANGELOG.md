@@ -6,6 +6,278 @@ the version being tagged and hands it to every channel.
 
 Versions follow `plugin_version` in `gradle.properties`, and a tag must match it.
 
+## 0.2.1-prealpha.16
+
+### Added
+
+- Blockbench `.bbmodel` format 3.2–5.0 cube import through a shared, platform-neutral
+  model IR. The importer preserves cube bounds, per-face UVs, pivots, element rotations,
+  visibility/export flags, texture references, outliner hierarchy, animation keyframes
+  and display transforms. Malformed JSON, duplicate ids, invalid dimensions, unsafe
+  paths, oversized inputs, box-UV models and outliner cycles are rejected.
+- Java model compilation from the IR: flattened zero-rotation groups, single-axis element
+  rotation, face UVs, texture size and display transforms. Rotated bones, inflation and
+  multi-axis element rotation are refused rather than baked incorrectly, and a Blockbench
+  item that fails Java compilation is skipped on Bedrock too.
+- Bedrock geometry compilation from the same IR, preserving outliner hierarchy as real
+  parented bones with pivots and rotations, plus per-face UVs, UV rotation, inflation and
+  multiple material instances. Blockbench imports no longer pass through a flattened Java
+  model first.
+- Blockbench keyframes compile to Bedrock `format_version` 1.8.0 animation JSON for held
+  items. Loop animations are auto-started from the attachable's `scripts.animate`; loop,
+  hold and once modes are preserved.
+- Blockbench 3D items and block items get a rendered 64×64 isometric inventory preview;
+  the model's own material textures stay separate from that flat icon.
+- Bound 3D items receive generated first/third-person hold animations from authored
+  Blockbench/Java display transforms, with a half-scale fallback. This replaces the vanilla
+  player-skeleton hold animations that left custom bound models at the wrong scale and
+  orientation.
+- `BedrockSupport` seam with a no-op `NONE` implementation; Geyser-backed support is
+  constructed only after Geyser-Spigot is confirmed present, so Java-only startup does not
+  resolve Geyser classes.
+- Private-use-area glyphs now get Bedrock `font/glyph_XX.png` pages, so chat/item/menu
+  icons that work on Java are not missing for Bedrock players.
+- Placed-model runtime for Blockbench items: `place:` creates a chunk-saved Java
+  `ItemDisplay` plus `Interaction` hitbox, writes Bedrock client-entity/geometry/animation
+  files, registers the entity with Geyser, and spawns/removes/animates it for nearby
+  Bedrock sessions. The Geyser session/packet calls are reflective and fail closed if a
+  Geyser build moves them.
+- Placed-model storage and state cycling: `place.storage` serializes container contents
+  onto the hitbox and survives restart; `place.states` cycles scale/light/solid/model/sound.
+  State models compile their own Bedrock client entity; state index and light/barrier are
+  restored on chunk load.
+- Placed-model Java animation: a placed Blockbench item with authored loop animations now
+  gets one `ItemDisplay` per bone, sampled with `ModelAnimations` and rotated/scaled around
+  the authored pivots; the rig is rebuilt on chunk load and removed with the hitbox.
+- Block/furniture interaction animation: `animation: {idle, interact}` selects the idle
+  loop and a one-shot right-click clip. Java plays it once through the per-bone rig and
+  resumes idle; Bedrock receives an `AnimateEntityPacket` for the animated client entity.
+- Parent-bone motion propagation for Java display rigs: sampled bone rotations, positions and
+  scales are composed through the parent chain before becoming display transforms, and the
+  same composition is used by blocks, placed models, mobs and worn armor.
+- Mob/armor interaction animation: `animation: {idle, interact}` selects the idle loop and
+  a one-shot clip. Right-clicking a custom mob (or right-clicking empty-handed while wearing
+  3D armor) plays it on Java and sends the matching Bedrock trigger; idle resumes after.
+- Per-bone Java animation for custom mobs and 3D worn armor: both compile one `ItemDisplay`
+  model per bone and sample authored loop animations with `ModelAnimations`; the rigs follow
+  the mob/player and use the entity-space half-block correction.
+- Placed-model interaction animation: right-click plays the configured one-shot clip once
+  on Java, holds the final sampled frame, then resumes the idle loops; Bedrock receives the
+  matching animation trigger. Names resolve by authored or sanitized spelling.
+- Multi-performer emotes: `performers:` defines cast slots with offsets, and
+  `/kalo emote <emote> <names>` validates and seats each member around the lead. Every
+  performer gets an independent Java rig and Bedrock client entity.
+- Per-player emote skins: a PNG cached at `plugins/Kalo/skins/<uuid>.png` is validated and
+  overlaid into that XUID's staged Bedrock pack; the session digest includes the overlay,
+  so changing a skin rebuilds only that session.
+- Automatic skin resolution: when no cached PNG exists, Kalo reads the player's signed
+  `textures` profile property, fetches the skin from an allowlisted host, caps the response
+  at 1 MiB, validates the PNG signature and writes the cache atomically. The cached PNG
+  records its source URL, so a changed skin is fetched again instead of serving stale
+  bytes. At Bedrock login,
+  the cached skin is applied to every body-emote texture path, so the first discovery is
+  used from the next pack negotiation. Fetching is disabled with
+  `emotes.skin-fetch: false`; the allowlist and timeout live under `emotes`.
+- Player-body emotes: `rig: player` and `skin:` compile a Blockbench player rig into
+  per-bone Java displays and a Bedrock client entity/attachable with the baked skin. The
+  vanilla body is hidden while the emote plays and restored on stop. Java body rigs now
+  reference a unique `emote/<name>_skin` texture, and a small per-player resource-pack
+  overlay replaces that path with the player's cached/fetched skin. The optional overlay is
+  stacked on top of the global pack under a stable per-player pack id; Relay and no-host
+  modes keep the authored skin.
+- Bezier keyframe interpolation: Blockbench per-axis `bezier_*_time`/`bezier_*_value`
+  handles are parsed into the model IR. Java solves the cubic curve for the requested
+  time; Bedrock has no cubic keyframes, so each segment is baked into intermediate linear
+  keys with an INFO diagnostic. Step keys switch exactly at their key time.
+- Catmull-Rom keyframes: Java samples the uniform spline with the immediate neighbouring
+  keys, matching the generated Bedrock `lerp_mode: catmullrom`; endpoints duplicate the
+  nearest key. Runtime and generated-pack tests cover the neighbour-dependent curve.
+- Full controller Molang: state variables with linear remap curves, arithmetic, ternaries,
+  comparisons, `math.*` functions and animation blend weights are evaluated on Java and
+  written unchanged for Bedrock. Blended Java poses use component-wise linear weights.
+- Liquids: `type: liquid` defines water/lava rules (color, potion effect, damage,
+  fireproof). Volumes are saved to `plugins/Kalo/liquids.json`; `/kalo liquid corner` +
+  `fill` mark one, and a `liquid:` bucket item places a source block. Empty-bucket pickup
+  removes and trims a volume and returns the custom bucket; fluid flow expands/trims saved
+  volumes. Sponge absorption trims the absorbed region, and placing, breaking or a physics
+  update inside a marked volume trims that cell; breaking a bank outside the volume leaves
+  the pool marked and flow expands it. Handler priority, trim idempotence and
+  order-independence are covered by `LiquidRuntimeTest`. Colored liquids get one biome in an owned
+  `datapacks/kalo-liquids` pack, and contact is checked once a second.
+- Clean-room access history: a read-only session-store query showed the original
+  development session referenced 89 RP Engine Java files and had a full 747-file source tree
+  plus a 205-file docs site on disk. Those artifacts are now quarantined with tree digests.
+  Re-audits against the actual tree, the 66 docs Java code blocks and docs prose report
+  0.062, 0.016 and 0.002 top similarity, with no pair at 0.15. See
+  `docs/clean-room-access-history-2026-11-19.md`.
+- Clean-room full-tree audit: RP Engine 0.2.90 (commit `60be18c`) was cloned into the
+  root-only quarantine and compared against 370 Kalo main sources, 137 test sources and 5
+  text resources. Top pairs: main code 0.062, main comments 0.030, test code 0.052, test
+  comments 0.074, resources 0.102 — no pair at the 0.15 review threshold. A distribution
+  guard (`scripts/clean-room-guard.py`) now runs in CI and before release, failing any jar
+  with RP Engine packages, embedded GPL text or a non-`io.kalo` main class. Full MIT remains
+  the project direction; legal certification is still an external review item.
+- Clean-room rewrite: fresh-context implementers rewrote the reviewed comments/javadoc and
+  replaced the NMS camera transport from a behaviour contract without reading the prior
+  implementation. The executable code in the comment-only files was token-verified
+  unchanged; targeted tests pass and the provenance audit still reports 0 high-risk pairs.
+- Clean-room provenance: six RP Engine reference files found under `/tmp` are quarantined
+  outside the repository. A reproducible audit reports 2,220 pairs and no high-risk literal
+  copy; two independent reviewers, denied access to the reference files, found the top API
+  and geometry pairs independently written from public specs and required no rewrite.
+  Remaining comment-level, access-history and legal checks are recorded in
+  `docs/CLEAN_ROOM.md`.
+- Live Bedrock check: a separate Canvas 1.21.11 + Geyser 2.12.1 server and a
+  Bedrock 1.26.60 protocol client confirmed Kalo's staged pack identity/size, VFX sprite
+  entities, the camera-sprite entity and the model entity. The check also fixed three
+  startup regressions: duplicate `kalo vehicle`/`kalo spawn` command chains, colored-liquid
+  biome JSON missing fields required by 1.21.11, and `setBiome` being called from the
+  server thread during enable on Folia/Canvas. Java camera packets are not translated by
+  Geyser. A follow-up mob-free void run isolated acid contact damage as five-point health
+  drops (`damage: 5.0`), with natural regeneration between ticks.
+- VFX: `type: vfx` loads one of ten named presets, an inline Studio-style recipe or a
+  JSON recipe file. Motes layers are cleaned and capped, colored sprite textures and item
+  models are written into the generated Java pack, and a deterministic simulation drives
+  non-persistent item displays. Recipe sound events play on the timeline; loop casting
+  supports build-up/repeat/fade, `loop:<n>x`, `loop:<time>`, graceful stop, tags and
+  `end:cut`. Cast options add speed, scale, follow, offset, turn, delay, seed,
+  `only:caster`, and `until`/`while`/`check` conditions. Unknown condition names fall back
+  to PlaceholderAPI while built-ins keep priority. `camera` layers anchor sprite bursts
+  to the caster's eyes and view direction, and `model` layers place a real item model for
+  their time window with scale, rotation and spin. The `vfx.max-sprites` planned-sprite
+  budget stops the oldest casts first. Bedrock gets generated client-entity geometry,
+  entity definitions and textures; spawn/move/remove events are sent through Geyser, with
+  `only:caster` filtering the Bedrock viewer and the cast `scale` delivered as `SCALE`
+  entity metadata so Bedrock matches Java's display scaling. Camera layers attach the Java
+  client camera through a reflective `ClientboundSetCameraPacket` seam with a no-op
+  fallback; `fov` is a dolly approximation because vanilla Java has no FOV packet. Model
+  layers compile to Bedrock client entities from sprite, custom Java and Blockbench item
+  models and spawn/move/remove through the same VFX rig seam; a model layer's `roll` is
+  baked into a wrapper bone so Bedrock matches Java's Z rotation. `/kalo vfx <name>` casts
+  one; `/kalo vfx stop` ends it.
+- Dialogs: `type: dialog` builds a Java multi-action dialog and writes it to an owned
+  `datapacks/kalo-dialogs` pack; `/kalo dialog <name>` opens it for a player and
+  `/kalo dialog open <player> <name>` targets someone else. Buttons support player or
+  console commands (single or up to 16 per button), HTTPS URLs, copy, suggest, nested
+  dialogs and close. Commands are sent as authorized `/kalo click <key>` routes, not in
+  the client payload. Tooltips, widths, `can-close-with-escape`, `after` modes and raw
+  Java dialog JSON (`json:` + `console-commands`) are supported. Titles, bodies, labels
+  and tooltips resolve `{player}`/`{target}` at open time through an inline dialog command;
+  the generated data pack remains the fallback. The same definition becomes a Cumulus
+  Bedrock form when Floodgate/Geyser shares the server.
+- HUD overlays: `type: hud` binds an image to a Private Use Area glyph, compiles a Java
+  font provider and a Bedrock glyph page, and `/kalo hud <name>` draws it on the action
+  bar or boss bar. `offset` adds a positive or negative pixel shift through a Java space
+  provider and a scaled shift inside the Bedrock glyph cell. Boss-bar HUDs persist until
+  `/kalo hud stop`; action-bar HUDs refresh once a second. The HUD key can also be
+  permission-gated through `session-content`.
+- Extended Molang statements: assignments and mutable structs, single-quoted strings and
+  equality, `loop`/`for_each` with `break`/`continue`, `??`, the `->` entity operator
+  through `EntityResolver`, and multi-statement expressions with `return`. Controller JSON
+  preserves the full expressions, including loop/struct bodies.
+- Arrays in Molang: array literals and environment arrays support Molang indexing
+  (C-style cast, negative clamp, large-index wrap), and `query.count` counts array elements.
+  `math.random`/`math.random_integer` use a caller-supplied or expression-seeded
+  deterministic source. External `query.*` functions, including argument-aware ones, use a
+  `QueryResolver`; controller JSON preserves every expression unchanged.
+- Blockbench animation controllers: `animation_controllers` from a project compile into
+  Bedrock controller JSON and auto-start on the entity/attachable. Java runs a state machine
+  over the same transitions and selects the active state's clips through the per-bone rigs;
+  conditions support query flags, `!`, `&&`, `||`, parentheses and numeric comparisons.
+- Vehicle medium handling: `medium: land|water|air` with configurable buoyancy, gravity,
+  climb-speed and collision. Water vehicles rise at the surface, air vehicles climb while
+  jump is held and otherwise descend, and land vehicles stop at solid blocks instead of
+  driving through them.
+- Vehicles: `type: vehicle` spawns an invisible real carrier (armour stand by default),
+  one marker stand per declared seat, a Java display and a Bedrock client entity. Seat zero
+  drives through Paper 1.21.4 `PlayerInput` (W/S throttle, A/D turn, sneak dismount);
+  right-click fills the next free seat. `seats: 3` makes a centred row and a YAML seat list
+  sets each offset explicitly. Medium handling is basic; real client verification remains.
+- Emote props: `type: emote` plus `/kalo emote <name>` spawns a Blockbench prop that follows
+  the player for its duration (or until sneaking), with a Bedrock client entity and Java
+  display. This is a prop emote, not a re-skinned player body.
+- Custom mobs: `type: mob` loads a real base `LivingEntity`, applies name/health and
+  compiles the Blockbench model to Bedrock geometry/entity/animation plus a Geyser client
+  entity. Java hides the base body and follows it with a display rig; Bedrock receives
+  spawn/move/remove packets. `/kalo spawn <mob>` creates one.
+- Worn 3D armor: `armor_model:` compiles a Blockbench player-frame model to a Java model
+  and a Bedrock attachable bound to the vanilla armor bones, hiding the flat equipment
+  layer on both platforms. Java follows the wearer with a display rig.
+- Block/furniture animation runtime: an animated Blockbench block or furniture model is
+  automatically placed through virtual display entities (unless `java.mode: native` is
+  explicit). Java renders one `ItemDisplay` per bone and samples authored loop keyframes at
+  two-tick intervals; Bedrock gets animation/entity JSON, a client-entity registration and a
+  transparent terrain texture so the static block does not double-draw. The block surface
+  is restored for explicitly native blocks. Older native placements are not migrated;
+  break and replace them once after upgrading.
+- Per-session Bedrock packs: each XUID is served its own deterministic
+  `bedrock-packs/<xuid>.mcpack` containing a `kalo-session.json` marker with the source
+  SHA-256. Staging is idempotent, rebuilds only when `generated.mcpack` changes, and after
+  a rebuild online sessions holding the old revision are transferred through their join
+  address so the next login reads the new copy. `bedrock-packs.per-player` and
+  `bedrock-packs.transfer` control both behaviours.
+- Session-scoped Bedrock contents: the compiler writes `kalo-content.json`, mapping every
+  generated asset to its owning content key. `bedrock-packs.session-content` can then give
+  an XUID only selected namespaces or full keys; unlisted sessions still receive
+  everything. Filtering is applied at staging and included in the session digest, so two
+  sessions cannot receive each other's filtered model, animation or texture files.
+  Shared atlases and manifests remain common.
+- Gameplay entitlements: `session-content.permissions` maps a content key (or namespace
+  wildcard) to a permission node. The node is checked when staging that session's pack and
+  by Java gates for give, pickup, use, placement, crafting, vehicle/mob spawning and
+  emotes. The permission outcome is part of the session digest; existing placed/spawned
+  state is not retroactively removed.
+- `model.blockbench` YAML support for items, blocks and furniture, with optional texture
+  overrides keyed by Blockbench texture id, name, UUID or path.
+- Content-addressed `ModelRegistry` cache (SHA-256 fingerprint) shared by both compilers;
+  changed model bytes invalidate on the next generation without a restart.
+- Classloader-safe Bedrock Forms guard: Floodgate/Geyser are detected before the Cumulus
+  bridge class is loaded, so Java-only and Velocity-proxy backends keep working.
+- DeluxeMenus Forms bridge: with Geyser present, DeluxeMenus inventory opens can be
+  rendered as Cumulus forms instead of Java chest menus.
+- GUI head icons: custom skull textures from DeluxeMenus menus are scanned and compiled
+  into Bedrock form images, sharing one resolver with the Java menu path.
+- Tests for the importer, both compilers, registry cache/path safety, block/item pipeline
+  integration, YAML parsing and optional-form provider selection.
+
+### Changed
+
+- Align the site version metadata with the actual pre-alpha build version.
+- Correct Bedrock deployment guidance for Geyser on Velocity or a standalone process,
+  including the file-export path and the fact that no proxy JVM API is called.
+- Document the exact static Java-model and Blockbench conversion limits.
+- Clarify that the Paper API baseline is 1.21.4 and that the 26.2 run-server target is not
+  the minimum supported API version.
+
+### Fixed
+
+- Bedrock cube and bone rest rotations now follow Blockbench's Java-to-Bedrock rule:
+  X and Y are negated and Z keeps its authored sign. The previous Y sign was wrong for
+  rotated geometry.
+- A player-skin fetch removed its in-flight marker before invoking the completion
+  callback, so a changed profile URL requested from that callback could fetch again
+  instead of being silently dropped and timing out.
+
+### Limitations
+
+- Placed-model parity is a first slice: Java has a chunk-saved display entity and hitbox,
+  Bedrock has a spawned client entity and authored animations. Per-bone Java animation and
+  hitbox-per-bone remain unimplemented; seats, storage and light/solid/model state cycling
+  are implemented. Reflection against Geyser's internal session/packet API is guarded but
+  requires real-client verification.
+- Held Blockbench item animations are wired to Bedrock attachables; animated
+  blocks/furniture and placed models play loop animations on both platforms, and both play
+  a configured one-shot interaction clip, including mobs and worn armor. Provider-specific
+  Molang query catalogs and entity references remain host supplied as described above.
+- Box-UV models, mesh elements, texture meshes and layered/emissive texture modes remain
+  unsupported; variables, remaps, arithmetic, ternaries, comparisons, arrays, structs,
+  strings, loops, deterministic random, external queries, the `->` operator, `??`,
+  multi-statement expressions, common `math.*` functions and blend weights are evaluated
+  on Java.
+- Blockbench imports are unit-tested against synthetic fixtures but not a corpus of real
+  projects, and static/animated Bedrock rendering still requires real-client verification.
+- The 1.21.4 end of the supported range is compiled against but remains runtime-untested.
+
 ## 0.2.1-prealpha.7
 
 ### Added

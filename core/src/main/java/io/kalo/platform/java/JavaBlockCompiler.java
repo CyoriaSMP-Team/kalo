@@ -120,6 +120,43 @@ public final class JavaBlockCompiler {
                 // block state pointing at it is generated.
                 return custom.model();
             }
+            case BlockModelDefinition.Blockbench blockbench -> {
+                io.kalo.model.ModelIR imported;
+                try {
+                    imported = io.kalo.model.ModelRegistry.load(pack, blockbench.source());
+                } catch (java.io.IOException | io.kalo.model.ModelImportException error) {
+                    throw new IllegalStateException("Cannot read Blockbench model "
+                            + blockbench.source().asString() + ": " + error.getMessage(), error);
+                }
+                String stem = key.namespace() + "_" + key.value();
+                io.kalo.model.java.JavaModelCompiler.Result compiled =
+                        io.kalo.model.java.JavaModelCompiler.compile(imported,
+                                blockbench.textures(), key.namespace(), stem);
+                io.kalo.model.ModelDiagnostics.log(LOGGER,
+                        "Blockbench block model for " + key.asString(), compiled.diagnostics());
+                if (!compiled.compiled()) {
+                    throw new IllegalStateException(compiled.errorSummary());
+                }
+                for (io.kalo.model.ModelTextureResolver.ResolvedTexture texture
+                        : compiled.textures()) {
+                    if (texture.embeddedPng() != null) {
+                        pack.file(texturePath(texture.key()),
+                                io.kalo.pack.Writable.bytes(texture.embeddedPng()));
+                    } else if (pack.file(texturePath(texture.key())) == null
+                            && pack.file(texturePath(texture.key()) + ".mcmeta") == null) {
+                        throw new IllegalStateException("Blockbench texture "
+                                + texture.key().asString() + " is missing from the pack");
+                    }
+                }
+                pack.file(modelPath(modelKey), Json.writable(compiled.model()));
+                BlockbenchRigRegistry.Rig rig = BlockbenchBoneRigCompiler.compile(pack,
+                        key, imported, blockbench.textures(), stem, "block", LOGGER,
+                        "block " + key.asString());
+                if (rig != null) {
+                    BlockbenchRigRegistry.put(rig);
+                }
+                return modelKey;
+            }
         }
         return modelKey;
     }
@@ -217,6 +254,10 @@ public final class JavaBlockCompiler {
 
     private static @NotNull String modelPath(@NotNull Key key) {
         return "assets/" + key.namespace() + "/models/" + key.value() + ".json";
+    }
+
+    private static @NotNull String texturePath(@NotNull Key key) {
+        return "assets/" + key.namespace() + "/textures/" + key.value() + ".png";
     }
 
     private static @NotNull String itemDefinitionPath(@NotNull Key key) {

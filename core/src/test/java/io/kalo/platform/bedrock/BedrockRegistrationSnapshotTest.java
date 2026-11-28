@@ -76,4 +76,68 @@ class BedrockRegistrationSnapshotTest {
         assertTrue(read.isPresent());
         assertEquals("mypack:current", read.get().blocks().getFirst().javaKey());
     }
+
+    @Test
+    void placedModelRegistrationsTravelWithTheSameGeneration() {
+        var generation = BedrockRegistrationSnapshot.beginGeneration();
+        var placed = new BedrockPlacedModelRegistration(
+                net.kyori.adventure.key.Key.key("mypack", "chair"),
+                "kalo:model_mypack_chair",
+                "geometry.kalo.mypack_chair.placed",
+                "textures/items/mypack_chair_t0",
+                Map.of("swing", "animation.kalo.mypack_chair.swing"),
+                List.of("swing"), 1.5);
+        BedrockRegistrationSnapshot.publishSuccess(generation,
+                List.of(block("mypack:ruby")), List.of(), List.of(placed));
+
+        var read = BedrockRegistrationSnapshot.await(Duration.ofSeconds(1)).orElseThrow();
+        assertEquals(1, read.placedModels().size());
+        assertEquals("kalo:model_mypack_chair",
+                read.placedModels().getFirst().entityIdentifier());
+    }
+
+    @Test
+    void vehicleAndEmoteRigsTravelWithTheSameGeneration() {
+        var generation = BedrockRegistrationSnapshot.beginGeneration();
+        var rig = new BedrockRigRegistration(
+                net.kyori.adventure.key.Key.key("mypack", "speeder"),
+                "kalo:vehicle_mypack_speeder_vehicle");
+        BedrockRegistrationSnapshot.publishSuccess(generation,
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(rig));
+
+        var read = BedrockRegistrationSnapshot.await(Duration.ofSeconds(1)).orElseThrow();
+        assertEquals(1, read.rigs().size());
+        assertEquals("kalo:vehicle_mypack_speeder_vehicle",
+                read.rigs().getFirst().entityIdentifier());
+    }
+
+    @Test
+    void mobRegistrationsTravelWithTheSameGeneration() {
+        var generation = BedrockRegistrationSnapshot.beginGeneration();
+        var mob = new BedrockMobRegistration(
+                net.kyori.adventure.key.Key.key("mypack", "golem"),
+                "kalo:mob_mypack_golem");
+        BedrockRegistrationSnapshot.publishSuccess(generation,
+                List.of(), List.of(), List.of(), List.of(), List.of(mob));
+
+        var read = BedrockRegistrationSnapshot.await(Duration.ofSeconds(1)).orElseThrow();
+        assertEquals(1, read.mobs().size());
+        assertEquals("kalo:mob_mypack_golem",
+                read.mobs().getFirst().entityIdentifier());
+    }
+
+    @Test
+    void animatedBlockRegistrationsTravelWithTheSameGeneration() {
+        var generation = BedrockRegistrationSnapshot.beginGeneration();
+        var animated = new BedrockAnimatedBlockRegistration(
+                net.kyori.adventure.key.Key.key("mypack", "fan"),
+                "kalo:block_mypack_fan");
+        BedrockRegistrationSnapshot.publishSuccess(generation,
+                List.of(block("mypack:fan")), List.of(), List.of(), List.of(animated));
+
+        var read = BedrockRegistrationSnapshot.await(Duration.ofSeconds(1)).orElseThrow();
+        assertEquals(1, read.animatedBlocks().size());
+        assertEquals("kalo:block_mypack_fan",
+                read.animatedBlocks().getFirst().entityIdentifier());
+    }
 }

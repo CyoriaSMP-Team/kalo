@@ -3,6 +3,7 @@ package io.kalo.platform.java;
 import io.kalo.content.block.Block;
 import io.kalo.content.block.definition.BlockCarrier;
 import io.kalo.content.block.definition.JavaBlockMode;
+import io.kalo.integration.GeyserIntegration;
 import io.kalo.manager.RegistryManager;
 import io.kalo.performance.RuntimeBudget;
 import io.kalo.utils.Constants;
@@ -31,13 +32,16 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -75,6 +79,8 @@ public final class JavaBlockListener implements Listener {
     /** Renderer lookup is O(1); the entity UUID is not persistent Kalo state. */
     private final ConcurrentHashMap<BlockAddress, UUID> renderedDisplays = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkAddress, Set<BlockAddress>> renderedByChunk = new ConcurrentHashMap<>();
+    /** Per-bone Java display rigs for animated Blockbench blocks and furniture. */
+    private final ConcurrentHashMap<BlockAddress, RigInstance> rigs = new ConcurrentHashMap<>();
 
     public JavaBlockListener(@NotNull BlockStateAllocator allocator,
                              @NotNull VirtualBlockStore virtualBlocks) {
@@ -170,8 +176,17 @@ public final class JavaBlockListener implements Listener {
         }
     }
 
-    private @NotNull ItemDisplay spawnOrRefreshVirtualDisplay(@NotNull org.bukkit.block.Block placed,
-                                                               @NotNull Block block) {
+    private void spawnOrRefreshVirtualDisplay(@NotNull org.bukkit.block.Block placed,
+                                              @NotNull Block block) {
+        BlockbenchRigRegistry.Rig rig = BlockbenchRigRegistry.get(block.key());
+        if (rig != null && rig.animateable() && rig.hasLoops()) {
+            spawnOrRefreshRig(placed, block, rig);
+            announceBedrockBlock(placed, block);
+            return;
+        }
+        // A reload can turn an animated block back into a static one; drop the old rig.
+        removeRig(BlockAddress.of(placed));
+
         ItemDisplay existing = findVirtualDisplay(placed, false);
         if (existing != null) {
             existing.setItemStack(block.itemStack().get());
@@ -180,7 +195,8 @@ public final class JavaBlockListener implements Listener {
             existing.getPersistentDataContainer().set(
                     VIRTUAL_BLOCK_ID_KEY, PersistentDataType.STRING, block.key().asString());
             trackDisplay(placed, existing);
-            return existing;
+            announceBedrockBlock(placed, block);
+            return;
         }
 
         Location location = placed.getLocation().add(0.5, 0.5, 0.5);
@@ -197,7 +213,209 @@ public final class JavaBlockListener implements Listener {
                     VIRTUAL_BLOCK_ID_KEY, PersistentDataType.STRING, block.key().asString());
         });
         trackDisplay(placed, display);
-        return display;
+        announceBedrockBlock(placed, block);
+    }
+
+    /**
+     * Spawns one {@link ItemDisplay} per bone and remembers the pivots and clips that
+     * drive them. Every display is placed at the block centre; a bone's authored pivot is
+     * applied as a transform correction, so the rest pose is identical to the static
+     * model.
+     */
+    private void spawnOrRefreshRig(@NotNull org.bukkit.block.Block placed,
+                                   @NotNull Block block,
+                                   @NotNull BlockbenchRigRegistry.Rig rig) {
+        BlockAddress address = BlockAddress.of(placed);
+        UUID previous = renderedDisplays.remove(address);
+        if (previous != null) {
+            Entity stale = Bukkit.getEntity(previous);
+            if (stale != null) {
+                stale.remove();
+            }
+        }
+        removeRig(address);
+
+        Location center = placed.getLocation().add(0.5, 0.5, 0.5);
+        // Remove every renderer at this block, not just the one in the lookup map. A
+        // plugin reload can leave a previous single display or a partial rig behind.
+        for (Entity entity : placed.getWorld().getNearbyEntities(center,
+                0.45, 0.45, 0.45, candidate -> candidate instanceof ItemDisplay)) {
+            if (entity.getPersistentDataContainer().has(VIRTUAL_BLOCK_ID_KEY,
+                    PersistentDataType.STRING)) {
+                entity.remove();
+            }
+        }
+        List<RigBone> bones = new ArrayList<>();
+        for (BlockbenchRigRegistry.BoneRig bone : rig.bones()) {
+            ItemStack stack = boneStack(bone.modelKey());
+            ItemDisplay display = center.getWorld().spawn(center, ItemDisplay.class, spawned -> {
+                spawned.setItemStack(stack);
+                spawned.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+                spawned.setPersistent(false);
+                spawned.setViewRange(displayViewRange);
+                spawned.setInvulnerable(true);
+                spawned.setGravity(false);
+                spawned.setSilent(true);
+                // Two-tick client interpolation matches the sampler period.
+                spawned.setInterpolationDuration(2);
+                spawned.getPersistentDataContainer().set(VIRTUAL_BLOCK_ID_KEY,
+                        PersistentDataType.STRING, block.key().asString());
+            });
+            bones.add(new RigBone(display.getUniqueId(), bone.boneId(), bone.pivot()));
+        }
+        io.kalo.content.block.definition.BlockAnimation animation =
+                block.definition().animation();
+        List<io.kalo.model.animation.ModelAnimations.Clip> idle = rig.animations();
+        io.kalo.model.animation.ModelAnimations.Clip namedIdle = animation == null
+                ? null : io.kalo.model.animation.ModelAnimations.find(idle,
+                animation.idle());
+        if (namedIdle != null) {
+            idle = List.of(namedIdle);
+        }
+        RigInstance instance = new RigInstance(System.nanoTime(), idle,
+                rig.allAnimations(), rig.bones(), List.copyOf(bones),
+                io.kalo.platform.java.RigControllers.create(rig.controllers(),
+                        rig.allAnimations()));
+        instance.task = Bukkit.getRegionScheduler().runAtFixedRate(
+                io.kalo.utils.Plugins.plugin(), center,
+                ignored -> tickRig(address), 2L, 2L);
+        rigs.put(address, instance);
+        renderedByChunk.computeIfAbsent(address.chunk(),
+                ignored -> ConcurrentHashMap.newKeySet()).add(address);
+    }
+
+    /** One {@code ItemDisplay} payload whose item model is a single bone's cubes. */
+    private static @NotNull ItemStack boneStack(@NotNull Key modelKey) {
+        ItemStack stack = new ItemStack(Material.PAPER);
+        stack.setData(io.papermc.paper.datacomponent.DataComponentTypes.ITEM_MODEL, modelKey);
+        return stack;
+    }
+
+    /**
+     * Runs on the region that owns this block every two ticks. Sampled poses are applied
+     * to the per-bone displays; the client interpolates between them.
+     */
+    private void tickRig(@NotNull BlockAddress address) {
+        RigInstance rig = rigs.get(address);
+        if (rig == null) {
+            return;
+        }
+        long now = System.nanoTime();
+        io.kalo.model.animation.ModelAnimations.Pose pose =
+                new io.kalo.model.animation.ModelAnimations.Pose(java.util.Map.of());
+        if (rig.activeClip != null) {
+            double elapsed = (now - rig.activeStartNanos) / 1_000_000_000.0;
+            if (rig.activeClip.finished(elapsed)) {
+                rig.activeClip = null;
+            } else {
+                pose = rig.activeClip.sampleOnce(elapsed);
+            }
+        }
+        if (rig.activeClip == null) {
+            double elapsed = (now - rig.startedAtNanos) / 1_000_000_000.0;
+            if (!rig.controllers.isEmpty()) {
+                io.kalo.model.animation.ControllerRuntime.Signals signals =
+                        new io.kalo.model.animation.ControllerRuntime.Signals(
+                                false, true, false, false, false, false, elapsed, 0);
+                pose = io.kalo.platform.java.RigControllers.sample(rig.controllers,
+                        signals, 0.1, elapsed);
+            }
+            if (pose.bones().isEmpty()) {
+                for (io.kalo.model.animation.ModelAnimations.Clip clip : rig.idleClips) {
+                    pose = pose.merge(clip.sample(elapsed));
+                }
+            }
+        }
+        java.util.Map<String, org.bukkit.util.Transformation> transforms =
+                BlockbenchRigTransforms.pose(rig.boneRigs, pose, 1.0, 0.0);
+        for (RigBone bone : rig.bones) {
+            Entity entity = Bukkit.getEntity(bone.entityId());
+            if (!(entity instanceof ItemDisplay display) || !display.isValid()) {
+                // The chunk went away without an unload event reaching us; the store
+                // will rebuild the rig on the next load.
+                removeRig(address);
+                return;
+            }
+            org.bukkit.util.Transformation transform = transforms.get(bone.boneId());
+            if (transform != null) {
+                display.setTransformation(transform);
+            }
+        }
+    }
+
+    /**
+     * Plays an interaction clip once on the per-bone rig; idle loops resume when it ends.
+     */
+    private boolean startInteraction(@NotNull org.bukkit.block.Block block,
+                                     @NotNull String animation) {
+        RigInstance rig = rigs.get(BlockAddress.of(block));
+        if (rig == null) {
+            return false;
+        }
+        io.kalo.model.animation.ModelAnimations.Clip clip =
+                io.kalo.model.animation.ModelAnimations.find(rig.allClips, animation);
+        if (clip == null) {
+            return false;
+        }
+        rig.activeClip = clip;
+        rig.activeStartNanos = System.nanoTime();
+        return true;
+    }
+
+    private void removeRig(@NotNull BlockAddress address) {
+        RigInstance rig = rigs.remove(address);
+        if (rig == null) {
+            return;
+        }
+        if (rig.task != null) {
+            rig.task.cancel();
+        }
+        for (RigBone bone : rig.bones) {
+            Entity entity = Bukkit.getEntity(bone.entityId());
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+    }
+
+    private static void announceBedrockBlock(@NotNull org.bukkit.block.Block placed,
+                                             @NotNull Block block) {
+        GeyserIntegration.support().blockPlaced(placed.getWorld().getUID(),
+                placed.getX(), placed.getY(), placed.getZ(), block.key().asString());
+    }
+
+    private record RigBone(@NotNull UUID entityId, @NotNull String boneId,
+                           @NotNull io.kalo.model.ModelIR.Vec3 pivot) {
+    }
+
+    private static final class RigInstance {
+        private final long startedAtNanos;
+        private final List<io.kalo.model.animation.ModelAnimations.Clip> idleClips;
+        private final List<io.kalo.model.animation.ModelAnimations.Clip> allClips;
+        private final List<BlockbenchRigRegistry.BoneRig> boneRigs;
+        private final List<RigBone> bones;
+        private final List<io.kalo.model.animation.ControllerRuntime> controllers;
+        private io.papermc.paper.threadedregions.scheduler.ScheduledTask task;
+        private io.kalo.model.animation.ModelAnimations.Clip activeClip;
+        private long activeStartNanos;
+
+        private RigInstance(long startedAtNanos,
+                            List<io.kalo.model.animation.ModelAnimations.Clip> idleClips,
+                            List<io.kalo.model.animation.ModelAnimations.Clip> allClips,
+                            List<BlockbenchRigRegistry.BoneRig> boneRigs,
+                            List<RigBone> bones,
+                            List<io.kalo.model.animation.ControllerRuntime> controllers) {
+            this.startedAtNanos = startedAtNanos;
+            this.idleClips = idleClips;
+            this.allClips = allClips;
+            this.boneRigs = boneRigs;
+            this.bones = bones;
+            this.controllers = controllers;
+        }
+
+        private long startedAtNanos() {
+            return startedAtNanos;
+        }
     }
 
     /**
@@ -252,6 +470,16 @@ public final class JavaBlockListener implements Listener {
             event.setCancelled(true);
             if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
                 breakVirtual(clicked, event.getPlayer(), virtual);
+            } else if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                io.kalo.content.block.definition.BlockAnimation animation =
+                        virtual.definition().animation();
+                if (animation != null && animation.interact() != null) {
+                    startInteraction(clicked, animation.interact());
+                    GeyserIntegration.support().blockAnimationStarted(
+                            clicked.getWorld().getUID(), clicked.getX(), clicked.getY(),
+                            clicked.getZ(), virtual.key().asString(),
+                            animation.interact());
+                }
             }
         } else if (JavaBlockRules.preventsTuning(clicked.getType(), event.getAction())
                 && resolve(clicked) != null) {
@@ -387,8 +615,11 @@ public final class JavaBlockListener implements Listener {
 
     private void removeVirtualDisplay(@NotNull org.bukkit.block.Block worldBlock) {
         BlockAddress address = BlockAddress.of(worldBlock);
+        removeRig(address);
         UUID uuid = renderedDisplays.remove(address);
         removeAddressFromChunk(address);
+        GeyserIntegration.support().blockRemoved(worldBlock.getWorld().getUID(),
+                worldBlock.getX(), worldBlock.getY(), worldBlock.getZ());
         if (uuid != null) {
             Entity entity = Bukkit.getEntity(uuid);
             if (entity instanceof ItemDisplay display) {
@@ -475,7 +706,12 @@ public final class JavaBlockListener implements Listener {
         ChunkAddress chunkAddress = new ChunkAddress(chunk.getWorld().getUID(), chunk.getX(), chunk.getZ());
         Set<BlockAddress> addresses = renderedByChunk.remove(chunkAddress);
         if (addresses != null) {
-            addresses.forEach(renderedDisplays::remove);
+            for (BlockAddress address : addresses) {
+                removeRig(address);
+                renderedDisplays.remove(address);
+                GeyserIntegration.support().blockRemoved(chunk.getWorld().getUID(),
+                        address.x(), address.y(), address.z());
+            }
         }
         // Renderer entities are non-persistent; the store survives and recreates them on
         // the next load of this chunk.

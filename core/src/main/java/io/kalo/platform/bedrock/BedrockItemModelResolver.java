@@ -23,6 +23,8 @@ import java.util.Set;
  *
  * Bedrock does not inherit Java model files, so an unresolved parent with no
  * local geometry cannot be converted. Parent cycles and excessive depth fail safe.
+ * Display transforms are carried from the nearest model that declares them so held-item
+ * hold animations use the author's own Blockbench display settings.
  */
 final class BedrockItemModelResolver {
     private BedrockItemModelResolver() {}
@@ -67,6 +69,9 @@ final class BedrockItemModelResolver {
             }
             if (level.has("texture_size")) {
                 flattened.add("texture_size", level.get("texture_size").deepCopy());
+            }
+            if (level.has("display")) {
+                flattened.add("display", level.get("display").deepCopy());
             }
             if (level.has("elements")) {
                 flattened.add("elements", level.get("elements").deepCopy());

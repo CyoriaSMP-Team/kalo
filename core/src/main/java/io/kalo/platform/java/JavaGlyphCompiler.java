@@ -89,9 +89,9 @@ public final class JavaGlyphCompiler {
      * The providers already in the pack, or vanilla's defaults when writing
      * {@code minecraft:default} for the first time.
      */
-    private static @NotNull JsonArray existingProviders(@NotNull ResourcePack pack,
-                                                        @NotNull String path,
-                                                        @NotNull Key font) {
+    static @NotNull JsonArray existingProviders(@NotNull ResourcePack pack,
+                                                @NotNull String path,
+                                                @NotNull Key font) {
         Writable existing = pack.file(path);
         if (existing != null) {
             try {

@@ -9,6 +9,15 @@ import io.kalo.content.furniture.FurnitureRegistryEntryImpl;
 import io.kalo.content.armor.Armor;
 import io.kalo.content.armor.ArmorRegistryEntry;
 import io.kalo.content.armor.ArmorRegistryEntryImpl;
+import io.kalo.content.mob.Mob;
+import io.kalo.content.mob.MobRegistryEntry;
+import io.kalo.content.mob.MobRegistryEntryImpl;
+import io.kalo.content.emote.Emote;
+import io.kalo.content.emote.EmoteRegistryEntry;
+import io.kalo.content.emote.EmoteRegistryEntryImpl;
+import io.kalo.content.vehicle.Vehicle;
+import io.kalo.content.vehicle.VehicleRegistryEntry;
+import io.kalo.content.vehicle.VehicleRegistryEntryImpl;
 import io.kalo.content.item.Item;
 import io.kalo.content.item.ItemRegistryEntry;
 import io.kalo.content.item.ItemRegistryEntryImpl;
@@ -49,6 +58,21 @@ public class RegistriesImpl implements Registries {
     @Getter @Accessors(fluent = true)
     private final EntryWritableRegistry<Armor, ArmorRegistryEntry> armor = create(
             new EntryScalableRegistry<>(ArmorRegistryEntryImpl::new)
+    );
+
+    @Getter @Accessors(fluent = true)
+    private final EntryWritableRegistry<Mob, MobRegistryEntry> mob = create(
+            new EntryScalableRegistry<>(MobRegistryEntryImpl::new)
+    );
+
+    @Getter @Accessors(fluent = true)
+    private final EntryWritableRegistry<Emote, EmoteRegistryEntry> emote = create(
+            new EntryScalableRegistry<>(EmoteRegistryEntryImpl::new)
+    );
+
+    @Getter @Accessors(fluent = true)
+    private final EntryWritableRegistry<Vehicle, VehicleRegistryEntry> vehicle = create(
+            new EntryScalableRegistry<>(VehicleRegistryEntryImpl::new)
     );
 
     @Getter @Accessors(fluent = true)

@@ -14,7 +14,6 @@ import io.kalo.content.feature.builtin.CooldownFeature;
 import io.kalo.content.feature.builtin.ParticleFeature;
 import io.kalo.content.feature.builtin.SoundFeature;
 import io.kalo.content.item.Item;
-import io.kalo.content.item.ItemImpl;
 import io.kalo.event.RegistryInitializeEvent;
 import io.kalo.utils.Constants;
 import net.kyori.adventure.key.Key;
@@ -150,28 +149,21 @@ public final class ContentManagerImpl implements ContentManager, Managerial, Rel
 
     @Override
     public @NotNull Optional<Item> getItemByStack(@NotNull ItemStack itemStack) {
-        // Single PDC read plus one registry lookup. This used to stream every registered
+        // One identity read plus one registry lookup. This used to stream every registered
         // item and test the stack against each, which is a real per-event cost in an
         // inventory click handler.
-        String id = ItemImpl.idOf(itemStack);
-        if (id == null) {
-            return Optional.empty();
-        }
-        final Key key;
-        try {
-            key = Key.key(id);
-        } catch (RuntimeException ignored) {
-            // Item PDC can be edited by commands/tools; malformed data is not content.
+        Optional<Key> id = io.kalo.Kalo.plugin().items().idOf(itemStack);
+        if (id.isEmpty()) {
             return Optional.empty();
         }
 
         RegistryManager.GlobalRegistries registries = RegistryManager.GlobalRegistries.registries();
-        Item item = registries.item().get(key).orElse(null);
+        Item item = registries.item().get(id.get()).orElse(null);
         if (item != null) {
             return Optional.of(item);
         }
         // Armor has an item form and carries the same item id marker, but lives in its
         // own registry so a lookup limited to item() made it invisible to this API.
-        return registries.armor().get(key).map(Item.class::cast);
+        return registries.armor().get(id.get()).map(Item.class::cast);
     }
 }

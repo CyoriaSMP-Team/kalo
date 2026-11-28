@@ -22,6 +22,10 @@ Build once. Play everywhere. No paywalls. No player caps.
 - [[GUIs]] — Server-side inventory menus
 - [[Sounds]] — Custom sound events
 - [[Glyphs]] — Custom font characters
+- [[HUDs]] — Image overlays on the action bar or boss bar
+- [[Dialogs]] — Server-side menus with buttons, on Java and Bedrock
+- [[VFX]] — Item-display spell and ability effects
+- [[Liquids]] — Water or lava with rules and saved volumes
 - [[Recipes]] — Crafting and smelting recipes
 
 ## 🌏 Platform
@@ -48,9 +52,9 @@ Build once. Play everywhere. No paywalls. No player caps.
 
 ---
 
-> **Status:** Pre-alpha (v0.1.0)
+> **Status:** Pre-alpha (v0.2.1-prealpha.16)
 > **License:** MIT
-> **Java:** 21+ (Paper 1.21.4) / 25 (Paper 26.2)
+> **Java:** 21 bytecode / 25 for 26.x runtime
 
 ---
 
@@ -60,6 +64,6 @@ Build once. Play everywhere. No paywalls. No player caps.
 
 [GitHub](https://github.com/CyoriaSMP-Team/kalo) • [Issues](https://github.com/CyoriaSMP-Team/kalo/issues) • [Discord](https://discord.gg/kalo) (coming soon)
 
-> **Version:** 0.1.0 • **License:** MIT • **Java:** 21+ / 25
+> **Version:** 0.2.1-prealpha.16 • **License:** MIT • **Java:** 21 bytecode / 25 for 26.x runtime
 
 *Build once. Play everywhere.*

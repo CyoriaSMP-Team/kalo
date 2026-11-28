@@ -75,9 +75,7 @@ public final class PackValidator {
 
         if (path.contains("/items/") || path.contains("/blockstates/")) {
             for (String model : valuesOf(content, "model")) {
-                if (!model.startsWith("minecraft:")) {
-                    requireModel(path, model, files, problems);
-                }
+                requireModel(path, model, files, problems);
             }
         }
 
@@ -103,12 +101,17 @@ public final class PackValidator {
                                        @NotNull String texture,
                                        @NotNull Map<String, Writable> files,
                                        @NotNull List<String> problems) {
-        if (texture.startsWith("minecraft:")) {
-            // Vanilla textures are in the client, not in this pack.
+        // A #name is a texture variable resolved within the JSON model, not an asset path.
+        if (texture.startsWith("#")) {
             return;
         }
         String[] parts = split(texture);
         String expected = "assets/" + parts[0] + "/textures/" + parts[1] + ".png";
+        // Unqualified names resolve to minecraft: too. The client supplies Vanilla assets;
+        // a resource pack does not have to duplicate them just to satisfy a reference.
+        if ("minecraft".equals(parts[0]) && !files.containsKey(expected)) {
+            return;
+        }
         if (!files.containsKey(expected)) {
             problems.add(source + " references texture '" + texture + "' (expected " + expected + ")");
         }
@@ -120,6 +123,10 @@ public final class PackValidator {
                                      @NotNull List<String> problems) {
         String[] parts = split(model);
         String expected = "assets/" + parts[0] + "/models/" + parts[1] + ".json";
+        // The Minecraft client owns Vanilla models, including unqualified item/generated.
+        if ("minecraft".equals(parts[0]) && !files.containsKey(expected)) {
+            return;
+        }
         if (!files.containsKey(expected)) {
             problems.add(source + " references model '" + model + "' (expected " + expected + ")");
         }

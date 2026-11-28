@@ -20,6 +20,8 @@ public final class TestKalo {
         RegistryManagerImpl registries = new RegistryManagerImpl();
         ContentManager contents = ignored -> Optional.empty();
         ResourcePackManager resourcePacks = () -> CompletableFuture.completedFuture(null);
+        io.kalo.items.ItemIdentity items = new io.kalo.items.ItemIdentityImpl(
+                java.nio.file.Path.of("build", "test-external-items.yml"));
 
         Kalo.registerPlugin(new KaloPlugin() {
             @Override
@@ -30,6 +32,11 @@ public final class TestKalo {
             @Override
             public ContentManager contentManager() {
                 return contents;
+            }
+
+            @Override
+            public io.kalo.items.ItemIdentity items() {
+                return items;
             }
 
             @Override
