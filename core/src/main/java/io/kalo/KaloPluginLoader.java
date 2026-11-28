@@ -23,6 +23,9 @@ public final class KaloPluginLoader implements PluginLoader {
         resolver.addRepository(centralRepo);
 
         resolver.addDependency(new Dependency(new DefaultArtifact("org.incendo:cloud-paper:2.0.0"), null));
+        // Runtime for the embedded compat layer. Not shaded: the signatures other plugins link
+        // against mention kotlin.Unit.
+        resolver.addDependency(new Dependency(new DefaultArtifact("org.jetbrains.kotlin:kotlin-stdlib:2.4.21"), null));
 
         return resolver;
     }

@@ -123,6 +123,7 @@ public final class KaloPluginImpl extends JavaPlugin implements KaloPlugin {
         }
         io.kalo.integration.PlaceholderApiIntegration.initialize(this);
         io.kalo.integration.MythicMobsIntegration.initialize(this);
+        io.kalo.compat.KaloCompat.enable(this);
         io.kalo.integration.ModelEngineIntegration.initialize(this);
     }
 

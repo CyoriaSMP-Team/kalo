@@ -89,13 +89,16 @@ Output: `build/libs/Kalo-{version}.jar`
 - `migration` — `OraxenImporter`, `ItemsAdderImporter`, `ImportReport`
 - `registry` — `MappedRegistry`, `DirectScalableRegistry`, `EntryScalableRegistry`
 
-### `nexo-compat` — optional add-on, Kotlin
+### `compat` — embedded compatibility layer, Kotlin
 
-`Kalo-NexoCompat-*.jar`: a separate plugin named `Nexo` that answers the Nexo API
-(`com.nexomc.nexo.api.*`) from Kalo's registries. It is **not** in the main jar and never
-installed beside real Nexo. `KaloItems` is the only class that touches Kalo; `NexoIds` owns the
-Nexo-id to Kalo-key rule. Signatures are pinned by `NexoApiSignatureTest`. See
-`docs/NEXO_COMPAT.md` — unsupported members must fail with `NoSuchMethodError`, never no-op.
+Shaded into the main jar. Where a plugin is a **stand-in for Kalo** (defines the items, blocks,
+furniture or models others consume), Kalo answers its API; plugins that consume Kalo content
+are not impersonated. Names are claimed through `provides` in `core/build.gradle.kts` and must
+match `KaloCompat.PROVIDED_NAMES` — a name is listed only once its API exists. `KaloItems` is
+the only class that touches Kalo; `NexoIds` owns the Nexo-id to Kalo-key rule. Signatures are
+pinned by `NexoApiSignatureTest`; unsupported members must fail with `NoSuchMethodError`, never
+no-op. `kotlin-stdlib` comes from `KaloPluginLoader` and must not be shaded or relocated.
+See `docs/COMPAT.md`.
 
 ## Architecture
 

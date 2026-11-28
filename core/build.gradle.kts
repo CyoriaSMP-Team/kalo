@@ -17,6 +17,8 @@ repositories {
 
 dependencies {
     implementation(project(":api"))
+    // Embedded compatibility layer (Kotlin); its stdlib comes from KaloPluginLoader at runtime.
+    implementation(project(":compat"))
     compileOnly("com.github.bindglam:ConfigLib:1.0.0")
     compileOnly("org.incendo:cloud-paper:2.0.0")
     // Soft dependency: the hook is only touched when the plugin is installed.
@@ -58,6 +60,10 @@ paperPluginYaml {
     apiVersion = property("paper_plugin_api_version").toString()
     author = "Kalo"
     foliaSupported = true
+    // Plugin names Kalo answers to. A real plugin of the same name wins: Paper logs an
+    // "Ambiguous plugin name" error and carries on. Keep in step with KaloCompat.PROVIDED_NAMES;
+    // a name belongs here only once its API exists.
+    provides = listOf("Nexo")
     dependencies {
         // Paper plugins get isolated classloaders, unlike legacy Bukkit ones: without
         // joinClasspath a soft-depended plugin's classes are simply not visible, and the
