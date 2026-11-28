@@ -8,6 +8,12 @@ on:
       tag:
         description: 'Tag to release (e.g. v0.0.1). Created from the current ref if missing.'
         required: true
+        type: string
+      skip_github_release:
+        description: 'Skip GitHub release creation when rerunning external publishers for an existing release'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -153,6 +159,7 @@ jobs:
       # read. --generate-notes alone published a commit list and left the written notes for
       # Modrinth and Hangar only.
       - name: Publish GitHub release
+        if: ${{ !inputs.skip_github_release }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -175,7 +182,7 @@ jobs:
       # Modrinth, Hangar, and MCMall are skipped rather than failed when their credentials
       # are absent, so the release workflow remains usable before every channel is configured.
       - name: Publish to Modrinth
-        if: ${{ env.MODRINTH_TOKEN != '' }}
+        if: ${{ env.MODRINTH_TOKEN != '' && vars.MODRINTH_PROJECT_ID != '' && vars.SUPPORTED_GAME_VERSIONS != '' }}
         env:
           MODRINTH_PROJECT: ${{ vars.MODRINTH_PROJECT_ID }}
           GAME_VERSIONS: ${{ vars.SUPPORTED_GAME_VERSIONS }}
@@ -202,7 +209,7 @@ jobs:
             -F "file=@$jar"
 
       - name: Publish to Hangar
-        if: ${{ env.HANGAR_TOKEN != '' }}
+        if: ${{ env.HANGAR_TOKEN != '' && vars.HANGAR_SLUG != '' }}
         env:
           HANGAR_SLUG: ${{ vars.HANGAR_SLUG }}
           GAME_VERSIONS: ${{ vars.SUPPORTED_GAME_VERSIONS }}
